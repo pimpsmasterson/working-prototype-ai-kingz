@@ -8,9 +8,10 @@ process.env.NODE_ENV = 'test';
 
 function resetDb() {
   try {
-    // Clear audit and usage events and reset warm_pool state row to defaults
+    // Clear audit, usage events, and generated content, and reset warm_pool state row to defaults
     db.db.prepare('DELETE FROM admin_audit').run();
     db.db.prepare('DELETE FROM usage_events').run();
+    db.db.prepare('DELETE FROM generated_content').run();
     db.db.prepare("UPDATE warm_pool SET instance = NULL, desiredSize = 1, lastAction = NULL, isPrewarming = 0, safeMode = 0 WHERE id = 1").run();
 
     // Also reset in-memory warm-pool state (if module loaded in this process)

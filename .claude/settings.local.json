@@ -5,7 +5,9 @@
       "Bash(findstr:*)",
       "Bash(npm run coverage:*)",
       "Bash(npm test:*)",
-      "Bash(npx nyc report:*)"
+      "Bash(npx nyc report:*)",
+      "Bash(node -e:*)",
+      "Bash(timeout 3 node:*)"
     ]
   }
 }

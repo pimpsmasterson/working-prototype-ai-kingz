@@ -149,6 +149,38 @@ WARM_POOL_IDLE_MINUTES=15
 - `POST /api/proxy/warm-pool/prewarm` - Start GPU instance
 - `POST /api/proxy/warm-pool/claim` - Claim running instance
 
+### Generation Endpoints (Image & Video)
+- `POST /api/proxy/generate` - Start a generation job (returns `jobId`)
+  - Body (JSON):
+    - `prompt` (string, required)
+    - `workflowType` (`image` | `video`, default `image`)
+    - `muse` (object, optional): character data (id, name, attributes)
+    - `settings` (object, optional): width, height, steps, cfgScale, sampler, seed, frames, fps, checkpoint
+  - Response: `{ jobId, status: 'pending', message, estimatedTime }`
+
+- `GET /api/proxy/generate/:jobId` - Poll job status and retrieve results
+  - Response: `{ jobId, status, progress, createdAt, result?: { url, thumbnailUrl, metadata } }`
+
+### Gallery Endpoints
+- `GET /api/gallery` - List generated content with filters: `?museId=`, `?status=completed|pending|failed|all`, `?limit=`, `?offset=`
+- `GET /api/gallery/content/:id` - Stream the generated image or video by ID (or `job_id`)
+- `GET /api/gallery/thumbnail/:id` - Stream thumbnail image for content
+- `DELETE /api/gallery/:id` - Delete content (file + DB entry)
+
+Example: Submit an image generation request using curl
+
+```bash
+curl -X POST http://localhost:3000/api/proxy/generate \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"beautiful warrior","workflowType":"image","settings":{"width":512,"height":768}}'
+```
+
+Example: Check job status (replace JOB_ID)
+
+```bash
+curl http://localhost:3000/api/proxy/generate/JOB_ID
+```
+
 ### Admin Endpoints (Require ADMIN_API_KEY)
 - `GET /admin/warm-pool` - Admin dashboard
 - `POST /api/proxy/admin/set-tokens` - Configure API tokens

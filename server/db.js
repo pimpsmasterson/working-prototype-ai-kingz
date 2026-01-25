@@ -78,6 +78,66 @@ if (hasLegacySchema && !hasNewSchema) {
 const init = db.prepare('INSERT OR IGNORE INTO warm_pool (id, desiredSize, instance, lastAction, isPrewarming) VALUES (1, 1, NULL, NULL, 0)');
 init.run();
 
+// Generated content table for tracking image/video generation jobs
+db.exec(`CREATE TABLE IF NOT EXISTS generated_content (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id TEXT UNIQUE NOT NULL,
+  user_id TEXT,
+  muse_id TEXT,
+  muse_name TEXT,
+
+  -- Generation Parameters
+  prompt TEXT NOT NULL,
+  negative_prompt TEXT,
+  workflow_type TEXT DEFAULT 'image',
+  workflow_json TEXT,
+
+  -- Technical Settings
+  seed INTEGER,
+  steps INTEGER,
+  cfg_scale REAL,
+  width INTEGER,
+  height INTEGER,
+  sampler TEXT,
+  model_checkpoint TEXT,
+
+  -- Video-Specific
+  frame_count INTEGER,
+  fps INTEGER,
+  duration_seconds REAL,
+
+  -- Results
+  status TEXT DEFAULT 'pending',
+  comfyui_prompt_id TEXT,
+  result_path TEXT,
+  result_url TEXT,
+  thumbnail_path TEXT,
+  file_size_bytes INTEGER,
+
+  -- GPU Instance Info
+  gpu_instance_id TEXT,
+  gpu_type TEXT,
+  generation_time_seconds REAL,
+  cost_usd REAL,
+
+  -- Metadata
+  created_at TEXT DEFAULT (datetime('now')),
+  started_at TEXT,
+  completed_at TEXT,
+  error_message TEXT,
+
+  -- Organization
+  is_favorite INTEGER DEFAULT 0,
+  is_archived INTEGER DEFAULT 0,
+  tags TEXT
+)`);
+
+// Create indexes for performance
+db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_muse ON generated_content(muse_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_status ON generated_content(status)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_created ON generated_content(created_at DESC)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_job ON generated_content(job_id)`);
+
 console.log('DB ready:', DB_PATH);
 
 function getState() {
@@ -97,4 +157,145 @@ function saveState(state) {
     .run(state.desiredSize, instanceStr, state.lastAction, state.isPrewarming ? 1 : 0, state.safeMode ? 1 : 0);
 }
 
-module.exports = { getState, saveState, db };
+// ============================================================================
+// GENERATION CONTENT MANAGEMENT
+// ============================================================================
+
+/**
+ * Create a new generation job
+ * @param {Object} jobData - Job parameters
+ * @returns {Object} SQLite run result
+ */
+function createJob(jobData) {
+  const stmt = db.prepare(`
+    INSERT INTO generated_content
+    (job_id, muse_id, muse_name, prompt, negative_prompt, workflow_type,
+     workflow_json, seed, steps, cfg_scale, width, height, sampler, model_checkpoint,
+     frame_count, fps, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  return stmt.run(
+    jobData.jobId,
+    jobData.museId || null,
+    jobData.museName || null,
+    jobData.prompt,
+    jobData.negativePrompt || null,
+    jobData.workflowType || 'image',
+    jobData.workflowJson || null,
+    jobData.seed || null,
+    jobData.steps || null,
+    jobData.cfgScale || null,
+    jobData.width || null,
+    jobData.height || null,
+    jobData.sampler || null,
+    jobData.checkpoint || null,
+    jobData.frameCount || null,
+    jobData.fps || null,
+    'pending'
+  );
+}
+
+/**
+ * Update job status and optional fields
+ * @param {string} jobId - Job ID
+ * @param {string} status - New status (pending, processing, completed, failed)
+ * @param {Object} updates - Additional fields to update
+ * @returns {Object} SQLite run result
+ */
+function updateJobStatus(jobId, status, updates = {}) {
+  const fields = Object.keys(updates);
+  const values = Object.values(updates);
+
+  if (fields.length === 0) {
+    // Only update status
+    const stmt = db.prepare('UPDATE generated_content SET status = ? WHERE job_id = ?');
+    return stmt.run(status, jobId);
+  }
+
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const stmt = db.prepare(`
+    UPDATE generated_content
+    SET status = ?, ${setClause}
+    WHERE job_id = ?
+  `);
+
+  return stmt.run(status, ...values, jobId);
+}
+
+/**
+ * Get job by job_id
+ * @param {string} jobId - Job ID
+ * @returns {Object|undefined} Job record or undefined if not found
+ */
+function getJob(jobId) {
+  const row = db.prepare('SELECT * FROM generated_content WHERE job_id = ?').get(jobId);
+  if (!row) return null;
+  // Backwards compatibility: alias model_checkpoint -> checkpoint
+  if (typeof row.checkpoint === 'undefined' && typeof row.model_checkpoint !== 'undefined') {
+    row.checkpoint = row.model_checkpoint;
+  }
+  return row;
+}
+
+/**
+ * Get all jobs (with optional filters)
+ * @param {Object} filters - Optional filters (museId, status, limit, offset)
+ * @returns {Array} Array of job records
+ */
+function getAllJobs(filters = {}) {
+  let query = 'SELECT * FROM generated_content WHERE 1=1';
+  const params = [];
+
+  if (filters.museId) {
+    query += ' AND muse_id = ?';
+    params.push(filters.museId);
+  }
+
+  if (filters.status && filters.status !== 'all') {
+    query += ' AND status = ?';
+    params.push(filters.status);
+  }
+
+  query += ' ORDER BY created_at DESC';
+
+  if (filters.limit) {
+    query += ' LIMIT ?';
+    params.push(filters.limit);
+
+    if (filters.offset) {
+      query += ' OFFSET ?';
+      params.push(filters.offset);
+    }
+  }
+
+  const rows = db.prepare(query).all(...params);
+  // Alias model_checkpoint -> checkpoint for compatibility
+  return rows.map(r => {
+    if (typeof r.checkpoint === 'undefined' && typeof r.model_checkpoint !== 'undefined') {
+      r.checkpoint = r.model_checkpoint;
+    }
+    return r;
+  });
+}
+
+/**
+ * Delete a job and its associated files
+ * @param {string} jobId - Job ID or database ID
+ * @returns {Object} SQLite run result
+ */
+function deleteJob(jobId) {
+  // Try both job_id and id columns
+  return db.prepare('DELETE FROM generated_content WHERE job_id = ? OR id = ?').run(jobId, jobId);
+}
+
+module.exports = {
+  getState,
+  saveState,
+  db,
+  createJob,
+  updateJobStatus,
+  getJob,
+  getAllJobs,
+  deleteJob
+};

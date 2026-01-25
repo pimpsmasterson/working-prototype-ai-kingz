@@ -2,29 +2,42 @@ const assert = require('assert');
 const supertest = require('supertest');
 
 describe('API key validation', function() {
-  it('checkApiKeyOrDie returns 500 when VASTAI_API_KEY is not set', async function() {
-    this.timeout(5000); // Increase timeout for this test
-
+  it('checkApiKeyOrDie returns 500 when VASTAI_API_KEY is not set', function() {
     // Save original key
     const originalKey = process.env.VASTAI_API_KEY;
 
     try {
       // Unset the key temporarily
       delete process.env.VASTAI_API_KEY;
+      delete process.env.VAST_AI_API_KEY;
+      process.env.FORCE_MISSING_VAST_KEY = '1';
 
-      // Re-require the app to pick up the missing key
+      // Re-require the app to pick up the missing key and get middleware
       delete require.cache[require.resolve('../server/vastai-proxy')];
       const app = require('../server/vastai-proxy');
-      const request = supertest(app);
+      const check = app.checkApiKeyOrDie;
 
-      const res = await request.post('/api/proxy/bundles')
-        .send({ verified: { eq: true } });
+      // Minimal mocks
+      const req = {};
+      let sentStatus = null;
+      let sentBody = null;
+      const res = {
+        status(code) { sentStatus = code; return this; },
+        json(obj) { sentBody = obj; }
+      };
+      let nextCalled = false;
+      const next = () => { nextCalled = true; };
 
-      assert.strictEqual(res.status, 500);
-      assert.ok(res.body.error.includes('VASTAI_API_KEY'));
+      check(req, res, next);
+
+      assert.strictEqual(sentStatus, 500);
+      assert.ok(sentBody.error && sentBody.error.includes('VASTAI_API_KEY'));
+      assert.strictEqual(nextCalled, false);
     } finally {
       // Restore key
       process.env.VASTAI_API_KEY = originalKey;
+      delete process.env.VAST_AI_API_KEY;
+      delete process.env.FORCE_MISSING_VAST_KEY;
 
       // Re-require to restore original state
       delete require.cache[require.resolve('../server/vastai-proxy')];

@@ -253,76 +253,121 @@ class StudioAppPro {
     }
 
     async generateWithComfyUI(muse, userPrompt, variationId = null) {
-        // If no ComfyUI connection, use mock generation
-        if (!this.comfyUI || !this.comfyUI.baseUrl) {
-            return await this.mockGeneration(muse, userPrompt);
-        }
-
         try {
-            // Check if using Vast.ai and attempt to claim a warm instance first
-            if (this.comfyUI.serviceType === 'vastai') {
-                this.updateGenerateButton('generating', 'Checking for warm GPU instance...');
-                console.log('Using Vast.ai cloud GPU for generation — attempting warm-claim');
-                try {
-                    const claimed = await this.tryClaimWarmPool();
-                    if (claimed && claimed.connectionUrl) {
-                        // Configure comfyUI to use proxied comfy endpoint which forwards to claimed instance
-                        this.comfyUI.setEndpoint('http://localhost:3000/api/proxy/comfy', { serviceType: 'vastai', claimed: true });
-                        this.showInfo('Attached to warm ComfyUI instance. Generating now.');
-                    } else {
-                        this.updateGenerateButton('generating', 'Connecting to Vast.ai...');
-                        console.log('No warm instance claimed; will proceed with launch flow');
-                    }
-                } catch (err) {
-                    console.warn('Warm pool claim failed:', err);
-                    this.updateGenerateButton('generating', 'Connecting to Vast.ai...');
-                }
-            }
+            // Build request payload for new backend endpoint
+            const workflowType = this.getWorkflowType(); // 'image' or 'video' from UI toggle
 
-            // Generate with muse if available
-            if (muse) {
-                const response = await this.comfyUI.generateWithMuse(muse, userPrompt, variationId, {
+            const payload = {
+                muse: muse ? {
+                    id: muse.id,
+                    name: muse.name,
+                    basic: muse.basic,
+                    body: muse.body,
+                    face: muse.face,
+                    style: muse.style,
+                    aiSettings: muse.aiSettings
+                } : null,
+                prompt: muse ? muse.generatePrompt(userPrompt, variationId) : userPrompt,
+                negativePrompt: muse ? muse.generateNegativePrompt() : 'ugly, deformed, bad anatomy',
+                settings: {
                     width: 512,
                     height: 768,
-                    seed: Math.floor(Math.random() * 1000000000)
-                });
+                    steps: muse?.aiSettings?.steps || 25,
+                    cfgScale: muse?.aiSettings?.cfgScale || 7,
+                    seed: Math.floor(Math.random() * 1000000000),
+                    sampler: muse?.aiSettings?.sampler || 'euler_ancestral',
+                    checkpoint: muse?.aiSettings?.preferredCheckpoint || 'dreamshaper_8.safetensors',
+                    frames: workflowType === 'video' ? 16 : undefined,
+                    fps: workflowType === 'video' ? 8 : undefined
+                },
+                workflowType
+            };
 
-                // Poll for completion
-                return await this.pollComfyUIStatus(response);
-            } else {
-                // Generate without muse (basic prompt only)
-                const workflow = this.comfyUI.createDefaultWorkflow(
-                    { aiSettings: {} },
-                    userPrompt,
-                    'ugly, deformed, bad anatomy, low quality',
-                    { width: 512, height: 768 }
-                );
+            // Submit to generation handler
+            const response = await fetch('http://localhost:3000/api/proxy/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-                const response = await this.comfyUI.submitWorkflow(workflow);
-                return await this.pollComfyUIStatus(response);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Generation failed');
             }
+
+            const { jobId, estimatedTime } = await response.json();
+            console.log(`Generation job started: ${jobId}`);
+
+            // Show estimated time to user
+            this.showInfo(`Generating ${workflowType}... Estimated time: ${estimatedTime}`);
+
+            // Poll for completion
+            return await this.pollJobStatus(jobId);
+
         } catch (error) {
-            console.error('ComfyUI generation error:', error);
-
-            // Provide specific error messages for Vast.ai
-            if (this.comfyUI.serviceType === 'vastai') {
-                if (error.message.includes('Instance launching')) {
-                    this.showInfo('🚀 Launching new GPU instance! This takes 5-10 minutes. Check the console for progress updates.');
-                    return await this.mockGeneration(muse, userPrompt); // Show mock while waiting
-                } else if (error.message.includes('Cannot connect to Vast.ai instance')) {
-                    this.showError('Vast.ai instance is starting up. Please wait a few minutes and try again.');
-                } else if (error.message.includes('instance failed to start')) {
-                    this.showError('Failed to start Vast.ai instance. Please check your account balance and try again.');
-                } else {
-                    this.showError(`Vast.ai error: ${error.message}`);
-                }
-            } else {
-                this.showError(`Generation failed: ${error.message}`);
-            }
+            console.error('Generation error:', error);
+            this.showError(`Generation failed: ${error.message}`);
 
             // Fallback to mock generation
             return await this.mockGeneration(muse, userPrompt);
         }
+    }
+
+    /**
+     * Poll job status until complete
+     */
+    async pollJobStatus(jobId, maxAttempts = 120) {
+        for (let i = 0; i < maxAttempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second intervals
+
+            try {
+                const response = await fetch(`http://localhost:3000/api/proxy/generate/${jobId}`);
+
+                if (!response.ok) {
+                    throw new Error(`Status check failed: ${response.status}`);
+                }
+
+                const status = await response.json();
+
+                // Update UI with progress
+                this.updateGenerateButton('generating',
+                    `${status.workflowType === 'video' ? 'Rendering video' : 'Generating image'}... ${status.progress}%`
+                );
+
+                if (status.status === 'completed') {
+                    return {
+                        success: true,
+                        imageUrl: status.result.url,
+                        thumbnailUrl: status.result.thumbnailUrl,
+                        settings: status.result.metadata,
+                        workflowType: status.workflowType
+                    };
+                }
+
+                if (status.status === 'failed') {
+                    throw new Error(status.error || 'Generation failed');
+                }
+
+                // Continue polling if pending or processing
+
+            } catch (error) {
+                console.error(`Polling attempt ${i + 1} failed:`, error);
+                if (i === maxAttempts - 1) throw error; // Re-throw on last attempt
+            }
+        }
+
+        throw new Error('Generation timeout after 6 minutes');
+    }
+
+    /**
+     * Get workflow type from UI (image or video)
+     * For MVP, defaults to 'image'
+     * Future: Add toggle button in Studio UI
+     */
+    getWorkflowType() {
+        // Check if video toggle is enabled in UI
+        // For MVP, default to 'image'
+        return 'image';
     }
 
     async tryClaimWarmPool() {

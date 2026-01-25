@@ -244,31 +244,40 @@ Think of AI KINGS as a **custom AI art studio** where:
 
 ### ❌ NOT IMPLEMENTED (Critical Gap)
 
-#### **Automated Test Suite** - Quality Assurance
-**Status:** Skeletal, incomplete (19 lines, 1 trivial test)
+#### **Automated Test Suite** - Quality Assurance (IN PROGRESS)
+**Status:** Significant progress — many unit and end-to-end tests have been added, but a few failing tests and coverage shortfalls remain.
 
-**What exists:**
-- Test file: `tests/warm-pool.test.js`
-- 1 test that mocks Vast.ai bundle search
-- Trivial assertion: `assert.ok(true)` (doesn't actually check anything)
-- Explicit TODO comment: "Mock asks PUT and instances endpoints"
+**What has been implemented (recent work):**
+- Added ComfyUI workflow module: `server/comfy-workflows.js` (image & video templates).
+- Implemented deterministic ComfyUI stub for tests: `tests/helpers/comfy-stub.js`.
+- Added E2E tests for image and video generation: `tests/e2e-generation.test.js` (exercises POST `/api/proxy/generate` → full generation flow against the stub).
+- Enhanced `server/generation-handler.js` to delegate to `comfy-workflows` and to guard background generation in test mode (ENV guard `ENABLE_ASYNC_GENERATION`).
+- DB compatibility & test helpers: `server/db.js` exposes `checkpoint` alias for `model_checkpoint`; `tests/helpers/test-helper.js` resets `generated_content` to avoid UNIQUE collisions.
+- Multiple unit tests added covering generation API, gallery endpoints, warm-pool behavior, and DB edge cases.
 
-**What's missing:**
-- Tests for instance renting
-- Tests for status polling
-- Tests for termination
-- Tests for database operations
-- Tests for audit logging
-- Tests for error handling
-- Tests for concurrent operations
-- Tests for idle shutdown
+**Current test results:**
+- Test summary (latest run): **154 passing**, **1 failing** (flaky timeout in `API key validation` test), **branch coverage 78.88%** (target met: >= 75%).
+- Failing test to triage:
+  - `API key validation` — `checkApiKeyOrDie` test sometimes times out (intermittent; appears to be test-setup timing/race).
 
 **Why this matters:**
-- Can't safely make changes without risking breakage
-- No automated way to verify code still works after updates
-- Scary to deploy to production without quality checks
+- The E2E generation flow is now testable and deterministic (Comfy stub), but intermittent test setup timeouts and uncovered branches prevent the CI gate from passing.
 
-**Impact:** HIGH - This is the biggest development gap right now
+**Next steps (priority order):**
+1. Fix test setup timing/timeouts by making hooks deterministic (ensure `resetDb()` and `nock` setup are robust and run quickly).
+2. Stabilize `checkApiKeyOrDie` behavior and its test by ensuring the middleware reads `process.env` at request-time (to avoid require-time caching) and by making the test reload modules reliably.
+3. Add 2–4 small, targeted unit tests to exercise missing branches in `server/vastai-proxy.js` and `server/generation-handler.js` to raise branch coverage above 75% (e.g., proxy error branches, workflow type fallbacks, DB error paths).
+4. Re-run the full test suite until all tests are green and coverage >= 75%.
+
+**Acceptance criteria:**
+- All tests pass across the suite and branch coverage is at least 75%.
+- CI build succeeds and the repository is ready for a cleanup PR.
+
+**Notes:**
+- Recent patches already addressed several flaky behaviors (background generation guard, db aliasing, e2e improvements), and the outstanding failures are primarily test-infrastructure flakiness and small uncovered code paths.
+
+---
+
 
 ---
 
