@@ -1,0 +1,230 @@
+
+/* ===========================================
+   AIKINGZ PROTOTYPE STYLES
+   Customize this file with your own styles
+   =========================================== */
+
+   /* Reset and base styles */
+   * {
+     margin: 0;
+     padding: 0;
+     box-sizing: border-box;
+   }
+
+   body {
+     font-family: 'Arial', sans-serif;
+     line-height: 1.6;
+     color: #333;
+     background-color: #fff;
+   }
+
+   /* Navigation styles */
+   .main-navigation {
+     background-color: #2c3e50;
+     color: white;
+     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+     position: sticky;
+     top: 0;
+     z-index: 1000;
+   }
+
+   .nav-container {
+     max-width: 1200px;
+     margin: 0 auto;
+     padding: 0 1rem;
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+   }
+
+   .nav-brand h2 {
+     color: white;
+     text-decoration: none;
+     font-size: 1.5rem;
+   }
+
+   .nav-menu {
+     display: flex;
+     list-style: none;
+   }
+
+   .nav-link {
+     color: white;
+     text-decoration: none;
+     padding: 1rem;
+     display: block;
+     transition: background-color 0.3s ease;
+   }
+
+   .nav-link:hover,
+   .nav-link.active {
+     background-color: #34495e;
+   }
+
+   /* Mobile navigation toggle */
+   .nav-toggle {
+     display: none;
+     flex-direction: column;
+     cursor: pointer;
+   }
+
+   .nav-toggle span {
+     width: 25px;
+     height: 3px;
+     background: white;
+     margin: 3px 0;
+     transition: 0.3s;
+   }
+
+   /* Main content */
+   .main-content {
+     min-height: 60vh;
+     padding: 2rem 0;
+   }
+
+   .content-container {
+     max-width: 1200px;
+     margin: 0 auto;
+     padding: 0 1rem;
+   }
+
+   /* Hero section */
+   .hero-section {
+     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+     color: white;
+     padding: 4rem 0;
+     text-align: center;
+   }
+
+   .hero-container {
+     max-width: 800px;
+     margin: 0 auto;
+     padding: 0 1rem;
+   }
+
+   .hero-container h1 {
+     font-size: 3rem;
+     margin-bottom: 1rem;
+   }
+
+   .hero-container p {
+     font-size: 1.25rem;
+     margin-bottom: 2rem;
+   }
+
+   .cta-button {
+     display: inline-block;
+     background-color: #e74c3c;
+     color: white;
+     padding: 0.75rem 1.5rem;
+     text-decoration: none;
+     border-radius: 4px;
+     font-weight: bold;
+     transition: background-color 0.3s ease;
+   }
+
+   .cta-button:hover {
+     background-color: #c0392b;
+   }
+
+   /* Content sections */
+   .content-section {
+     padding: 3rem 0;
+   }
+
+   .content-section:nth-child(even) {
+     background-color: #f8f9fa;
+   }
+
+   /* Footer */
+   .main-footer {
+     background-color: #2c3e50;
+     color: white;
+     padding: 2rem 0;
+     margin-top: 2rem;
+   }
+
+   .footer-container {
+     max-width: 1200px;
+     margin: 0 auto;
+     padding: 0 1rem;
+   }
+
+   .footer-content {
+     display: grid;
+     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+     gap: 2rem;
+     margin-bottom: 2rem;
+   }
+
+   .footer-section h3 {
+     margin-bottom: 1rem;
+     color: #ecf0f1;
+   }
+
+   .footer-links {
+     list-style: none;
+   }
+
+   .footer-links li {
+     margin-bottom: 0.5rem;
+   }
+
+   .footer-links a {
+     color: #bdc3c7;
+     text-decoration: none;
+   }
+
+   .footer-links a:hover {
+     color: white;
+   }
+
+   .footer-bottom {
+     border-top: 1px solid #34495e;
+     padding-top: 1rem;
+     text-align: center;
+     color: #95a5a6;
+   }
+
+   .legal-notice {
+     font-size: 0.875rem;
+     line-height: 1.4;
+   }
+
+   /* Responsive design */
+   @media (max-width: 768px) {
+     .nav-menu {
+       display: none;
+     }
+
+     .nav-toggle {
+       display: flex;
+     }
+
+     .hero-container h1 {
+       font-size: 2rem;
+     }
+
+     .footer-content {
+       grid-template-columns: 1fr;
+     }
+   }
+
+   /* Prototype specific styles */
+   .prototype-page {
+     /* Add any prototype-specific styles here */
+   }
+
+   /* Placeholder styles for customization */
+   .customize-this {
+     border: 2px dashed #e74c3c;
+     padding: 1rem;
+     background-color: #fdf2f2;
+     margin: 1rem 0;
+   }
+
+   .customize-this::before {
+     content: "⚠️ CUSTOMIZE: ";
+     font-weight: bold;
+     color: #e74c3c;
+   }

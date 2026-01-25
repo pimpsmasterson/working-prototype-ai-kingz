@@ -1,0 +1,249 @@
+/* 
+ * ============================================================
+ * AI KINGS - GILDED SOVEREIGN LOGO SYSTEM v5.0
+ * Artistic Standards: Heraldic Precision & Luxury Materiality
+ * ============================================================
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display+SC:wght@400;700;900&display=swap');
+
+.logo-nexus {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0.5rem 1rem; /* Reduced vertical padding for better alignment */
+    user-select: none;
+    text-decoration: none;
+    margin: 0; /* Remove any default margins */
+}
+
+/* Navigation-specific alignment */
+.nav-brand {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.logo-nexus:focus {
+    outline: 2px solid #D4AF37;
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+
+.logo-nexus:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* 1. IMPERIAL CROWN SVG */
+.crown-container {
+    position: relative;
+    width: 180px;
+    height: 150px; /* Larger: 180 / (120/100) = 150px for imperial crown */
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.crown-svg {
+    width: 180px;
+    height: 150px;
+    overflow: visible;
+    filter: drop-shadow(0 8px 20px rgba(218, 165, 32, 0.5)) drop-shadow(0 4px 12px rgba(184, 134, 11, 0.3));
+}
+
+/* Imperial Crown Layers (Multi-Tier Architecture) */
+.base-tier {
+    /* Bottom tier - Foundation */
+    filter: drop-shadow(0 4px 12px rgba(139, 105, 20, 0.6));
+    transition: all 0.5s ease;
+    will-change: transform, opacity;
+}
+
+.lower-ring {
+    /* Jeweled circlet - Middle tier */
+    filter: drop-shadow(0 3px 10px rgba(218, 165, 32, 0.5));
+    transition: all 0.5s ease;
+    will-change: transform, opacity;
+}
+
+.crown-body {
+    /* Main crown arches - Upper tier */
+    filter: drop-shadow(0 2px 8px rgba(255, 215, 0, 0.4));
+    transition: all 0.5s ease;
+    will-change: transform, opacity;
+}
+
+.fleur-ornaments {
+    /* Ornamental details */
+    filter: drop-shadow(0 1px 4px rgba(218, 165, 32, 0.5));
+    transition: all 0.4s ease;
+    will-change: transform, opacity, scale;
+}
+
+.peak-jewels {
+    /* Gemstones at arch peaks */
+    transition: all 0.4s ease;
+    will-change: transform, opacity, scale;
+}
+
+.chains {
+    /* Decorative chains */
+    opacity: 0.4;
+    transition: all 0.6s ease;
+}
+
+/* Jewel Styling (Rubies, Emeralds, Sapphires, Diamonds) */
+.base-tier circle,
+.lower-ring ellipse,
+.peak-jewels ellipse {
+    transition: filter 0.3s ease;
+    will-change: filter;
+}
+
+/* Metallic Bevels & 3D Depth */
+path[filter*="metalBevel"],
+ellipse[filter*="metalBevel"] {
+    transition: filter 0.4s ease;
+}
+
+/* Filigree Details */
+.lower-ring path[stroke] {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.8s ease;
+}
+
+/* Performance: GPU Acceleration */
+.crown-svg g {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* 2. TYPOGRAPHY SYSTEM */
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: 'Playfair Display SC', serif;
+    text-align: center;
+    opacity: 0;
+    /* Reveal via JS */
+    transform: translateY(10px);
+}
+
+.ai-part {
+    font-weight: 900;
+    font-size: 42px;
+    /* Adjusted for navigation scale balance */
+    letter-spacing: -0.025em;
+    line-height: 0.9;
+    background: linear-gradient(110deg, #8B6B3D 0%, #D4AF37 45%, #F4E7BC 50%, #D4AF37 55%, #8B6B3D 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    position: relative;
+}
+
+/* Sharp Specular Highlight Overlay */
+.ai-part::after {
+    content: "FETISH";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.4) 48%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0.4) 52%, transparent 60%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.kings-part {
+    font-weight: 400;
+    font-size: 20px;
+    /* Adjusted for KING (4 letters vs 5) - better proportion */
+    letter-spacing: 0.45em;
+    text-transform: uppercase;
+    color: #D4AF37;
+    margin-top: 2px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    width: 100%;
+}
+
+/* 3. RESPONSIVE SCALE */
+@media (max-width: 991px) {
+    .crown-container {
+        width: 135px;
+        height: 112.5px; /* 135 / (120/100) = 112.5px */
+    }
+
+    .crown-svg {
+        width: 135px;
+        height: 112.5px;
+    }
+
+    .ai-part {
+        font-size: 32px;
+    }
+
+    .kings-part {
+        font-size: 16px;
+        letter-spacing: 0.35em;
+    }
+}
+
+/* Medium screens */
+@media (max-width: 768px) {
+    .crown-container {
+        width: 120px;
+        height: 100px; /* 120 / (120/100) = 100px */
+    }
+
+    .crown-svg {
+        width: 120px;
+        height: 100px;
+    }
+
+    .ai-part {
+        font-size: 28px;
+    }
+
+    .kings-part {
+        font-size: 13px;
+        letter-spacing: 0.35em;
+    }
+
+    .logo-nexus {
+        padding: 0.5rem;
+    }
+}
+
+/* Small screens */
+@media (max-width: 480px) {
+    .crown-container {
+        width: 90px;
+        height: 75px; /* 90 / (120/100) = 75px */
+    }
+
+    .crown-svg {
+        width: 90px;
+        height: 75px;
+    }
+
+    .ai-part {
+        font-size: 24px;
+    }
+
+    .kings-part {
+        font-size: 11px;
+        letter-spacing: 0.3em;
+    }
+}

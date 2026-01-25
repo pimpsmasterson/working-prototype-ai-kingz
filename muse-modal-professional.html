@@ -1,0 +1,599 @@
+<!--
+    AI KINGS - Professional Muse Modal
+    Complete character/muse management interface for adult content AI generation
+
+    INSTRUCTIONS: Copy this entire modal div and replace the existing #muse-modal in studio.html
+-->
+
+<div class="modal-overlay" id="muse-modal-pro">
+    <div class="muse-modal-container">
+
+        <!-- HEADER -->
+        <div class="muse-modal-header">
+            <h2>
+                <i class="ph ph-users-three"></i>
+                The Casting Room - Professional Edition
+            </h2>
+            <button class="muse-modal-close close-modal">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+
+        <!-- BODY -->
+        <div class="muse-modal-body">
+
+            <!-- SIDEBAR: Muse List & Filters -->
+            <div class="muse-sidebar">
+                <div class="muse-sidebar-header">
+                    <h3>
+                        Your Characters
+                        <button class="btn-new-muse" id="btn-new-muse-pro">
+                            <i class="ph ph-plus"></i>
+                            New
+                        </button>
+                    </h3>
+
+                    <!-- Filters -->
+                    <div class="muse-filters">
+                        <input type="text"
+                               class="ai-input"
+                               id="muse-search"
+                               placeholder="Search characters...">
+
+                        <select class="ai-select" id="muse-category-filter">
+                            <option value="all">All Categories</option>
+                            <option value="general">General</option>
+                            <option value="fantasy">Fantasy</option>
+                            <option value="cosplay">Cosplay</option>
+                            <option value="celebrity">Celebrity-Inspired</option>
+                            <option value="anime">Anime/Hentai</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Muse List -->
+                <div class="muse-list-container" id="muse-list-container">
+                    <!-- Muse cards will be dynamically rendered here -->
+                </div>
+            </div>
+
+            <!-- EDITOR: Multi-Tab Character Editor -->
+            <div class="muse-editor">
+
+                <!-- Tabs -->
+                <div class="muse-editor-tabs">
+                    <button class="editor-tab-btn active" data-tab="basic">Basic Info</button>
+                    <button class="editor-tab-btn" data-tab="body">Body</button>
+                    <button class="editor-tab-btn" data-tab="face">Face & Hair</button>
+                    <button class="editor-tab-btn" data-tab="features">Features</button>
+                    <button class="editor-tab-btn" data-tab="style">Style & Persona</button>
+                    <button class="editor-tab-btn" data-tab="references">References</button>
+                    <button class="editor-tab-btn" data-tab="ai-settings">AI Settings</button>
+                    <button class="editor-tab-btn" data-tab="variations">Variations</button>
+                    <button class="editor-tab-btn" data-tab="history">History</button>
+                    <button class="editor-tab-btn" data-tab="notes">Notes</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="muse-editor-content">
+
+                    <!-- TAB: Basic Info -->
+                    <div class="editor-tab-panel active" data-tab="basic">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Basic Information</h3>
+
+                            <div class="form-group">
+                                <label>Character Name</label>
+                                <input type="text" class="ai-input" id="muse-name" placeholder="e.g. Seraphina Stone">
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Age</label>
+                                    <input type="text" class="ai-input" id="muse-age" placeholder="25">
+                                </div>
+                                <div class="form-group">
+                                    <label>Appears As (Age)</label>
+                                    <input type="text" class="ai-input" id="muse-age-appearance" placeholder="25">
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Nationality</label>
+                                    <input type="text" class="ai-input" id="muse-nationality" placeholder="e.g. American">
+                                </div>
+                                <div class="form-group">
+                                    <label>Ethnicity</label>
+                                    <input type="text" class="ai-input" id="muse-ethnicity" placeholder="e.g. Caucasian, Asian, Latina, etc.">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Occupation (for context)</label>
+                                <input type="text" class="ai-input" id="muse-occupation" placeholder="e.g. Model, Teacher, Athlete">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select class="ai-select" id="muse-category">
+                                    <option value="general">General</option>
+                                    <option value="fantasy">Fantasy</option>
+                                    <option value="cosplay">Cosplay</option>
+                                    <option value="celebrity">Celebrity-Inspired</option>
+                                    <option value="anime">Anime/Hentai</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Tags</label>
+                                <div id="muse-tags-container">
+                                    <!-- Tags rendered dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Body -->
+                    <div class="editor-tab-panel" data-tab="body">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Body Attributes</h3>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Height</label>
+                                    <select class="ai-select" id="muse-height">
+                                        <option value="petite">Petite</option>
+                                        <option value="short">Short</option>
+                                        <option value="average" selected>Average</option>
+                                        <option value="tall">Tall</option>
+                                        <option value="very-tall">Very Tall</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Height (cm) - Optional</label>
+                                    <input type="text" class="ai-input" id="muse-height-cm" placeholder="e.g. 170">
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Build</label>
+                                    <select class="ai-select" id="muse-build">
+                                        <option value="petite">Petite</option>
+                                        <option value="slim">Slim</option>
+                                        <option value="athletic" selected>Athletic</option>
+                                        <option value="curvy">Curvy</option>
+                                        <option value="voluptuous">Voluptuous</option>
+                                        <option value="muscular">Muscular</option>
+                                        <option value="plus-size">Plus-Size</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Body Shape</label>
+                                    <select class="ai-select" id="muse-body-shape">
+                                        <option value="hourglass" selected>Hourglass</option>
+                                        <option value="pear">Pear</option>
+                                        <option value="apple">Apple</option>
+                                        <option value="rectangle">Rectangle</option>
+                                        <option value="triangle">Triangle</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Skin Tone</label>
+                                    <select class="ai-select" id="muse-skin-tone">
+                                        <option value="pale">Pale</option>
+                                        <option value="fair" selected>Fair</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="olive">Olive</option>
+                                        <option value="tan">Tan</option>
+                                        <option value="brown">Brown</option>
+                                        <option value="dark">Dark</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Skin Texture</label>
+                                    <select class="ai-select" id="muse-skin-texture">
+                                        <option value="smooth" selected>Smooth</option>
+                                        <option value="freckled">Freckled</option>
+                                        <option value="tattooed">Tattooed</option>
+                                        <option value="scarred">Scarred</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <h3 class="form-section-title">Measurements (Optional)</h3>
+
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label>Bust</label>
+                                    <input type="text" class="ai-input" id="muse-bust" placeholder="e.g. 36">
+                                </div>
+                                <div class="form-group">
+                                    <label>Cup Size</label>
+                                    <input type="text" class="ai-input" id="muse-bust-cup" placeholder="e.g. C">
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Waist</label>
+                                    <input type="text" class="ai-input" id="muse-waist" placeholder="e.g. 26">
+                                </div>
+                                <div class="form-group">
+                                    <label>Hips</label>
+                                    <input type="text" class="ai-input" id="muse-hips" placeholder="e.g. 38">
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Muscle Tone</label>
+                                    <select class="ai-select" id="muse-muscle-tone">
+                                        <option value="soft">Soft</option>
+                                        <option value="toned" selected>Toned</option>
+                                        <option value="athletic">Athletic</option>
+                                        <option value="muscular">Muscular</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Body Hair</label>
+                                    <select class="ai-select" id="muse-body-hair">
+                                        <option value="none">None</option>
+                                        <option value="minimal" selected>Minimal</option>
+                                        <option value="natural">Natural</option>
+                                        <option value="abundant">Abundant</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Face & Hair -->
+                    <div class="editor-tab-panel" data-tab="face">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Face</h3>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Face Shape</label>
+                                    <select class="ai-select" id="muse-face-shape">
+                                        <option value="oval" selected>Oval</option>
+                                        <option value="round">Round</option>
+                                        <option value="square">Square</option>
+                                        <option value="heart">Heart</option>
+                                        <option value="diamond">Diamond</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Jawline</label>
+                                    <select class="ai-select" id="muse-jawline">
+                                        <option value="soft">Soft</option>
+                                        <option value="defined" selected>Defined</option>
+                                        <option value="sharp">Sharp</option>
+                                        <option value="strong">Strong</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label>Eye Color</label>
+                                    <input type="text" class="ai-input" id="muse-eye-color" placeholder="e.g. Blue, Green, Brown">
+                                </div>
+                                <div class="form-group">
+                                    <label>Eye Shape</label>
+                                    <select class="ai-select" id="muse-eye-shape">
+                                        <option value="almond" selected>Almond</option>
+                                        <option value="round">Round</option>
+                                        <option value="hooded">Hooded</option>
+                                        <option value="upturned">Upturned</option>
+                                        <option value="downturned">Downturned</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Eye Size</label>
+                                    <select class="ai-select" id="muse-eye-size">
+                                        <option value="small">Small</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="large">Large</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label>Lips</label>
+                                    <select class="ai-select" id="muse-lips">
+                                        <option value="thin">Thin</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="full" selected>Full</option>
+                                        <option value="plump">Plump</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Lip Color</label>
+                                    <input type="text" class="ai-input" id="muse-lip-color" placeholder="e.g. natural, red, pink">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nose</label>
+                                    <select class="ai-select" id="muse-nose">
+                                        <option value="small">Small</option>
+                                        <option value="average" selected>Average</option>
+                                        <option value="prominent">Prominent</option>
+                                        <option value="button">Button</option>
+                                        <option value="aquiline">Aquiline</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Cheekbones</label>
+                                    <select class="ai-select" id="muse-cheekbones">
+                                        <option value="subtle">Subtle</option>
+                                        <option value="moderate">Moderate</option>
+                                        <option value="high" selected>High</option>
+                                        <option value="prominent">Prominent</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Makeup Style</label>
+                                    <select class="ai-select" id="muse-makeup">
+                                        <option value="none">None</option>
+                                        <option value="natural" selected>Natural</option>
+                                        <option value="glamorous">Glamorous</option>
+                                        <option value="dramatic">Dramatic</option>
+                                        <option value="gothic">Gothic</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <h3 class="form-section-title">Hair</h3>
+
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label>Hair Color</label>
+                                    <input type="text" class="ai-input" id="muse-hair-color" placeholder="e.g. Blonde, Black, Red">
+                                </div>
+                                <div class="form-group">
+                                    <label>Hair Length</label>
+                                    <select class="ai-select" id="muse-hair-length">
+                                        <option value="pixie">Pixie</option>
+                                        <option value="short">Short</option>
+                                        <option value="shoulder">Shoulder-Length</option>
+                                        <option value="long" selected>Long</option>
+                                        <option value="very-long">Very Long</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Hair Style</label>
+                                    <select class="ai-select" id="muse-hair-style">
+                                        <option value="straight" selected>Straight</option>
+                                        <option value="wavy">Wavy</option>
+                                        <option value="curly">Curly</option>
+                                        <option value="braided">Braided</option>
+                                        <option value="updo">Updo</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Hair Texture</label>
+                                <input type="text" class="ai-input" id="muse-hair-texture" placeholder="e.g. smooth, silky, messy">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Facial Hair (for male characters)</label>
+                                <input type="text" class="ai-input" id="muse-facial-hair" placeholder="e.g. none, beard, goatee, stubble">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Features -->
+                    <div class="editor-tab-panel" data-tab="features">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Tattoos</h3>
+                            <div id="tattoos-list">
+                                <!-- Tattoos rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3 class="form-section-title">Piercings</h3>
+                            <div id="piercings-list">
+                                <!-- Piercings rendered dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3 class="form-section-title">Unique Traits</h3>
+                            <div class="form-group">
+                                <label>Other Distinguishing Features</label>
+                                <textarea class="ai-textarea" id="muse-unique-traits" placeholder="e.g. dimples, beauty mark on left cheek, heterochromia, etc."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Style & Persona -->
+                    <div class="editor-tab-panel" data-tab="style">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Fashion & Style</h3>
+
+                            <div class="form-group">
+                                <label>Fashion Style</label>
+                                <input type="text" class="ai-input" id="muse-fashion-style" placeholder="e.g. casual, elegant, sporty, gothic">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Lingerie Preferences</label>
+                                <input type="text" class="ai-input" id="muse-lingerie" placeholder="e.g. lace, silk, leather">
+                            </div>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Footwear</label>
+                                    <input type="text" class="ai-input" id="muse-footwear" placeholder="e.g. heels, boots, sneakers">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nails</label>
+                                    <select class="ai-select" id="muse-nails">
+                                        <option value="natural" selected>Natural</option>
+                                        <option value="manicured">Manicured</option>
+                                        <option value="long">Long</option>
+                                        <option value="painted">Painted</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <h3 class="form-section-title">Personality & Vibe</h3>
+
+                            <div class="form-group">
+                                <label>Personality</label>
+                                <textarea class="ai-textarea" id="muse-personality" placeholder="e.g. confident, playful, dominant, shy, etc."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Overall Vibe</label>
+                                <input type="text" class="ai-input" id="muse-vibe" placeholder="e.g. sensual, romantic, fierce, playful">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: References -->
+                    <div class="editor-tab-panel" data-tab="references">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Reference Images</h3>
+                            <p style="color: #999; font-size: 0.9rem; margin-bottom: 1rem;">
+                                Upload reference images to help the AI maintain character consistency.
+                                Mark one as primary for IP-Adapter/ControlNet face reference.
+                            </p>
+
+                            <div class="reference-images-grid" id="reference-images-container">
+                                <!-- Reference images rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: AI Settings -->
+                    <div class="editor-tab-panel" data-tab="ai-settings">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Prompt Settings</h3>
+
+                            <div class="form-group">
+                                <label>Quality Tags</label>
+                                <input type="text" class="ai-input" id="muse-quality-tags" placeholder="masterpiece, best quality, high resolution, detailed">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Style Tags</label>
+                                <input type="text" class="ai-input" id="muse-style-tags" placeholder="e.g. photorealistic, cinematic, studio lighting">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Positive Prompt Prefix</label>
+                                <textarea class="ai-textarea" id="muse-positive-prefix" placeholder="Additional positive tags to add to every generation..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Negative Prompt Additions</label>
+                                <textarea class="ai-textarea" id="muse-negative-additions" placeholder="Additional negative tags to add to every generation..."></textarea>
+                            </div>
+
+                            <h3 class="form-section-title">ComfyUI Settings</h3>
+
+                            <div class="form-row-2">
+                                <div class="form-group">
+                                    <label>Preferred Checkpoint</label>
+                                    <input type="text" class="ai-input" id="muse-checkpoint" placeholder="model.safetensors">
+                                </div>
+                                <div class="form-group">
+                                    <label>Preferred VAE</label>
+                                    <input type="text" class="ai-input" id="muse-vae" placeholder="vae.safetensors">
+                                </div>
+                            </div>
+
+                            <div class="form-row-3">
+                                <div class="form-group">
+                                    <label>Sampler</label>
+                                    <input type="text" class="ai-input" id="muse-sampler" placeholder="DPM++ 2M Karras">
+                                </div>
+                                <div class="form-group">
+                                    <label>Steps</label>
+                                    <input type="number" class="ai-input" id="muse-steps" placeholder="30">
+                                </div>
+                                <div class="form-group">
+                                    <label>CFG Scale</label>
+                                    <input type="number" step="0.5" class="ai-input" id="muse-cfg-scale" placeholder="7">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Variations -->
+                    <div class="editor-tab-panel" data-tab="variations">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Character Variations</h3>
+                            <p style="color: #999; font-size: 0.9rem; margin-bottom: 1rem;">
+                                Create variations of this character with different outfits, scenarios, or styles.
+                            </p>
+
+                            <div class="variations-container" id="variations-container">
+                                <!-- Variations rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: History -->
+                    <div class="editor-tab-panel" data-tab="history">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Generation History</h3>
+                            <div class="generation-history-container" id="generation-history-container">
+                                <!-- History rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB: Notes -->
+                    <div class="editor-tab-panel" data-tab="notes">
+                        <div class="form-section">
+                            <h3 class="form-section-title">Notes & Ideas</h3>
+                            <textarea class="ai-textarea" id="muse-notes" placeholder="Notes about this character, ideas for future generations, etc." style="min-height: 300px;"></textarea>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="muse-modal-footer">
+            <div class="footer-actions-left">
+                <button class="btn-secondary" id="btn-export-muse">
+                    <i class="ph ph-download"></i>
+                    Export
+                </button>
+                <button class="btn-secondary" id="btn-import-muse">
+                    <i class="ph ph-upload"></i>
+                    Import
+                </button>
+            </div>
+            <div class="footer-actions-right">
+                <button class="btn-danger" id="btn-delete-muse">
+                    <i class="ph ph-trash"></i>
+                    Delete
+                </button>
+                <button class="btn-primary" id="btn-save-muse-pro">
+                    <i class="ph ph-floppy-disk"></i>
+                    Save Character
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>

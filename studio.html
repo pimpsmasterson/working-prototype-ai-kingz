@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" class="ai-kings-theme">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI KINGS Studio | Create Your Fantasy</title>
+
+    <!-- Core Styles -->
+    <link href="assets/css/ai-kings-theme.css" rel="stylesheet">
+    <link href="assets/css/ai-kings-studio.css" rel="stylesheet">
+    <link href="assets/css/conscious-navigation.css" rel="stylesheet">
+    <link href="assets/css/human-navigation.css" rel="stylesheet">
+    <link href="assets/css/muse-manager-pro.css" rel="stylesheet">
+
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+</head>
+
+<body class="studio-body">
+
+    <!-- STUDIO SHELL -->
+    <div class="studio-layout">
+
+        <!-- SIDEBAR: Navigation & Tools -->
+        <aside class="studio-sidebar glass-panel">
+            <div class="studio-brand">
+                <div class="brand-logo small">
+                    <div class="logo-icon">AI</div>
+                </div>
+            </div>
+
+            <nav class="studio-nav main-navigation">
+                <div class="navigation-pattern"></div>
+                <button class="nav-item active" data-tooltip="Studio" aria-label="Studio"><i
+                        class="ph ph-paint-brush-broad"></i></button>
+                <button class="nav-item" data-tooltip="Collection" aria-label="Collection"><i
+                        class="ph ph-images"></i></button>
+                <button class="nav-item" data-tooltip="The Muse" id="btn-muse-panel" aria-label="The Muse"><i
+                        class="ph ph-users-three"></i></button>
+                <div class="spacer"></div>
+                <button class="nav-item" data-tooltip="Settings" aria-label="Settings"><i
+                        class="ph ph-gear"></i></button>
+            </nav>
+
+            <!-- Cloud Status Indicator -->
+            <div class="cloud-status-indicator" id="cloud-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Initializing...</span>
+            </div>
+        </aside>
+
+        <!-- MAIN STAGE: The Canvas -->
+        <main class="studio-stage">
+            <div class="canvas-wrapper" id="main-canvas-container">
+                <!-- Placeholder for Canvas/Image Display -->
+                <div class="empty-stage-state">
+                    <i class="ph ph-sparkle"></i>
+                    <h3>The Canvas is Empty</h3>
+                    <p>Select a Muse or describe your fantasy to begin.</p>
+                </div>
+                <div class="active-content" style="display: none;">
+                    <img id="stage-image" src="" alt="Generated Content">
+                    <div class="stage-overlay-actions">
+                        <button class="action-btn"><i class="ph ph-download-simple"></i></button>
+                        <button class="action-btn"><i class="ph ph-arrows-out"></i></button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- CONTROL DOCK: Input & Parameters -->
+        <section class="studio-dock glass-panel">
+            <div class="dock-header">
+                <div class="active-muse-indicator" id="dock-muse-indicator">
+                    <span class="label">Muse:</span>
+                    <span class="value">None Selected</span>
+                </div>
+                <div class="dock-tabs">
+                    <button class="dock-tab active">Generate</button>
+                    <button class="dock-tab">Refine</button>
+                </div>
+            </div>
+
+            <div class="dock-controls">
+                <div class="terminal-input-group">
+                    <input type="text" class="input-terminal small" placeholder="Describe the scene..."
+                        id="studio-prompt">
+                    <button class="btn-magnetic small" id="btn-generate">
+                        <span>Manifest</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- THE MUSE: PROFESSIONAL CASTING ROOM -->
+    <div class="modal-overlay" id="muse-modal-pro">
+        <div class="muse-modal-container">
+            <div class="muse-modal-header">
+                <h2><i class="ph ph-users-three"></i> The Casting Room - Professional Edition</h2>
+                <button class="muse-modal-close close-modal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="muse-modal-body">
+                <div class="muse-sidebar">
+                    <div class="muse-sidebar-header">
+                        <h3>Your Characters<button class="btn-new-muse" id="btn-new-muse-pro"><i class="ph ph-plus"></i> New</button></h3>
+                        <div class="muse-filters">
+                            <input type="text" class="ai-input" id="muse-search" placeholder="Search characters...">
+                            <select class="ai-select" id="muse-category-filter">
+                                <option value="all">All Categories</option>
+                                <option value="general">General</option>
+                                <option value="fantasy">Fantasy</option>
+                                <option value="cosplay">Cosplay</option>
+                                <option value="celebrity">Celebrity-Inspired</option>
+                                <option value="anime">Anime/Hentai</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="muse-list-container" id="muse-list-container"></div>
+                </div>
+                <div class="muse-editor">
+                    <div class="muse-editor-tabs">
+                        <button class="editor-tab-btn active" data-tab="basic">Basic Info</button>
+                        <button class="editor-tab-btn" data-tab="body">Body</button>
+                        <button class="editor-tab-btn" data-tab="face">Face & Hair</button>
+                        <button class="editor-tab-btn" data-tab="features">Features</button>
+                        <button class="editor-tab-btn" data-tab="style">Style & Persona</button>
+                        <button class="editor-tab-btn" data-tab="references">References</button>
+                        <button class="editor-tab-btn" data-tab="ai-settings">AI Settings</button>
+                        <button class="editor-tab-btn" data-tab="variations">Variations</button>
+                        <button class="editor-tab-btn" data-tab="history">History</button>
+                        <button class="editor-tab-btn" data-tab="notes">Notes</button>
+                    </div>
+                    <div class="muse-editor-content">
+                        <!-- Basic Info Tab -->
+                        <div class="editor-tab-panel active" data-tab="basic">
+                            <div class="form-section">
+                                <h3 class="form-section-title">Basic Information</h3>
+                                <div class="form-group"><label>Character Name</label><input type="text" class="ai-input" id="muse-name" placeholder="e.g. Seraphina Stone"></div>
+                                <div class="form-row-2">
+                                    <div class="form-group"><label>Age</label><input type="text" class="ai-input" id="muse-age" placeholder="25"></div>
+                                    <div class="form-group"><label>Appears As (Age)</label><input type="text" class="ai-input" id="muse-age-appearance" placeholder="25"></div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div class="form-group"><label>Nationality</label><input type="text" class="ai-input" id="muse-nationality" placeholder="e.g. American"></div>
+                                    <div class="form-group"><label>Ethnicity</label><input type="text" class="ai-input" id="muse-ethnicity" placeholder="e.g. Caucasian, Asian, Latina"></div>
+                                </div>
+                                <div class="form-group"><label>Occupation (for context)</label><input type="text" class="ai-input" id="muse-occupation" placeholder="e.g. Model, Teacher"></div>
+                                <div class="form-group"><label>Category</label><select class="ai-select" id="muse-category"><option value="general">General</option><option value="fantasy">Fantasy</option><option value="cosplay">Cosplay</option><option value="celebrity">Celebrity-Inspired</option><option value="anime">Anime/Hentai</option><option value="custom">Custom</option></select></div>
+                                <div class="form-group"><label>Tags</label><div id="muse-tags-container"></div></div>
+                            </div>
+                        </div>
+                        <!-- Remaining tabs will be loaded by JavaScript for brevity -->
+                        <div class="editor-tab-panel" data-tab="body"><div class="form-section"><h3 class="form-section-title">Body Attributes</h3><div class="form-row-2"><div class="form-group"><label>Height</label><select class="ai-select" id="muse-height"><option value="petite">Petite</option><option value="short">Short</option><option value="average" selected>Average</option><option value="tall">Tall</option><option value="very-tall">Very Tall</option></select></div><div class="form-group"><label>Height (cm)</label><input type="text" class="ai-input" id="muse-height-cm" placeholder="170"></div></div><div class="form-row-2"><div class="form-group"><label>Build</label><select class="ai-select" id="muse-build"><option value="petite">Petite</option><option value="slim">Slim</option><option value="athletic" selected>Athletic</option><option value="curvy">Curvy</option><option value="voluptuous">Voluptuous</option><option value="muscular">Muscular</option><option value="plus-size">Plus-Size</option></select></div><div class="form-group"><label>Body Shape</label><select class="ai-select" id="muse-body-shape"><option value="hourglass" selected>Hourglass</option><option value="pear">Pear</option><option value="apple">Apple</option><option value="rectangle">Rectangle</option><option value="triangle">Triangle</option></select></div></div><div class="form-row-2"><div class="form-group"><label>Skin Tone</label><select class="ai-select" id="muse-skin-tone"><option value="pale">Pale</option><option value="fair" selected>Fair</option><option value="medium">Medium</option><option value="olive">Olive</option><option value="tan">Tan</option><option value="brown">Brown</option><option value="dark">Dark</option></select></div><div class="form-group"><label>Skin Texture</label><select class="ai-select" id="muse-skin-texture"><option value="smooth" selected>Smooth</option><option value="freckled">Freckled</option><option value="tattooed">Tattooed</option><option value="scarred">Scarred</option></select></div></div><h3 class="form-section-title">Measurements (Optional)</h3><div class="form-row-3"><div class="form-group"><label>Bust</label><input type="text" class="ai-input" id="muse-bust" placeholder="36"></div><div class="form-group"><label>Cup Size</label><input type="text" class="ai-input" id="muse-bust-cup" placeholder="C"></div></div><div class="form-row-2"><div class="form-group"><label>Waist</label><input type="text" class="ai-input" id="muse-waist" placeholder="26"></div><div class="form-group"><label>Hips</label><input type="text" class="ai-input" id="muse-hips" placeholder="38"></div></div><div class="form-row-2"><div class="form-group"><label>Muscle Tone</label><select class="ai-select" id="muse-muscle-tone"><option value="soft">Soft</option><option value="toned" selected>Toned</option><option value="athletic">Athletic</option><option value="muscular">Muscular</option></select></div><div class="form-group"><label>Body Hair</label><select class="ai-select" id="muse-body-hair"><option value="none">None</option><option value="minimal" selected>Minimal</option><option value="natural">Natural</option><option value="abundant">Abundant</option></select></div></div></div></div>
+                        <div class="editor-tab-panel" data-tab="face"><div class="form-section"><h3 class="form-section-title">Face</h3><div class="form-row-2"><div class="form-group"><label>Face Shape</label><select class="ai-select" id="muse-face-shape"><option value="oval" selected>Oval</option><option value="round">Round</option><option value="square">Square</option><option value="heart">Heart</option><option value="diamond">Diamond</option></select></div><div class="form-group"><label>Jawline</label><select class="ai-select" id="muse-jawline"><option value="soft">Soft</option><option value="defined" selected>Defined</option><option value="sharp">Sharp</option><option value="strong">Strong</option></select></div></div><div class="form-row-3"><div class="form-group"><label>Eye Color</label><input type="text" class="ai-input" id="muse-eye-color" placeholder="Blue, Green, Brown"></div><div class="form-group"><label>Eye Shape</label><select class="ai-select" id="muse-eye-shape"><option value="almond" selected>Almond</option><option value="round">Round</option><option value="hooded">Hooded</option><option value="upturned">Upturned</option><option value="downturned">Downturned</option></select></div><div class="form-group"><label>Eye Size</label><select class="ai-select" id="muse-eye-size"><option value="small">Small</option><option value="medium" selected>Medium</option><option value="large">Large</option></select></div></div><div class="form-row-3"><div class="form-group"><label>Lips</label><select class="ai-select" id="muse-lips"><option value="thin">Thin</option><option value="medium">Medium</option><option value="full" selected>Full</option><option value="plump">Plump</option></select></div><div class="form-group"><label>Lip Color</label><input type="text" class="ai-input" id="muse-lip-color" placeholder="natural, red, pink"></div><div class="form-group"><label>Nose</label><select class="ai-select" id="muse-nose"><option value="small">Small</option><option value="average" selected>Average</option><option value="prominent">Prominent</option><option value="button">Button</option><option value="aquiline">Aquiline</option></select></div></div><div class="form-row-2"><div class="form-group"><label>Cheekbones</label><select class="ai-select" id="muse-cheekbones"><option value="subtle">Subtle</option><option value="moderate">Moderate</option><option value="high" selected>High</option><option value="prominent">Prominent</option></select></div><div class="form-group"><label>Makeup Style</label><select class="ai-select" id="muse-makeup"><option value="none">None</option><option value="natural" selected>Natural</option><option value="glamorous">Glamorous</option><option value="dramatic">Dramatic</option><option value="gothic">Gothic</option></select></div></div><h3 class="form-section-title">Hair</h3><div class="form-row-3"><div class="form-group"><label>Hair Color</label><input type="text" class="ai-input" id="muse-hair-color" placeholder="Blonde, Black, Red"></div><div class="form-group"><label>Hair Length</label><select class="ai-select" id="muse-hair-length"><option value="pixie">Pixie</option><option value="short">Short</option><option value="shoulder">Shoulder-Length</option><option value="long" selected>Long</option><option value="very-long">Very Long</option></select></div><div class="form-group"><label>Hair Style</label><select class="ai-select" id="muse-hair-style"><option value="straight" selected>Straight</option><option value="wavy">Wavy</option><option value="curly">Curly</option><option value="braided">Braided</option><option value="updo">Updo</option></select></div></div><div class="form-group"><label>Hair Texture</label><input type="text" class="ai-input" id="muse-hair-texture" placeholder="smooth, silky, messy"></div><div class="form-group"><label>Facial Hair</label><input type="text" class="ai-input" id="muse-facial-hair" placeholder="none, beard, goatee"></div></div></div>
+                        <div class="editor-tab-panel" data-tab="features"><div class="form-section"><h3 class="form-section-title">Tattoos</h3><div id="tattoos-list"></div></div><div class="form-section"><h3 class="form-section-title">Piercings</h3><div id="piercings-list"></div></div><div class="form-section"><h3 class="form-section-title">Unique Traits</h3><div class="form-group"><label>Other Distinguishing Features</label><textarea class="ai-textarea" id="muse-unique-traits" placeholder="dimples, beauty mark, heterochromia..."></textarea></div></div></div>
+                        <div class="editor-tab-panel" data-tab="style"><div class="form-section"><h3 class="form-section-title">Fashion & Style</h3><div class="form-group"><label>Fashion Style</label><input type="text" class="ai-input" id="muse-fashion-style" placeholder="casual, elegant, sporty, gothic"></div><div class="form-group"><label>Lingerie Preferences</label><input type="text" class="ai-input" id="muse-lingerie" placeholder="lace, silk, leather"></div><div class="form-row-2"><div class="form-group"><label>Footwear</label><input type="text" class="ai-input" id="muse-footwear" placeholder="heels, boots, sneakers"></div><div class="form-group"><label>Nails</label><select class="ai-select" id="muse-nails"><option value="natural" selected>Natural</option><option value="manicured">Manicured</option><option value="long">Long</option><option value="painted">Painted</option></select></div></div><h3 class="form-section-title">Personality & Vibe</h3><div class="form-group"><label>Personality</label><textarea class="ai-textarea" id="muse-personality" placeholder="confident, playful, dominant, shy..."></textarea></div><div class="form-group"><label>Overall Vibe</label><input type="text" class="ai-input" id="muse-vibe" placeholder="sensual, romantic, fierce, playful"></div></div></div>
+                        <div class="editor-tab-panel" data-tab="references"><div class="form-section"><h3 class="form-section-title">Reference Images</h3><p style="color: #999; font-size: 0.9rem; margin-bottom: 1rem;">Upload reference images for character consistency. Mark one as primary for IP-Adapter/ControlNet.</p><div class="reference-images-grid" id="reference-images-container"></div></div></div>
+                        <div class="editor-tab-panel" data-tab="ai-settings"><div class="form-section"><h3 class="form-section-title">Prompt Settings</h3><div class="form-group"><label>Quality Tags</label><input type="text" class="ai-input" id="muse-quality-tags" placeholder="masterpiece, best quality, high resolution"></div><div class="form-group"><label>Style Tags</label><input type="text" class="ai-input" id="muse-style-tags" placeholder="photorealistic, cinematic, studio lighting"></div><div class="form-group"><label>Positive Prompt Prefix</label><textarea class="ai-textarea" id="muse-positive-prefix" placeholder="Additional positive tags..."></textarea></div><div class="form-group"><label>Negative Prompt Additions</label><textarea class="ai-textarea" id="muse-negative-additions" placeholder="Additional negative tags..."></textarea></div><h3 class="form-section-title">ComfyUI Settings</h3><div class="form-row-2"><div class="form-group"><label>Preferred Checkpoint</label><input type="text" class="ai-input" id="muse-checkpoint" placeholder="model.safetensors"></div><div class="form-group"><label>Preferred VAE</label><input type="text" class="ai-input" id="muse-vae" placeholder="vae.safetensors"></div></div><div class="form-row-3"><div class="form-group"><label>Sampler</label><input type="text" class="ai-input" id="muse-sampler" placeholder="DPM++ 2M Karras"></div><div class="form-group"><label>Steps</label><input type="number" class="ai-input" id="muse-steps" placeholder="30"></div><div class="form-group"><label>CFG Scale</label><input type="number" step="0.5" class="ai-input" id="muse-cfg-scale" placeholder="7"></div></div></div></div>
+                        <div class="editor-tab-panel" data-tab="variations"><div class="form-section"><h3 class="form-section-title">Character Variations</h3><p style="color: #999; font-size: 0.9rem; margin-bottom: 1rem;">Create variations with different outfits, scenarios, or styles.</p><div class="variations-container" id="variations-container"></div></div></div>
+                        <div class="editor-tab-panel" data-tab="history"><div class="form-section"><h3 class="form-section-title">Generation History</h3><div class="generation-history-container" id="generation-history-container"></div></div></div>
+                        <div class="editor-tab-panel" data-tab="notes"><div class="form-section"><h3 class="form-section-title">Notes & Ideas</h3><textarea class="ai-textarea" id="muse-notes" placeholder="Notes about this character, ideas for future generations..." style="min-height: 300px;"></textarea></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="muse-modal-footer">
+                <div class="footer-actions-left">
+                    <button class="btn-secondary" id="btn-export-muse"><i class="ph ph-download"></i> Export</button>
+                    <button class="btn-secondary" id="btn-import-muse"><i class="ph ph-upload"></i> Import</button>
+                </div>
+                <div class="footer-actions-right">
+                    <button class="btn-danger" id="btn-delete-muse"><i class="ph ph-trash"></i> Delete</button>
+                    <button class="btn-primary" id="btn-save-muse-pro"><i class="ph ph-floppy-disk"></i> Save Character</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay modal-backdrop" id="settings-modal">
+        <div class="muse-modal-container">
+            <div class="muse-modal-header">
+                <h2><i class="ph ph-gear"></i> Studio Settings</h2>
+                <button class="muse-modal-close modal-close"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="muse-modal-body">
+                <div class="settings-content">
+                    <!-- Cloud GPU Settings -->
+                    <div class="settings-section">
+                        <h3>Cloud GPU Service</h3>
+                        <p class="settings-description">Connect to Vast.ai for cloud-based ComfyUI generation</p>
+
+                        <div class="form-group">
+                            <label>Service Provider</label>
+                            <select class="ai-select" id="cloud-service-select">
+                                <option value="local">Local ComfyUI</option>
+                                <option value="vastai">Vast.ai</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="vastai-settings" style="display: none;">
+                            <label>Vast.ai API Key</label>
+                            <form id="vastai-form" onsubmit="event.preventDefault();">
+                                <input type="text" name="username" autocomplete="username" style="display:none;" aria-hidden="true">
+                                <input type="password" class="ai-input" id="vastai-api-key" 
+                                       placeholder="Enter your Vast.ai API key" autocomplete="new-password">
+                                <small>Get your API key from <a href="https://console.vast.ai/account/" target="_blank">Vast.ai Account Settings</a></small>
+                            </form>
+                        </div>
+
+                        <div class="form-group" id="vastai-instance-controls" style="display: none;">
+                            <label>GPU Instance Management</label>
+                            <div class="instance-controls">
+                                <button class="btn-secondary" id="start-vastai-instance">Start Instance</button>
+
+                                <!-- Warm Pool Panel -->
+                                <div id="warm-pool-panel" style="margin-top:12px;">
+                                    <div><strong>Warm Pool</strong> - keep a ready GPU for fast starts</div>
+                                    <div id="warm-pool-status" style="margin-top:6px;">Status: <span id="warm-pool-status-text">Unknown</span></div>
+                                    <div style="margin-top:6px;">
+                                        <button class="btn-secondary" id="warm-pool-prewarm">Prewarm</button>
+                                        <button class="btn-secondary" id="warm-pool-terminate">Terminate</button>
+                                    </div>
+                                </div>
+                                <button class="btn-danger" id="stop-vastai-instance">Stop Instance</button>
+                                <div id="vastai-instance-status" class="status-indicator">Status: Not connected</div>
+                            </div>
+                        </div>
+
+                        <button id="test-cloud-connection" class="btn-secondary">Test Connection</button>
+                        <div id="connection-status"></div>
+                    </div>
+
+                    <!-- Local ComfyUI Settings -->
+                    <div class="settings-section">
+                        <h3>Local ComfyUI</h3>
+                        <p class="settings-description">Configure local ComfyUI endpoint</p>
+
+                        <div class="form-group">
+                            <label>ComfyUI Endpoint</label>
+                            <input type="text" class="ai-input" id="local-comfyui-endpoint" 
+                                   placeholder="http://127.0.0.1:8188"
+                                   value="http://127.0.0.1:8188">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="muse-modal-footer">
+                <div class="footer-actions">
+                    <button class="btn-secondary" id="settings-cancel">Cancel</button>
+                    <button class="btn-primary" id="settings-save">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="assets/js/navigation-timing.js"></script>
+    <script src="assets/js/navigation-context.js"></script>
+    <script src="assets/js/navigation-variation.js"></script>
+    <script src="assets/js/human-navigation-orchestrator.js"></script>
+
+    <!-- Professional Muse System -->
+    <script src="assets/js/muse-manager-pro.js"></script>
+    <script src="assets/js/muse-manager.js"></script>
+
+    <!-- Studio App (will use new muse system) -->
+    <script src="assets/js/ai-kings-studio-pro.js"></script>
+</body>
+
+</html>

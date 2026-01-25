@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Warm Pool Admin</title>
+  <style>
+    body{font-family:Arial;margin:20px}
+    label{display:block;margin:8px 0}
+    input[type=number]{width:80px}
+    .status{margin-top:12px;padding:10px;background:#f4f4f4;border-radius:6px}
+    .danger{color:#a00}
+  </style>
+</head>
+<body>
+  <h1>Warm Pool Admin</h1>
+  <p>Enter your <strong>admin key</strong> (set the server env var <code>ADMIN_API_KEY</code>) and click <em>Refresh</em>.</p>
+
+  <label>Admin Key: <input id="adminKey" type="password" /></label>
+  <button id="btnRefresh">Refresh</button>
+
+  <div class="status" id="statusBox">Not loaded</div>
+
+  <div id="controls" style="display:none">
+    <label>Desired pool size: <input id="desiredSize" type="number" min="0" /></label>
+    <label><input id="safeMode" type="checkbox" /> Safe mode (aggressive shutdown)</label>
+    <div style="margin-top:10px">
+      <button id="btnSave">Save</button>
+      <button id="btnTerminate">Terminate Instance</button>
+    </div>
+  </div>
+
+  <hr />
+  <h2>Admin Logs</h2>
+
+  <div id="logsControls">
+    <label>Since (ISO date/time): <input id="logsSince" type="datetime-local" /></label>
+    <label>Action (optional): <input id="logsAction" type="text" placeholder="e.g. terminate, set_warm_pool" /></label>
+    <label>Limit: <input id="logsLimit" type="number" min="1" max="100" value="50" /></label>
+    <div style="margin-top:8px">
+      <button id="btnLoadLogs">Load Logs</button>
+    </div>
+  </div>
+
+  <div id="logsSection" style="margin-top:12px; display:none">
+    <div id="logsPager" style="margin-bottom:6px">
+      <button id="logsPrev">Prev</button>
+      <span id="logsPageInfo">Page 1</span>
+      <button id="logsNext">Next</button>
+    </div>
+
+    <table id="logsTable" border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr>
+          <th>Timestamp</th><th>Action</th><th>Route</th><th>IP</th><th>Outcome</th><th>Details</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div id="logsStatus" style="margin-top:8px"></div>
+  </div>
+
+  <script src="/assets/js/admin-warm-pool.js"></script>
+</body>
+</html>

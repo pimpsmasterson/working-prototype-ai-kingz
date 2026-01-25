@@ -1,0 +1,451 @@
+a{
+  color:#999999;
+}
+
+.modal .modalBox.info {
+  border-color: #fff;
+}
+
+.modal .modalBox.info:after {
+  background: url("../images/modal_sprite2.png") no-repeat 0 0;
+}
+
+.modal .modalBox.adult {
+  border-color: #fff;
+}
+
+.modal .modalBox.adult:after {
+  background: url("../images/modal_sprite2.png") no-repeat -142px 0;
+}
+
+.modal .modalBox.info:after {
+  width: 142px;
+}
+
+.modal .modalBox.adult:after {
+  width: 130px;
+}
+
+.modal {
+    background: rgba(0,0,0,0.90);
+}
+
+main .cartData .right input {
+  color: #fff;
+  /*background: #d70000;*/
+}
+
+main .cartData .right input {
+  text-align: center;
+  width: 285px;
+  margin: 0 auto 20px;
+  display: block;
+  height: 40px;
+  font: bold 16px Arial;
+}
+
+main .cartData .right .small{
+  font: bold 12px Arial;
+}
+
+
+main .bottomLinks .socials a:hover{
+    background: url("../images/socials_sprite_hover.png") no-repeat;
+}
+
+main .bottomLinks .socials a:hover.instagram {
+    width: 29px;
+}
+
+main .bottomLinks .socials a:hover.twitter {
+    background-position: -44px 0;
+}
+
+main .bottomLinks .socials a:hover.twitter{
+    width: 34px;
+}
+
+main .bottomLinks .socials a:hover.facebook {
+    background-position: -91px 0;
+}
+
+main .bottomLinks .socials a:hover.facebook {
+    width: 29px;
+}
+
+.overme {
+    width: 300px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow: ellipsis;
+    color: red;
+}
+
+main .slider img.active {
+    opacity: 1;
+    position: relative;
+    z-index: 2;
+}
+main .slider img {
+    display: block;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    z-index: 1;
+    opacity: 0;
+    transition: all ease-in-out 400ms;
+    -webkit-transition: all ease-in-out 400ms;
+    -moz-transition: all ease-in-out 400ms;
+    -o-transition: all ease-in-out 400ms;
+}
+
+main .faq.table .content{
+    color: white;
+}
+
+main .pagination .dots a:hover  {
+    background-color: #202020;
+}
+
+header#mainHeader .middleNav .center .red a{
+    color: red;
+}
+
+
+#container {
+    bottom: -1px ;
+    display: none ;
+    left: 20px ;
+    left: 20px ;
+    position: fixed ;
+    width: 95% ;
+    z-index: 1000;
+    }
+#inner {
+    z-index: 1000;
+    background-color: #450000;
+    border: 4px solid #000;
+    border-bottom-width: 0px ;
+    padding: 0px 20px 20px 20px ;
+    color: white;
+    font: 700 14px/18px "Roboto Condensed";
+    }
+
+#inner table td{
+  vertical-align: top;
+}
+
+
+#inner .image{
+  float:left;
+  padding-right: 20px;
+}
+
+#inner .text{
+  font-size: 25px;
+  line-height: 22px;
+  text-align: center;
+}
+
+#inner td{
+  text-align: center;
+}
+
+#inner .close{
+  width: 100%;
+  text-align: right;
+  color: #aaa;
+}
+
+#inner .close span{
+  cursor: hand;
+  cursor: pointer;
+}
+
+
+main .details .priceTable .header .text {
+    padding: 0 0 0 20px;
+    width: 100%;
+    text-transform: uppercase;
+    font-family: "Roboto Condensed";
+}
+
+.unsubscribe{
+    color: white;
+    font: normal 24px/26px Arial;
+    text-align: center;
+}
+
+#itemCount {
+  position: absolute;
+  top: 10px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: red;
+  color: white;
+  text-align: center;
+  z-index: 1000;
+  font-family: Arial;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.mtable {
+    /* background: red; */
+    display: table;
+    width: 100%;
+    background: #2d2d2d;
+}
+
+.mtable:hover{
+    background: #3d3d3d;
+}
+
+.messageText, .messageDate {
+    display: table-cell;
+    padding: 0 5px 0 5px;
+
+    /* Ellipsis in table: http://bit.ly/1Q5zxLW */
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.messageText {
+
+    font-family: Arial;
+    padding: 5px;
+    font-size:14px;
+}
+
+.messageDate {
+    text-align: center;
+    font-family: Arial;
+    font-size:12px;
+}
+
+.msgbold{
+    font-weight: bold;
+    color: white;
+}
+
+.msgtopdate{
+    font-family: Arial;
+    padding: 5px;
+    font-size:12px;
+}
+
+.msgleft{
+    border-left: 5px solid red;
+}
+
+.message{
+    font-family: Arial;
+    margin: 5px;
+    font-size:14px;
+}
+
+.msgbottom{
+    margin-bottom: 0px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid #3d3d3d;
+}
+
+.msgtable{
+    padding-bottom: 0px !important;
+    padding-top: 0px !important;
+}
+
+.msgspace{
+    height: 40px;
+    margin-left: 25px;
+}
+
+.cartTable textarea{
+    margin-bottom: 0px !important;
+}
+
+.cartTable button{
+    margin-bottom: 0px !important;
+}
+
+.payproblem{
+    width: 380px;
+    text-align: center;
+    margin: 20px auto 20px;
+    display: block;
+    height: 40px;
+    font: bold 18px/40px Arial;
+}
+
+
+
+main .membership .discount span {
+    color: #fff;
+}
+
+main .membership .discount span {
+    position: absolute;
+    top: 9px;
+    left: 29px;
+    display: block;
+    -ms-transform: rotate(40deg);
+    -webkit-transform: rotate(40deg);
+    transform: rotate(40deg);
+    font: 700 22px/24px "Roboto Condensed";
+}
+
+main .membership {
+    position: relative;
+    overflow: hidden;
+}
+
+.subpageContent .lines{
+    border-bottom: 1px solid #555;
+}
+
+.cartalert{
+    font-family: Arial;
+    font-size:14px;
+}
+
+.cartalert b{
+    font-family: Arial;
+    font-size:14px;
+    font-weight: bolder;
+}
+@media only screen and (max-width: 640px){
+    main .cartTable span {
+        cursor: pointer;
+        width: 70px;
+        display: inline-block;
+        text-align: center;
+    }
+
+    main .cartTable .rem{
+        width: 100px;
+    }
+
+    main .cartTable .lines .oneLine .right span:after {
+        right: 5px;
+    }
+
+    main .inputSearch{
+        width:100%
+    }
+}
+
+.badge{
+    margin-right:20px;
+    margin-left:20px;
+    width: 70px;
+}
+
+.badgetext{
+    vertical-align: top;
+}
+
+main .membershipContent .content .cross:before {
+    background: url(../images/new/link.png) no-repeat;
+}
+
+main .membershipContent .content .price .subtext {
+    font-size: 18px;
+}
+
+.historyMembership::before {
+    background: url(../images/new/membership.png) no-repeat;
+    width: 22px;
+    height: 24px;
+    content: "";
+    display: block;
+    position: absolute;
+}
+
+.historyCrossmembership::before {
+    background: url(../images/new/link.png) no-repeat;
+    width: 22px;
+    height: 24px;
+    content: "";
+    display: block;
+    position: absolute;
+}
+
+.historyVideo::before {
+    background: url(../images/new/video.png) no-repeat;
+    width: 22px;
+    height: 24px;
+    content: "";
+    display: block;
+    position: absolute;
+}
+
+.historyCrowdfunding::before {
+    background: url(../images/new/crowdfunding.png) no-repeat;
+    width: 22px;
+    height: 24px;
+    content: "";
+    display: block;
+    position: absolute;
+}
+
+.history span{
+    padding-left: 30px;
+    width: 100% !important;
+    text-align: left !important;
+}
+
+main .categories .videoContent {
+    margin-bottom: 60px;
+}
+
+main .details .video.hd:before,.addToFavWithStar {
+    z-index: 100000000;
+}
+
+.activestar {
+  background-position: 0 -41px !important;
+}
+
+@media only screen and (max-width: 980px) {
+  header#mainHeader button[type=submit] {
+    top: 24px;
+  }
+}
+
+.coinpayments{
+    background-image: url(/assets/images/logos/coinpayments.png)!important;
+    margin-bottom: 0px !important;
+}
+
+.coinpayments:hover{
+    background-image: url(/assets/images/logos/coinpayments.png)!important;
+}
+
+.selectcrypto{
+    margin-right:20px;
+    margin-top:7px;
+    font: bold 16px Arial;
+}
+
+.selectcryptoInput{
+    margin-bottom: 20px;
+    margin-top:3px;
+}
+
+.coinSearch {
+    width: 323px !important;
+    box-sizing: border-box !important;
+    padding: 0 10px !important;
+    font: normal 14px Arial !important;
+    height: 28px !important;
+    text-align: left !important;
+    margin-bottom: 0px  !important;
+}
+
+.regTable p{
+    color: white;
+}

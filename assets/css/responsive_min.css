@@ -1,0 +1,808 @@
+main .membership .discount {
+    z-index: 8;
+    width: 78px;
+    height: 65px;
+    position: absolute;
+    right: 0;
+    top: 57px;
+}
+
+.regTable .cell.inputs .title {
+    display: none;
+    color: #fff;
+    font: 16px/28px Arial;
+    margin: 8px 0 0
+}
+
+.mobileMenus .mailIco {
+    display: none
+}
+
+@media only screen and (min-width: 1301px) {
+    main .videosContent .videoContent:nth-child(4n) {
+        margin: 0
+    }
+}
+
+@media only screen and (max-width: 1540px) and (min-width: 981px) {
+    header#mainHeader .middleNav .center nav {
+        padding: 0 40px 0 0
+    }
+    header#mainHeader .middleNav .center nav>ul>li.hasSubMenu .dropdownMenu {
+        margin-left: 0
+    }
+    header#mainHeader input[type="text"] {
+        width: 200px
+    }
+    header#mainHeader input[type="text"]:focus {
+        width: 165px
+    }
+    header#mainHeader .middleNav .right .basket {
+        width: 35px
+    }
+    header#mainHeader .middleNav .right .basket:after {
+        left: 5px
+    }
+    header#mainHeader .middleNav .right .joinNow,
+    header#mainHeader .middleNav .right .login {
+        padding-left: 2px;
+        padding-right: 2px
+    }
+    header#mainHeader .middleNav .center a {
+        padding-left: 4px;
+        padding-right: 4px
+    }
+    header#mainHeader .middleNav .right .joinNow,
+    header#mainHeader .middleNav .right .basket,
+    header#mainHeader .middleNav .right .login {
+        margin-right: 2px
+    }
+    header#mainHeader .middleNav .right .language {
+        padding: 26px 12px 0 4px
+    }
+    header#mainHeader .middleNav .right .language .selected:after {
+        right: 2px
+    }
+    header#mainHeader .middleNav .right .menu {
+        padding-left: 8px;
+        padding-right: 8px
+    }
+    header#mainHeader .middleNav .right .userPanel {
+        padding-left: 8px;
+        padding-right: 8px
+    }
+    header#mainHeader .mailIco {
+        padding-right: 10px
+    }
+}
+
+@media only screen and (max-width: 1300px) and (min-width: 981px) {
+    main .cartData .right .inner {
+        width: 300px
+    }
+    main .details .priceTable .priceBox,
+    main .details .priceTable {
+        width: 340px
+    }
+    h2.arrange {
+        padding-right: 380px
+    }
+    main .videosContent .videoContent {
+        width: 31%;
+        margin: 0 3.5% 0 0
+    }
+    main .videosContent .videoContent:nth-child(3n) {
+        margin: 0
+    }
+}
+
+@media only screen and (min-width: 981px) {
+    .mobileMenu,
+    .showMobile,
+    .mobileMenus,
+    .notification {
+        display: none !important
+    }
+}
+
+@media only screen and (max-width: 980px) {
+    main .slider .arrow {
+        width: 30px;
+        background-size: 60px auto
+    }
+    main .slider .arrow.left {
+        left: 10px
+    }
+    main .slider .arrow.right {
+        right: 10px
+    }
+    main .videosContent .videoContent {
+        width: 31%;
+        margin: 0 3.5% 0 0
+    }
+    main .videosContent .videoContent:nth-child(3n) {
+        margin: 0
+    }
+    .mobileMenus .mailIco {
+        display: block;
+        padding: 20px
+    }
+    header#mainHeader .middleNav .toCenter .right {
+        right: 0
+    }
+    header#mainHeader .middleNav .toCenter .left {
+        padding-left: 2px
+    }
+    main .inputSearch {}
+    header#mainHeader .middleNav .basket,
+    header#mainHeader .middleNav .joinNow,
+    header#mainHeader .middleNav .login,
+    header#mainHeader .middleNav .language,
+    header#mainHeader .middleNav .mailIco,
+    header#mainHeader .middleNav .userPanel,
+    header#mainHeader .middleNav .menu {
+        display: none
+    }
+    h2.arrange {
+        padding-right: 0
+    }
+    .regTable .cell.redCircle {
+        display: none
+    }
+    .regTable .cell.texts {
+        width: auto
+    }
+    .feedback {
+        display: none
+    }
+    main .screenshots .showMore span,
+    main .screenshots .showMore.toggleShow span {
+        padding-top: 20px;
+        padding-bottom: 20px
+    }
+    main .screenshots .showMore span:after,
+    main .screenshots .showMore.toggleShow span:after {
+        top: 25px
+    }
+    .cloned,
+    .headerClone {
+        display: none !important
+    }
+    main .details {
+        display: block
+    }
+    main .details>* {
+        display: block;
+        width: 100%
+    }
+    main .screenshots .scr img {
+        width: 100%
+    }
+    main .details .priceTable {
+        width: 100%
+    }
+    main .details .priceTable .priceBox {
+        float: left;
+        width: 48%;
+        margin: 0 4% 0 0
+    }
+    main .details .priceTable .priceBox:nth-child(2n) {
+        margin-right: 0
+    }
+    main .details .descriptions {
+        padding: 0
+    }
+    header#mainHeader .middleNav .right .search {
+        display: none
+    }
+    header#mainHeader {
+        position: relative
+    }
+    body {
+        padding-top: 0 !important
+    }
+    main .videosContent.extraPadding {
+        padding: 20px 0
+    }
+    .myMoviesShort .dropdowns {
+        clear: both;
+        float: none;
+        margin: 10px 0 0 -15px
+    }
+    main .myMoviesShort {
+        padding-bottom: 10px
+    }
+    main .myMovies {
+        padding: 10px 0
+    }
+    main .myMovies .videosContent {
+        width: 100%;
+        clear: both;
+        float: none
+    }
+    .modal .modalBox::after,
+    .modal .modalBox::before {
+        left: 20px
+    }
+    .modal .modalBox {
+        width: 100%;
+        padding: 50px 20px 25px 160px
+    }
+    main .faq .left li {
+        float: left;
+        width: 32%;
+        text-align: center;
+        box-sizing: border-box;
+        margin: 0 2% 2% 0
+    }
+    main .faq .left li:nth-child(3n) {
+        margin-right: 0
+    }
+    main .faq.table {
+        display: block
+    }
+    main .faq.table>* {
+        width: 100%;
+        display: block;
+        padding: 0
+    }
+    main .categories {
+        padding: 0;
+        padding: 0
+    }
+    main .categories .videosContent .videoContent {
+        margin-bottom: 30px !important
+    }
+    main .cartTable .table>* {
+        vertical-align: middle
+    }
+    main .cartData,
+    main .cartTable,
+    main .aboutBlocks {
+        padding-left: 0;
+        padding-right: 0
+    }
+    main .aboutBlock .table {
+        display: block
+    }
+    main .aboutBlock .table>* {
+        display: block;
+        width: 100%
+    }
+    main .aboutBlock .table>* p {
+        padding: 0
+    }
+    main .aboutBlock p.center {
+        padding: 20px 0 30px;
+        text-align: left
+    }
+    main .aboutBlock img {
+        max-width: 100%;
+        display: block;
+        margin: 0 auto !important
+    }
+    main .aboutBlock h3 {
+        text-align: center
+    }
+    main .aboutBlock h3.right {
+        text-align: center
+    }
+    main .aboutBlock p.right {
+        text-align: left
+    }
+    main .cartData .table {
+        display: block
+    }
+    main .cartData .table>* {
+        width: 100%;
+        display: block
+    }
+    main .cartData .table>*.center {
+        display: none
+    }
+    main .cartData .formLeft {
+        width: 565px;
+        display: block;
+        margin: 0 auto
+    }
+    main .cartData .right .inner {
+        width: 100%
+    }
+    main .cartData .right .inner {
+        padding: 20px 0
+    }
+    header#mainHeader .middleNav .center nav {
+        display: none
+    }
+    .mobileMenu {
+        display: block !important
+    }
+    main .slider .sliderPagination {
+        bottom: 20px;
+        right: 20px
+    }
+    main .promoLine .toLeft {
+        width: 50%
+    }
+    .hideMobile {
+        display: none !important
+    }
+    .showMobile {
+        display: block
+    }
+    main .discountBlock p {
+        width: 100%;
+        box-sizing: border-box
+    }
+    main .premiumBlock .content img {
+        margin: 0
+    }
+    main .darkBackground.extraPadding {
+        padding-bottom: 20px
+    }
+    main .premiumBlock .content>* {
+        display: block;
+        float: left
+    }
+    main .premiumBlock .content>*.left {
+        width: 30%
+    }
+    main .premiumBlock .content>*.left img {
+        max-width: 100%
+    }
+    main .premiumBlock .content>*.right {
+        width: 70%
+    }
+    main .accessBlock .image {
+        display: none
+    }
+    main .accessBlock .texts {
+        width: 100%
+    }
+    main .accessBlock .texts p {
+        padding-left: 0;
+        padding-right: 0
+    }
+    main .accessBlock {
+        background-size: cover !important
+    }
+    main .toCenter.extraPadding {
+        padding-left: 10px;
+        padding-right: 10px
+    }
+    main .deviceBlock .table>* {
+        display: block
+    }
+    main .deviceBlock .table .texts {
+        padding: 0
+    }
+    main .deviceBlock .table .image {
+        padding: 0;
+        width: 100%
+    }
+    main .deviceBlock .table .image img {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%
+    }
+    main .discountBlock .top {
+        padding: 0
+    }
+    main .discountBlock p {
+        padding: 0
+    }
+    main .badges {
+        padding: 30px 0 0
+    }
+    main .subpageContent {
+        padding-bottom: 50px
+    }
+    footer#mainFooter p {
+        padding-right: 0
+    }
+    main .badges .badgeContent {
+        padding-bottom: 30px
+    }
+    main .badges .badgeContent .badge {
+        margin: 0 20px 20px
+    }
+    main .contentSeparator {
+        padding: 0 50px
+    }
+}
+
+@media only screen and (max-width: 780px) {
+    main .screenshots .scr {
+        width: 48%;
+        margin: 0 4% 4% 0
+    }
+    main .screenshots .scr:nth-child(even) {
+        margin-right: 0
+    }
+    main .screenshots .scr:nth-child(odd) {
+        margin-right: 4%
+    }
+    main .actorData .actorDetails {
+        width: 250px
+    }
+    main .actorData .actorDetails ul {
+        width: 250px
+    }
+    main .actorData .actorDetails img {
+        width: 250px
+    }
+    main .actorData .actorIntro {
+        padding-left: 20px
+    }
+    main .myMovies .videosContent .videoContent,
+    main .myMovies .videosContent .videoData,
+    main .myMovies .videosContent .videoContent:nth-child(2n+1) {
+        width: 49%;
+        margin: 0
+    }
+    main .myMovies .videosContent .videoData .buttons a {
+        float: none;
+        clear: both;
+        margin: 0 0 10px;
+        display: block
+    }
+    main .myMovies .videosContent .videoData {
+        margin: 0 0 0 2%;
+        box-sizing: border-box
+    }
+    main .videosContent .videoContent {
+        width: 48%
+    }
+    main .videosContent .videoContent:nth-child(odd) {
+        margin: 0 4% 0 0
+    }
+    main .videosContent .videoContent:nth-child(even) {
+        margin: 0
+    }
+    main .premiumBlock .content>.left {
+        display: none
+    }
+    main .premiumBlock .content>.right {
+        width: 100%
+    }
+    main .premiumBlock .content p {
+        padding-left: 0;
+        padding-right: 0;
+        width: 100%
+    }
+    main .premiumBlock .toCenter {
+        padding-left: 10px;
+        padding-right: 10px
+    }
+    main .accountBlock input {
+        width: 48%;
+        margin: 0 4% 20px 0
+    }
+    main .accountBlock input:nth-child(2) {
+        margin-right: 0
+    }
+    main .accountBlock {
+        padding: 20px 0 0;
+        height: auto
+    }
+    main .accountBlock button {
+        width: 48%
+    }
+    main .bottomLinks .links,
+    main .bottomLinks .socials {
+        float: none;
+        clear: both
+    }
+    footer#mainFooter .image {
+        border: none;
+        border-bottom: 4px solid #2d2d2d;
+        padding: 0 0 30px
+    }
+    footer#mainFooter .image img {
+        margin: 0 auto;
+        max-width: 100%
+    }
+    footer#mainFooter .table {
+        display: block
+    }
+    footer#mainFooter .table>* {
+        width: 100%;
+        display: block
+    }
+    footer#mainFooter .texts {
+        padding: 30px 0 0
+    }
+    footer#mainFooter p {
+        padding: 0 0 20px
+    }
+    main .bottomLinks .links li {
+        margin-bottom: 20px
+    }
+    main .details .priceTable .priceBox {
+        float: none;
+        clear: both;
+        width: 100%;
+        margin: 0
+    }
+    main .contentSeparator {
+        padding: 0
+    }
+}
+
+@media only screen and (max-width: 640px) {
+    main .categories .categoryLine {
+        font-size: 11px;
+        }
+
+    .regTable {
+        display: block;
+        padding: 20px 0 0
+    }
+    .regTable .cell.texts {
+        display: none
+    }
+    .regTable .cell.inputs .title {
+        display: block
+    }
+    .regTable .inputs input[type="submit"] {
+        width: 100%
+    }
+    .regTable .inputs p,
+    .regTable .inputs label {
+        font-size: 14px
+    }
+    .regTable .inputs .tooltip {
+        right: 0
+    }
+    .regTable .inputs .tooltip:after {
+        left: auto;
+        margin: 0;
+        right: 7px
+    }
+    .regTable .cell.inputs {
+        width: 100%;
+        display: block
+    }
+    main .cartData .formLeft .inputName {
+        padding: 0
+    }
+    main .actorData {
+        display: block
+    }
+    main .actorData>* {
+        width: 100% !important;
+        display: block
+    }
+    main .actorData .actorDetails {
+        width: 250px
+    }
+    main .actorData .actorDetails ul {
+        width: 100%
+    }
+    main .actorData .actorDetails img {
+        width: 100%
+    }
+    main .actorData .actorIntro {
+        padding-top: 25px;
+        padding-left: 0
+    }
+    main .cartData .formLeft,
+    main .cartData .formLeft .inputName,
+    main .cartData .formLeft input[type="text"],
+    main .cartData .formLeft .dropdown {
+        width: 100%;
+        float: none;
+        clear: both;
+        text-align: left
+    }
+    .modal .modalBox::after,
+    .modal .modalBox::before {
+        display: none
+    }
+    .modal .modalBox {
+        width: 100%;
+        padding: 20px
+    }
+}
+
+@media only screen and (max-width: 640px) {
+    main .videosContent .videoContent img {
+        /*height: auto;*/
+        min-height: 100%
+    }
+    main .details .videoData .qualitySelector {
+        clear: both;
+        float: none;
+        margin-top: 20px;
+        margin-bottom: 10px
+    }
+    main .details .videoData .rate {
+        clear: both;
+        float: none
+    }
+    main .screenshots .scr {
+        width: 100%;
+        margin: 0 0 4% 0 !important
+    }
+    main .myMovies .videosContent .videoContent,
+    main .myMovies .videosContent .videoData,
+    main .myMovies .videosContent .videoContent:nth-child(2n+1) {
+        width: 100%;
+        margin: 0;
+        float: none;
+        clear: both
+    }
+    main .myMovies .videosContent .videoContent {
+        margin-bottom: 10px !important
+    }
+    main .myMovies .videosContent .videoData .buttons a {
+        float: none;
+        clear: both;
+        margin: 0 0 10px;
+        display: inline-block
+    }
+    main .myMovies .videosContent .videoData {
+        margin: 0 0 0 0%;
+        padding: 0;
+        box-sizing: border-box
+    }
+    main .faq .left li {
+        width: 100%;
+        margin: 0 0% 2% 0
+    }
+    main .cartData .right input {
+        width: 100%
+    }
+    body {
+        padding-top: 0
+    }
+    .topLogos,
+    header#mainHeader .bottomSection,
+    header#mainHeader .middleNav .right .userPanel,
+    header#mainHeader .middleNav .right .joinNow,
+    header#mainHeader .middleNav .right .search {
+        display: none
+    }
+    main .promoLine .toLeft {
+        width: 100%
+    }
+    main .filter .filterbox {
+        width: 100% !important;
+        margin: 10px 0;
+        float: none;
+        clear: both
+    }
+    main .slider {
+        height: auto !important
+    }
+    main .slider img {
+        width: 100%;
+        height: auto
+    }
+    main .sectionHeader .short {
+        float: none;
+        clear: both;
+        padding-top: 20px
+    }
+    main .videosContent:not(.categories) .videoContent {
+        width: 100%;
+        margin: 0 !important
+    }
+
+    main .videosContent .videoContent img {
+        min-width: 100%
+    }
+    main .accountBlock input {
+        width: 100%;
+        margin: 0 0 10px
+    }
+    main .accountBlock button {
+        width: 100%
+    }
+    main .accountBlock {
+        height: auto;
+        padding: 20px 0
+    }
+    main .accessBlock .texts a {
+        width: 100%
+    }
+    main .discountBlock .top>* {
+        display: block;
+        margin: 0 auto;
+        padding: 0
+    }
+    main .discountBlock .top {
+        margin: 0;
+        padding: 0 0 20px
+    }
+    main .discountBlock p {
+        padding: 0
+    }
+    .deviceBlock .table {
+        display: block
+    }
+    main .badges .badgeContent .badge {
+        margin: 0 0 20px
+    }
+    main .membershipContent .membership {
+        width: 100%;
+        margin: 0
+    }
+    main .membership .discount {
+        z-index: 8;
+        width: 78px;
+        height: 65px;
+        position: absolute;
+        right: 0;
+        top: 107px;
+    }
+    main .membershipContent .top .title,
+    main .membershipContent .top .price {
+        clear: both;
+        float: none;
+        text-align: center;
+        padding: 7px 0
+    }
+    main .membershipContent .content a {
+        width: 100%
+    }
+    main .myMoviesShort {
+        text-align: center;
+        padding: 10px;
+        box-sizing: border-box
+    }
+    main .myMoviesShort .logo {
+        float: none;
+        clear: both
+    }
+    main .myMoviesShort .logo img {
+        margin: 0 auto;
+        display: block
+    }
+    main .myMoviesShort .counter {
+        float: none;
+        clear: both;
+        padding: 5px 0;
+        text-align: center
+    }
+    main .myMoviesShort .counter strong {
+        font-size: 20px
+    }
+    main .myMoviesShort .dropdowns {
+        text-align: left
+    }
+    .myMoviesShort .dropdowns {
+        margin: 0
+    }
+    main .myMoviesShort .filterbox,
+    main .myMoviesShort .filterbox.long,
+    main .myMoviesShort .filterbox.medium {
+        margin: 10px 0;
+        width: 100%;
+        float: none;
+        clear: both
+    }
+    main a.showAll {
+        width: 100%
+    }
+    .mobileMenus .showSmallScreen {
+        display: block !important
+    }
+    main .commentBox button {
+        width: 100%
+    }
+    .mobileMenus .feedbackMenu button {
+        width: 100%
+    }
+    main .slider .arrow {
+        width: 20px;
+        background-size: 40px auto
+    }
+}
+
+@media only screen and (max-width: 339px) {
+    main .videosContent .videoContent {
+        width: 100%;
+        margin: 0 !important
+    }
+}

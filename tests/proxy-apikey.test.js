@@ -1,0 +1,55 @@
+const assert = require('assert');
+const supertest = require('supertest');
+
+describe('API key validation', function() {
+  it('checkApiKeyOrDie returns 500 when VASTAI_API_KEY is not set', async function() {
+    this.timeout(5000); // Increase timeout for this test
+
+    // Save original key
+    const originalKey = process.env.VASTAI_API_KEY;
+
+    try {
+      // Unset the key temporarily
+      delete process.env.VASTAI_API_KEY;
+
+      // Re-require the app to pick up the missing key
+      delete require.cache[require.resolve('../server/vastai-proxy')];
+      const app = require('../server/vastai-proxy');
+      const request = supertest(app);
+
+      const res = await request.post('/api/proxy/bundles')
+        .send({ verified: { eq: true } });
+
+      assert.strictEqual(res.status, 500);
+      assert.ok(res.body.error.includes('VASTAI_API_KEY'));
+    } finally {
+      // Restore key
+      process.env.VASTAI_API_KEY = originalKey;
+
+      // Re-require to restore original state
+      delete require.cache[require.resolve('../server/vastai-proxy')];
+      require('../server/vastai-proxy');
+    }
+  });
+
+  it('requireAdmin middleware allows valid admin key to proceed', async function() {
+    process.env.ADMIN_API_KEY = 'test_admin';
+    process.env.VASTAI_API_KEY = 'test_vast';
+
+    delete require.cache[require.resolve('../server/vastai-proxy')];
+    const app = require('../server/vastai-proxy');
+    const request = supertest(app);
+
+    // This endpoint uses requireAdmin middleware indirectly via its own check
+    // Let's test an endpoint that definitely calls next() on success
+    const warmPool = require('../server/warm-pool');
+    warmPool._internal.state.instance = null;
+
+    const res = await request.post('/api/proxy/admin/warm-pool')
+      .set('x-admin-key', 'test_admin')
+      .send({ desiredSize: 1 });
+
+    // Should succeed and call next(), resulting in 200
+    assert.strictEqual(res.status, 200);
+  });
+});

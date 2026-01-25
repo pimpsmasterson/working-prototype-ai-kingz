@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vast.ai Integration Test & Automation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-results {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #007bff; }
+        .warning { color: #ffc107; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        .status-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vast.ai Integration Test & Automation</h1>
+
+    <div class="controls">
+        <h2>Automated ComfyUI Instance Control</h2>
+
+        <div style="margin-bottom: 20px;">
+            <label><strong>Describe your ComfyUI task:</strong></label><br>
+            <input type="text" id="userRequest" placeholder="e.g., create a photorealistic portrait, generate 4K animation, simple sketch..." style="width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px;">
+            <br><small>The system will automatically determine the optimal GPU power based on your description</small>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label><strong>Or select complexity manually:</strong></label><br>
+            <select id="complexitySelect" style="padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="auto">Auto-detect from description</option>
+                <option value="low">Low - Basic tasks, simple images</option>
+                <option value="medium">Medium - Standard quality workflows</option>
+                <option value="high">High - Detailed, complex work</option>
+                <option value="ultra">Ultra - 4K/8K video, animations</option>
+            </select>
+        </div>
+
+        <button id="setupSSH">Setup SSH Key</button>
+        <button id="createTemplate">Create ComfyUI Template</button>
+        <button id="launchInstance">Launch Instance</button>
+        <button id="fullAuto">🚀 Full Automation</button>
+        <button id="checkStatus">Check Instance Status</button>
+        <button id="listInstances">List All Instances</button>
+        <br><br>
+        <label>Contract ID: <input type="text" id="contractId" placeholder="Enter contract ID"></label>
+    </div>
+
+    <div class="test-results">
+        <h2>Test Results & Logs</h2>
+        <div id="results"></div>
+    </div>
+
+    <div class="status-info" id="statusInfo" style="display: none;">
+        <h3>Instance Ready!</h3>
+        <div id="connectionDetails"></div>
+    </div>
+
+    <script src="vastai-test.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const test = new VastAITest();
+            const resultsDiv = document.getElementById('results');
+            const statusInfo = document.getElementById('statusInfo');
+            const connectionDetails = document.getElementById('connectionDetails');
+
+            const log = (message, type = 'info') => {
+                const div = document.createElement('div');
+                div.className = type;
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                resultsDiv.appendChild(div);
+                console.log(message);
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            };
+
+            // Button event handlers
+            document.getElementById('setupSSH').addEventListener('click', async () => {
+                log('🔑 Setting up SSH key...');
+                const result = await test.setupSSHKey();
+                if (result) {
+                    log('✅ SSH key setup complete!', 'success');
+                } else {
+                    log('❌ SSH key setup failed!', 'error');
+                }
+            });
+
+            document.getElementById('createTemplate').addEventListener('click', async () => {
+                log('📋 Creating ComfyUI template...');
+                const template = await test.createComfyUITemplate();
+                if (template) {
+                    log(`✅ Template created: ${template.name} (ID: ${template.id})`, 'success');
+                } else {
+                    log('❌ Template creation failed!', 'error');
+                }
+            });
+
+            document.getElementById('launchInstance').addEventListener('click', async () => {
+                const userRequest = document.getElementById('userRequest').value;
+                const complexitySelect = document.getElementById('complexitySelect').value;
+                const complexity = complexitySelect === 'auto' ? null : complexitySelect;
+
+                log('🚀 Launching instance...');
+                if (userRequest) {
+                    log(`User request: "${userRequest}"`);
+                }
+                if (complexity) {
+                    log(`Selected complexity: ${complexity.toUpperCase()}`);
+                }
+
+                const contractId = await test.launchAutomatedInstance(complexity || test.determineComplexity(userRequest));
+                if (contractId) {
+                    log(`✅ Instance launched! Contract ID: ${contractId}`, 'success');
+                    document.getElementById('contractId').value = contractId;
+                } else {
+                    log('❌ Instance launch failed!', 'error');
+                }
+            });
+
+            document.getElementById('fullAuto').addEventListener('click', async () => {
+                const userRequest = document.getElementById('userRequest').value;
+                const complexitySelect = document.getElementById('complexitySelect').value;
+                const finalComplexity = complexitySelect === 'auto' ? null : complexitySelect;
+
+                log('🤖 Starting full automation...');
+                if (userRequest) {
+                    log(`User request: "${userRequest}"`);
+                }
+
+                await test.runFullAutomation(userRequest || finalComplexity);
+            });
+
+            document.getElementById('checkStatus').addEventListener('click', async () => {
+                const contractId = document.getElementById('contractId').value;
+                if (!contractId) {
+                    log('❌ Please enter a contract ID', 'error');
+                    return;
+                }
+                log(`🔍 Checking status for contract ${contractId}...`);
+                const status = await test.checkInstanceStatus(contractId);
+                if (status) {
+                    if (status.actual_status === 'running') {
+                        showConnectionInfo(status);
+                    }
+                } else {
+                    log('❌ Status check failed!', 'error');
+                }
+            });
+
+            document.getElementById('listInstances').addEventListener('click', async () => {
+                log('📋 Listing all instances...');
+                const instances = await test.testInstanceListing();
+                if (instances && instances.instances) {
+                    log(`Found ${instances.instances.length} instances:`, 'info');
+                    instances.instances.forEach(inst => {
+                        log(`- Contract ${inst.id}: ${inst.actual_status} (${inst.gpu_name})`, 'info');
+                    });
+                } else {
+                    log('❌ Instance listing failed!', 'error');
+                }
+            });
+
+            const showConnectionInfo = (instance) => {
+                connectionDetails.innerHTML = `
+                    <strong>SSH Access:</strong><br>
+                    <code>ssh -i ~/.ssh/vast_ai_comfyui root@${instance.public_ipaddr}</code><br><br>
+                    <strong>ComfyUI Web Interface:</strong><br>
+                    <code>http://${instance.public_ipaddr}:8188</code><br><br>
+                    <strong>Instance Details:</strong><br>
+                    GPU: ${instance.gpu_name}<br>
+                    Status: ${instance.actual_status}<br>
+                    Cost: $${instance.dph_total}/hour
+                `;
+                statusInfo.style.display = 'block';
+                log('🎉 Instance connection details updated!', 'success');
+            };
+
+            // Initial connection test
+            log('🧪 Starting Vast.ai integration tests...');
+            const connectionOk = await test.testConnection();
+            if (connectionOk) {
+                log('✅ API connection test passed!', 'success');
+            } else {
+                log('❌ API connection test failed!', 'error');
+            }
+        });
+    </script>
+</body>
+</html></content>
+<parameter name="filePath">c:\Users\samsc\OneDrive\Desktop\working protoype\vastai-test.html

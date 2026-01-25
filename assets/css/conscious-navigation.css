@@ -1,0 +1,69 @@
+/* TIER 1: PHYSICAL COMPOSITION - assets/css/conscious-navigation.css */
+:root {
+    /* Human timing variables (from neuroscience research) */
+    --human-perception-delay: 300ms;
+    --cognitive-load-threshold: 1500ms;
+    --emotional-response-window: 500ms;
+    --forgiveness-fade: 1200ms;
+
+    /* Gold palette reimagined for human perception */
+    --gold-emotional: oklch(75% 0.18 85);
+    /* Warmth */
+    --gold-cognitive: oklch(78% 0.12 85);
+    /* Clarity */
+    --gold-instinctual: oklch(72% 0.22 85);
+    /* Presence */
+    --gold-forgiving: oklch(85% 0.08 85);
+    /* Softness */
+}
+
+.navigation-container {
+    /* Human physiological baseline */
+    --min-touch-target: 44px;
+    /* From WCAG, but also matches average fingertip */
+    --comfortable-motion: 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+    --stress-reduction-curve: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Forgiveness is anticipating human error, not punishing it */
+.navigation-error-state {
+    /* NOT: border: 1px solid red; (AI-Slop) */
+    /* INSTEAD: */
+    position: relative;
+    animation: gentle-nudge var(--forgiveness-fade) var(--stress-reduction-curve);
+}
+
+@keyframes gentle-nudge {
+    0% {
+        transform: translateX(0) scale(1);
+    }
+
+    15% {
+        transform: translateX(2px) scale(1.02);
+    }
+
+    30% {
+        transform: translateX(0) scale(1);
+    }
+
+    100% {
+        transform: translateX(0) scale(1);
+    }
+}
+
+/* Forgiving navigation pattern */
+.navigation-pattern {
+    /* Creates escape paths in the visual field */
+    background-image:
+        radial-gradient(circle at 20% 50%,
+            transparent 0%,
+            transparent 15%,
+            var(--gold-forgiving) 16%,
+            transparent 17%),
+        radial-gradient(circle at 80% 50%,
+            transparent 0%,
+            transparent 15%,
+            var(--gold-forgiving) 16%,
+            transparent 17%);
+    opacity: calc(0.05 * var(--user-anxiety-level, 0));
+}

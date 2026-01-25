@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        .test { margin: 20px 0; padding: 15px; border: 1px solid #0f0; }
+        .success { border-color: #0f0; background: #002200; }
+        .error { border-color: #f00; background: #220000; color: #f00; }
+        button { background: #0f0; color: #000; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
+        pre { background: #000; padding: 10px; overflow-x: auto; }
+        h2 { color: #0ff; }
+    </style>
+</head>
+<body>
+    <h1>🔧 AI KINGS API Test Suite</h1>
+    
+    <div class="test">
+        <h2>1. Proxy Health Check</h2>
+        <button onclick="testHealth()">Test Health</button>
+        <pre id="health-result">Click button to test...</pre>
+    </div>
+
+    <div class="test">
+        <h2>2. Check API Tokens</h2>
+        <button onclick="testTokens()">Check Tokens</button>
+        <pre id="tokens-result">Click button to test...</pre>
+    </div>
+
+    <div class="test">
+        <h2>3. Test Vast.ai Connection</h2>
+        <button onclick="testVastai()">Test Vast.ai</button>
+        <pre id="vastai-result">Click button to test...</pre>
+    </div>
+
+    <div class="test">
+        <h2>4. Full Console Log</h2>
+        <pre id="console-log"></pre>
+    </div>
+
+    <script>
+        const log = (msg, isError = false) => {
+            const el = document.getElementById('console-log');
+            const time = new Date().toLocaleTimeString();
+            el.textContent += `[${time}] ${isError ? '❌' : '✅'} ${msg}\n`;
+            console.log(msg);
+        };
+
+        async function testHealth() {
+            const result = document.getElementById('health-result');
+            try {
+                log('Testing proxy health...');
+                const response = await fetch('http://localhost:3000/api/proxy/health');
+                const data = await response.json();
+                result.textContent = JSON.stringify(data, null, 2);
+                result.parentElement.className = 'test success';
+                log('✅ Proxy health check PASSED');
+            } catch (error) {
+                result.textContent = `ERROR: ${error.message}`;
+                result.parentElement.className = 'test error';
+                log(`❌ Proxy health check FAILED: ${error.message}`, true);
+            }
+        }
+
+        async function testTokens() {
+            const result = document.getElementById('tokens-result');
+            try {
+                log('Checking API tokens...');
+                const response = await fetch('http://localhost:3000/api/proxy/check-tokens');
+                const data = await response.json();
+                result.textContent = JSON.stringify(data, null, 2);
+                
+                const allPresent = data.huggingface && data.civitai && data.vastai;
+                result.parentElement.className = allPresent ? 'test success' : 'test error';
+                
+                if (allPresent) {
+                    log('✅ All API tokens present: Vast.ai, HuggingFace, Civitai');
+                } else {
+                    log(`❌ Missing tokens: ${JSON.stringify(data)}`, true);
+                }
+            } catch (error) {
+                result.textContent = `ERROR: ${error.message}`;
+                result.parentElement.className = 'test error';
+                log(`❌ Token check FAILED: ${error.message}`, true);
+            }
+        }
+
+        async function testVastai() {
+            const result = document.getElementById('vastai-result');
+            try {
+                log('Testing Vast.ai connection via proxy...');
+                const response = await fetch('http://localhost:3000/api/proxy/instances', {
+                    method: 'GET'
+                });
+                
+                const data = await response.json();
+                result.textContent = `Status: ${response.status}\n${JSON.stringify(data, null, 2)}`;
+                
+                if (response.ok) {
+                    result.parentElement.className = 'test success';
+                    log(`✅ Vast.ai API connected! Found ${data.instances ? data.instances.length : 0} instances`);
+                } else {
+                    result.parentElement.className = 'test error';
+                    log(`❌ Vast.ai returned status ${response.status}`, true);
+                }
+            } catch (error) {
+                result.textContent = `ERROR: ${error.message}`;
+                result.parentElement.className = 'test error';
+                log(`❌ Vast.ai test FAILED: ${error.message}`, true);
+            }
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            log('🚀 Test suite loaded');
+            setTimeout(() => {
+                testHealth();
+                setTimeout(() => testTokens(), 500);
+                setTimeout(() => testVastai(), 1000);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

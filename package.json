@@ -1,0 +1,40 @@
+{
+  "name": "vastai-warm-pool-proxy",
+  "version": "1.0.0",
+  "description": "Vast.ai warm pool proxy with admin controls and audit logging",
+  "main": "server/vastai-proxy.js",
+  "scripts": {
+    "start": "node server/vastai-proxy.js",
+    "dev": "node server/vastai-proxy.js",
+    "start:pm2": "pm2 start ecosystem.config.js",
+    "pm2:install-logrotate": "pm2 install pm2-logrotate",
+    "test": "nyc mocha \"tests/**/*.test.js\" --exit",
+    "coverage": "nyc report --reporter=html && echo 'Coverage report generated in coverage/index.html'",
+    "inspect-db": "node server/db_inspect.js"
+  },
+  "keywords": [
+    "vastai",
+    "proxy",
+    "warm-pool",
+    "comfyui"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.21.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.8",
+    "mocha": "^10.2.0",
+    "nock": "^13.3.2",
+    "nyc": "^17.1.0",
+    "pm2": "^5.2.0",
+    "sinon": "^15.2.0",
+    "supertest": "^6.3.4"
+  }
+}

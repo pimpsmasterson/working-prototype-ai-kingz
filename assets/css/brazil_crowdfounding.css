@@ -1,0 +1,931 @@
+@font-face {
+  font-family: 'venus';
+  src: url("../fonts/venusris.woff2") format("woff2"), url("../fonts/venusris.woff") format("woff"), url("../fonts/venusris.ttf") format("truetype"), url("../fonts/venusris.svg#venus_risingregular") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+
+.cfText {
+  background: #080808;
+  -moz-box-shadow: inset 0 5px 5px 0 #000;
+  -webkit-box-shadow: inset 0 5px 5px 0 #000;
+  box-shadow: inset 0 5px 5px 0 #000;
+  color: #e97b1f;
+  text-transform: uppercase;
+  padding: 18px 0 15px;
+  font: 24px/18px 'venus';
+}
+
+.cfText span {
+  color: #fff;
+  font-size: 21px;
+}
+
+.cfBanner {
+  position: relative;
+  color: #fff;
+}
+
+.cfBanner img {
+  display: block;
+  width: 100%;
+}
+
+.cfBanner .cfBox {
+  width: 670px;
+  background: rgba(69, 0, 0, 0.89);
+  position: absolute;
+  bottom: 111px;
+  left: 10px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  padding: 20px 25px 20px 40px;
+}
+
+.cfBanner .header {
+  border-left: solid 7px #fff;
+  padding: 0 0 10px 12px;
+  margin: 0 0 12px;
+}
+
+.cfBanner .progress {
+  width: 100%;
+  height: 16px;
+  background: #fff;
+  margin: 0 0 20px;
+  position: relative;
+}
+
+.cfBanner .progress span {
+  position: absolute;
+  width: 0;
+  height: 100%;
+  background: #fcbb5a;
+  background: -moz-linear-gradient(left, #fcbb5a 0%, #e97b1f 100%);
+  background: -webkit-gradient(left top, right top, color-stop(0%, #fcbb5a), color-stop(100%, #e97b1f));
+  background: -webkit-linear-gradient(left, #fcbb5a 0%, #e97b1f 100%);
+  background: -o-linear-gradient(left, #fcbb5a 0%, #e97b1f 100%);
+  background: -ms-linear-gradient(left, #fcbb5a 0%, #e97b1f 100%);
+  background: -webkit-gradient(linear, left top, right top, from(#fcbb5a), to(#e97b1f));
+  background: linear-gradient(to right, #fcbb5a 0%, #e97b1f 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcbb5a', endColorstr='#e97b1f', GradientType=1 );
+}
+
+.cfBanner h3 {
+  font: 600 22px/24px "Roboto";
+  text-transform: uppercase;
+}
+
+.cfBanner p {
+  padding: 8px 0 0;
+  font: 400 12px/16px "Roboto";
+}
+
+.cfBanner .data {
+  text-align: center;
+  font: 400 18px/14px "Roboto";
+}
+
+.cfBanner .data span {
+  font-size: 12px;
+}
+
+.cfBanner .data .text {
+  padding: 5px 24px 0 12px;
+}
+
+.cfTabs {
+  background: #232323;
+}
+
+.cfTabs li {
+  color: #fff;
+  font: 600 18px/56px "Roboto Condensed";
+  background: #404040;
+  padding: 0 40px;
+  margin: 0 4px 0 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all ease-in-out 200ms;
+  -webkit-transition: all ease-in-out 200ms;
+  -moz-transition: all ease-in-out 200ms;
+  -o-transition: all ease-in-out 200ms;
+  cursor: pointer;
+}
+
+.cfTabs li.active, .cfTabs li:hover {
+  background: #e97b1f;
+}
+
+.cfContent {
+  margin: 35px 0 0;
+  display: table;
+  width: 100%;
+}
+
+.cfContent .cfTabContents,
+.cfContent .cfSidebar {
+  display: table-cell;
+  vertical-align: top;
+}
+
+.cfContent .cfTabContents {
+  padding: 0 30px 0 0;
+}
+
+.cfContent .cfSidebar {
+  width: 368px;
+}
+
+.cfSidebar .title {
+  padding: 0 0 0 80px;
+  color: #fff;
+  background: #e97b1f url("../images/icon05.png") no-repeat 14px center;
+  font: 600 18px/58px "Roboto";
+  text-transform: uppercase;
+}
+
+.cfSidebar .projects {
+  background: #131313;
+}
+
+.cfSidebar .projects .oneProject {
+  padding: 30px 20px;
+  border-bottom: solid 2px #282828;
+}
+
+.cfSidebar .projects h5 {
+  font: 400 18px/20px "Roboto Condensed";
+  text-transform: uppercase;
+  padding: 0 0 18px;
+}
+
+.cfSidebar .projects h5 span {
+  color: #fcbb5a;
+}
+
+.cfSidebar .projects h4 {
+  font-size: 14px;
+  padding: 0 0 10px;
+}
+
+.cfSidebar .projects p {
+  font: 400 11px/13px "Roboto";
+  color: #fff;
+  padding: 0 0 14px;
+}
+
+.cfSidebar .projects .delivery {
+  font: 400 11px/14px "Roboto";
+  color: #fff;
+  padding: 0 0 8px;
+}
+
+.cfSidebar .projects .delivery span {
+  margin: 3px 0 0;
+  color: #fcbb5a;
+  font-size: 12px;
+  display: table;
+}
+
+.cfSidebar .projects .button {
+  background: #fcbb5a;
+  color: #fff;
+  font: 600 18px/58px "Roboto Condensed";
+  text-transform: uppercase;
+  width: 180px;
+  text-align: center;
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -29px 0 0 -90px;
+  opacity: 0;
+  visibility: hidden;
+  -moz-box-shadow: 0 0 6px 0 rgba(255, 0, 0, 0.6);
+  -webkit-box-shadow: 0 0 6px 0 rgba(255, 0, 0, 0.6);
+  box-shadow: 0 0 6px 0 rgba(255, 0, 0, 0.6);
+  transition: all ease-in-out 500ms;
+  -webkit-transition: all ease-in-out 500ms;
+  -moz-transition: all ease-in-out 500ms;
+  -o-transition: all ease-in-out 500ms;
+}
+
+.cfSidebar .projects .data {
+  position: relative;
+  background: #292929;
+  padding: 18px 9px 14px;
+}
+
+.cfSidebar .projects .data:before {
+  position: absolute;
+  background: rgba(22, 22, 22, 0.62);
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  content: "";
+  opacity: 0;
+  visibility: hidden;
+  transition: all ease-in-out 2000ms;
+  -webkit-transition: all ease-in-out 2000ms;
+  -moz-transition: all ease-in-out 2000ms;
+  -o-transition: all ease-in-out 2000ms;
+}
+
+.cfSidebar .projects .data:hover:before {
+  opacity: 1;
+  visibility: visible;
+}
+
+.cfSidebar .projects .data:hover .button {
+  opacity: 1;
+  visibility: visible;
+}
+
+.cfTabContents .oneTab.hidden {
+  display: none !important;
+}
+
+.cfTabContents .logo {
+  width: 55px;
+}
+
+.cfTabContents .header {
+  margin: 0 0 0 5px;
+  height: 58px;
+}
+
+.cfTabContents .header img {
+  display: block;
+}
+
+.cfTabContents .header .name {
+  color: #fff;
+  font: 600 18px/40px "Roboto Condensed";
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.cfTabContents .cfTabCnt {
+  position: relative;
+  background: #131313;
+  padding: 15px;
+}
+
+.cfTabContents .cfTabCnt p {
+  color: #fff;
+  font: 400 13px/15px "Roboto";
+  padding: 0 0 15px;
+}
+
+.cfTabContents .lines {
+  position: absolute;
+}
+
+.cfTabContents .lines:before, .cfTabContents .lines:after {
+  content: "";
+  display: block;
+  position: absolute;
+  background: #fcbb5a;
+}
+
+.cfTabContents .lines.top {
+  top: 0;
+  left: 0;
+}
+
+.cfTabContents .lines.top:before {
+  width: 90px;
+  height: 3px;
+  top: -3px;
+  left: -3px;
+}
+
+.cfTabContents .lines.top:after {
+  width: 3px;
+  height: 90px;
+  top: -3px;
+  left: -3px;
+}
+
+.cfTabContents .lines.bottom {
+  bottom: 0;
+  right: 0;
+}
+
+.cfTabContents .lines.bottom:before {
+  width: 90px;
+  height: 3px;
+  bottom: -3px;
+  right: -3px;
+}
+
+.cfTabContents .lines.bottom:after {
+  width: 3px;
+  height: 90px;
+  bottom: -3px;
+  right: -3px;
+}
+
+.cfTabContents .commentData {
+  background: #222;
+  color: #fff;
+  padding: 0 10px 0 15px;
+  font: 600 14px/38px "Roboto Condensed";
+  margin: 0 0 10px;
+}
+
+.cfTabContents .oneComment {
+  padding: 0 0 15px;
+}
+
+.cfTabContents .oneComment p {
+  padding-left: 15px;
+  padding-right: 0;
+  font-size: 12px;
+}
+
+.cfTabContents .addComment {
+  padding: 30px 0 0;
+}
+
+.cfTabContents .addComment textarea {
+  width: 100%;
+  height: 200px;
+  font: 12px/15px Arial;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  padding: 10px;
+  display: block;
+  margin: 0 0 10px;
+  position: relative;
+  z-index: 10;
+  background: #fff;
+  color: #111;
+}
+
+.cfTabContents .addComment .button {
+  padding: 0 23px;
+  height: 30px;
+  background: #e97b1f;
+  text-align: center;
+  font: 700 18px/30px "Roboto Condensed";
+  cursor: pointer;
+  color: #fff;
+  transition: all ease-in-out 100ms;
+  -webkit-transition: all ease-in-out 100ms;
+  -moz-transition: all ease-in-out 100ms;
+  -o-transition: all ease-in-out 100ms;
+}
+
+.cfTabContents .addComment .button:hover {
+  background: #fcbb5a;
+}
+
+.cfTabContents .toggleBoxes .oneToggle.closed .toggleContent {
+  display: none;
+}
+
+.cfTabContents .toggleBoxes .oneToggle.closed .toggleHeader {
+  background: #313131;
+}
+
+.cfTabContents .toggleBoxes .oneToggle.closed .toggleHeader:after {
+  border-width: 6px 0 6px 12px;
+  border-color: transparent transparent transparent #ffffff;
+}
+
+.cfTabContents .toggleBoxes .toggleHeader {
+  background: #fcbb5a;
+  color: #fff;
+  font: 400 16px/28px "Roboto";
+  padding: 0 30px 0 8px;
+  margin: 2px 0 12px;
+  transition: all ease-in-out 200ms;
+  -webkit-transition: all ease-in-out 200ms;
+  -moz-transition: all ease-in-out 200ms;
+  -o-transition: all ease-in-out 200ms;
+  cursor: pointer;
+  position: relative;
+}
+
+.cfTabContents .toggleBoxes .toggleHeader:after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 11px 6px 0 6px;
+  border-color: #ffffff transparent transparent transparent;
+  top: 9px;
+  right: 10px;
+}
+
+.cfTabContents .toggleBoxes .toggleHeader:hover {
+  background: #fcbb5a !important;
+}
+
+.cfTabContents .toggleBoxes p {
+  font-size: 14px;
+  padding: 0 8px 20px;
+  line-height: 17px;
+}
+
+.cfTabContents .pornStars {
+  padding: 20px 15px 10px;
+}
+
+.cfTabContents .pornStars:last-child {
+  padding-bottom: 20px;
+}
+
+.cfTabContents .oneStar {
+  position: relative;
+  width: 30%;
+  margin: 0 5% 0 0;
+}
+
+.cfTabContents .oneStar:nth-child(3n) {
+  margin-right: 0;
+}
+
+.cfTabContents .oneStar img {
+  display: block;
+  width: 100%;
+}
+
+.cfTabContents .oneStar .name {
+  transition: all ease-in-out 200ms;
+  -webkit-transition: all ease-in-out 200ms;
+  -moz-transition: all ease-in-out 200ms;
+  -o-transition: all ease-in-out 200ms;
+  text-transform: uppercase;
+  position: absolute;
+  left: 0;
+  padding: 0 16px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 100%;
+  bottom: 0;
+  background: rgba(69, 0, 0, 0.89);
+  color: #fff;
+  font: 400 18px/40px "Roboto";
+}
+
+.cfTabContents .oneStar:hover .name {
+  background: #450000;
+}
+
+.cfBannerSearch {
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  position: relative;
+  color: #fff;
+}
+
+.cfBannerSearch .cfSearchForm {
+  display: table;
+  height: 585px;
+  text-align: center;
+  width: 100%;
+  text-transform: uppercase;
+}
+
+.cfBannerSearch .cfSearchForm .cell {
+  display: table-cell;
+  vertical-align: middle;
+}
+
+.cfBannerSearch h2 {
+  font: 600 48px/48px "Roboto Condensed";
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.cfBannerSearch h3 {
+  font: 600 17px/17px "Roboto Condensed";
+  margin: 0 0 25px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.cfBannerSearch form {
+  position: relative;
+  width: 512px;
+  margin: 0 auto 60px;
+  -moz-box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
+  -webkit-box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.4);
+}
+
+.cfBannerSearch input {
+  width: 100%;
+  display: block;
+  background: #fff;
+  height: 46px;
+  font: 400 16px "Roboto";
+  color: #080808;
+  padding: 0 115px 0 10px;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.cfBannerSearch button {
+  padding: 0;
+  width: 108px;
+  height: 46px;
+  background: #e97b1f;
+  text-align: center;
+  font: 600 18px/46px "Roboto Condensed";
+  cursor: pointer;
+  right: 0;
+  top: 0;
+  position: absolute;
+  color: #fff;
+  transition: all ease-in-out 100ms;
+  -webkit-transition: all ease-in-out 100ms;
+  -moz-transition: all ease-in-out 100ms;
+  -o-transition: all ease-in-out 100ms;
+}
+
+.cfBannerSearch button:hover {
+  background: #fcbb5a;
+}
+
+.cfStats {
+  padding: 9px 0 8px;
+  background: #232323;
+}
+
+.cfStats .icon {
+  margin: 0 10px 0 0;
+}
+
+.cfStats .icon img {
+  display: block;
+}
+
+.cfStats .texts {
+  margin: 5px 23px 0 0;
+  font: 400 18px/14px "Roboto";
+  text-align: center;
+  color: #fcbb5a;
+}
+
+.cfStats .texts span {
+  color: #fff;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.cfStats .button {
+  background: #e97b1f;
+  font: 600 18px/40px "Roboto Condensed";
+  color: #fff;
+  padding: 0 18px;
+  text-transform: uppercase;
+  transition: all ease-in-out 100ms;
+  -webkit-transition: all ease-in-out 100ms;
+  -moz-transition: all ease-in-out 100ms;
+  -o-transition: all ease-in-out 100ms;
+}
+
+.cfStats .button:hover {
+  background: #fcbb5a;
+}
+
+.projectHeader .icon {
+  margin: 0 19px 0 0;
+}
+
+.projectHeader .text {
+  font: 600 18px/40px "Roboto Condensed";
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.quickShort {
+  padding: 0 25px 14px 0;
+  color: #fff;
+  font: 400 14px/20px "Roboto Condensed";
+}
+
+.quickShort a {
+  color: #fff;
+}
+
+.quickShort a.active {
+  color: #fcbb5a;
+}
+
+.quickShort span {
+  font-weight: 600;
+}
+
+.quickShort li:after {
+  content: "|";
+  padding: 0 7px 0 6px;
+}
+
+.quickShort li:last-child:after {
+  display: none;
+}
+
+.cfList {
+  padding: 35px 0;
+}
+
+.cfList .oneItem {
+  position: relative;
+  background: #131313;
+  padding: 20px;
+  margin: 0 0 45px;
+}
+
+.cfList .oneItem:last-child {
+  margin-bottom: 0;
+}
+
+.cfList .lines {
+  position: absolute;
+}
+
+.cfList .lines:before, .cfList .lines:after {
+  content: "";
+  display: block;
+  position: absolute;
+  background: #fcbb5a;
+}
+
+.cfList .lines.top {
+  top: 0;
+  left: 0;
+}
+
+.cfList .lines.top:before {
+  width: 90px;
+  height: 3px;
+  top: -3px;
+  left: -3px;
+}
+
+.cfList .lines.top:after {
+  width: 3px;
+  height: 90px;
+  top: -3px;
+  left: -3px;
+}
+
+.cfList .lines.bottom {
+  bottom: 0;
+  right: 0;
+}
+
+.cfList .lines.bottom:before {
+  width: 90px;
+  height: 3px;
+  bottom: -3px;
+  right: -3px;
+}
+
+.cfList .lines.bottom:after {
+  width: 3px;
+  height: 90px;
+  bottom: -3px;
+  right: -3px;
+}
+
+.cfList .project {
+  display: table;
+  width: 100%;
+}
+
+.cfList .project .col {
+  display: table-cell;
+  vertical-align: top;
+}
+
+.cfList .project .col:first-child {
+  width: 285px;
+}
+
+.cfList .project .col:nth-child(2) {
+  padding: 0 20px;
+}
+
+.cfList .project .col:last-child {
+  width: 250px;
+  padding: 43px 0 0;
+}
+
+.cfList .project img {
+  width: 100%;
+  display: block;
+}
+
+.cfList h3 {
+  font: 400 18px/20px "Roboto Condensed";
+  text-transform: uppercase;
+  margin: 0 0 20px;
+}
+
+.cfList h3 a {
+  color: #fcbb5a;
+}
+
+.cfList h3 a:hover {
+  text-decoration: underline;
+}
+
+.cfList p {
+  color: #fff;
+  font: 400 12px/14px "Roboto";
+  padding: 0 0 15px;
+}
+
+.cfList p:last-child {
+  padding-bottom: 0;
+}
+
+.cfList .button {
+  display: table;
+  margin: 0 auto;
+  background: #e97b1f;
+  font: 600 18px/40px "Roboto Condensed";
+  color: #fff;
+  padding: 0 15px;
+  text-transform: uppercase;
+  transition: all ease-in-out 100ms;
+  -webkit-transition: all ease-in-out 100ms;
+  -moz-transition: all ease-in-out 100ms;
+  -o-transition: all ease-in-out 100ms;
+}
+
+.cfList .button:hover {
+  background: #fcbb5a;
+}
+
+.cfList .projectData {
+  padding: 0 0 18px;
+}
+
+.cfList .projectData .block {
+  height: 40px;
+  width: 50%;
+  border-left: solid 1px #131313;
+  background: #282828;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  margin: 0 0 1px;
+  color: #fff;
+  font: 400 10px/41px "Roboto";
+}
+
+.cfList .projectData .icon {
+  width: 35px;
+}
+
+.cfList .projectData .icon img {
+  margin: 10px auto 0;
+  display: block;
+  width: auto;
+}
+
+@media only screen and (max-width: 1200px) {
+  .cfBanner .cfBox {
+    bottom: 10px;
+  }
+}
+
+@media only screen and (max-width: 980px) {
+  .cfBanner > img {
+    display: none;
+  }
+  .cfBanner .cfBox {
+    position: relative;
+    width: 100%;
+    bottom: 0;
+    left: 0;
+    background: none;
+    padding: 20px;
+  }
+  .cfBanner {
+    background: #450000;
+  }
+  .cfTabs {
+    padding: 10px 0 0;
+  }
+  .cfTabs li {
+    text-align: center;
+    display: block;
+    width: 100%;
+    margin: 0 0 10px 0;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+  }
+  .cfContent .cfSidebar, .cfContent .cfTabContents {
+    display: block;
+    width: 100%;
+  }
+  .cfContent .cfTabContents {
+    padding: 0 0 20px;
+  }
+  .cfContent {
+    margin-top: 0;
+  }
+  .cfBannerSearch form {
+    margin-bottom: 0;
+  }
+  .cfBannerSearch .cfSearchForm {
+    height: 300px;
+  }
+  .cfStats .button {
+    width: 100%;
+    clear: both;
+    display: block;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  .cfStats .toCenter {
+    text-align: center;
+  }
+  .cfStats .toCenter > .toLeft {
+    display: inline-block;
+    float: none;
+    clear: both;
+    margin: 0 0 10px;
+  }
+  .cfList .project .col {
+    display: block;
+    width: 100% !important;
+  }
+  .cfList .project .col:nth-child(2) {
+    padding: 30px 0 0;
+  }
+  .cfList .project .col:last-child {
+    padding: 20px 0 0;
+  }
+  .cfList .button,
+  .cfTabContents .addComment .button {
+    width: 100%;
+    text-align: center;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+  }
+  .cfList .oneItem,
+  .cfTabContents .cfTabCnt {
+    padding: 10px;
+  }
+  .cfTabContents .pornStars {
+    padding: 0 0 20px;
+  }
+  .cfTabContents .pornStars:last-child {
+    padding: 0 !important;
+  }
+  .cfTabContents .oneComment p,
+  .cfTabContents .toggleBoxes p {
+    padding-left: 0;
+  }
+  .cfSidebar .projects .oneProject {
+    padding: 10px;
+  }
+}
+
+@media only screen and (max-width: 560px) {
+  .cfTabContents .oneStar {
+    width: 100%;
+    margin: 0 0 10px;
+  }
+  .cfBanner .data > .toLeft {
+    width: 50%;
+    margin: 0 0 10px;
+  }
+  .cfBannerSearch form {
+    width: 100%;
+    padding: 0 10px;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+  }
+  .cfBannerSearch button {
+    right: 10px;
+  }
+  .cfBannerSearch .cfSearchForm {
+    height: auto;
+    padding: 40px 0;
+  }
+  .cfBanner .data > .toLeft > .toLeft {
+    float: none;
+    display: table;
+    margin: 0 auto;
+  }
+  .cfBanner .data .text {
+    padding-top: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .quickShort ul {
+    float: left;
+  }
+}

@@ -1,0 +1,223 @@
+/* assets/css/human-navigation.css */
+/* CONSCIOUS NAVIGATION SYSTEM - IMPLEMENTING THE 7 HUMAN VIRTUES */
+
+:root {
+    /* HUMAN PERCEPTION VARIABLES */
+    --hp-instant: 100ms;
+    --hp-responsive: 300ms;
+    --hp-patient: 500ms;
+    --hp-forgiving: 1200ms;
+
+    /* EMOTIONAL COLOR SYSTEM (OKLCH for perceptual uniformity) */
+    --gold-calm: oklch(78% 0.12 85 / 0.1);
+    --gold-confident: oklch(75% 0.18 85 / 0.15);
+    --gold-anxious: oklch(82% 0.08 85 / 0.06);
+    --gold-curious: oklch(72% 0.22 85 / 0.12);
+
+    /* COGNITIVE LOAD ADAPTATION */
+    --cl-minimal: 0.1;
+    --cl-optimal: 0.3;
+    --cl-high: 0.6;
+    --cl-overload: 0.8;
+}
+
+/* THE PATTERN - Living, breathing, human-centric */
+.main-navigation {
+    position: relative;
+    z-index: 1000;
+}
+
+.main-navigation::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity var(--hp-patient) cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* FORGIVENESS: Escape paths built-in */
+    background-image:
+        radial-gradient(circle at 20% 50%,
+            transparent 0%,
+            transparent 15%,
+            var(--gold-calm) 16%,
+            transparent 17%),
+        radial-gradient(circle at 80% 50%,
+            transparent 0%,
+            transparent 15%,
+            var(--gold-calm) 16%,
+            transparent 17%);
+}
+
+.main-navigation.scrolled::before {
+    opacity: var(--pattern-intensity, 0.15);
+
+    /* EMPATHY: Pattern adapts to emotional state */
+    background-image:
+        /* Base hexagonal grid */
+        repeating-conic-gradient(from 0deg at 50% 50%,
+            transparent 0deg 60deg,
+            var(--current-gold-color, var(--gold-calm)) 60deg 120deg),
+
+        /* Contextual diamond layer */
+        repeating-linear-gradient(45deg,
+            transparent,
+            transparent 25px,
+            var(--gold-confident) 26px,
+            transparent 27px),
+
+        /* Energy-respecting subtle motion */
+        radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+            transparent 0%,
+            transparent 60%,
+            var(--gold-curious) 80%,
+            transparent 100%);
+
+    /* TEACHING: Progressive complexity */
+    background-size:
+        calc(50px * var(--user-experience, 1)) calc(50px * var(--user-experience, 1)),
+        40px 40px,
+        200px 200px;
+
+    /* PATIENCE: Human-perceived animation */
+    animation:
+        gentle-reveal var(--pattern-reveal-duration, 400ms) ease-out,
+        soft-drift calc(20s * var(--user-calm-level, 1)) ease-in-out infinite;
+
+    /* RESPECT FOR ENERGY: Reduces when needed */
+    filter:
+        blur(calc(6px * (1 - var(--user-energy, 0.5)))) saturate(calc(100% + (var(--user-engagement, 0) * 50%)));
+}
+
+/* Glass layer with human adaptation */
+.main-navigation.scrolled {
+    background:
+        linear-gradient(in oklch from oklch(98% 0.01 85),
+            oklch(98% 0.01 85 / 0.9) 0%,
+            oklch(97% 0.02 85 / 0.85) 100%);
+
+    backdrop-filter:
+        blur(calc(10px + (var(--user-focus, 0) * 5px))) contrast(calc(1 + (var(--user-clarity-need, 0) * 0.1)));
+
+    /* CONSISTENCY WITH VARIATION: Predictable foundation */
+    transition:
+        background var(--hp-responsive) ease,
+        backdrop-filter var(--hp-responsive) ease;
+}
+
+/* CONTEXT AWARENESS: Adapt to situation */
+@media (prefers-color-scheme: dark) {
+    .main-navigation.scrolled::before {
+        --current-gold-color: oklch(70% 0.15 85 / 0.12);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .main-navigation.scrolled::before {
+        animation: none;
+        background-size: 60px 60px;
+    }
+}
+
+/* Emotional state classes applied via JS */
+.navigation-pattern[data-emotion="anxious"],
+.main-navigation[data-emotion="anxious"] {
+    --current-gold-color: var(--gold-anxious);
+    --pattern-intensity: 0.08;
+    animation-duration: 30s;
+    filter: blur(8px) saturate(0.8);
+}
+
+.navigation-pattern[data-emotion="confident"],
+.main-navigation[data-emotion="confident"] {
+    --current-gold-color: var(--gold-confident);
+    --pattern-intensity: 0.18;
+    animation-duration: 15s;
+    filter: blur(4px) saturate(1.2);
+}
+
+.navigation-pattern[data-emotion="curious"],
+.main-navigation[data-emotion="curious"] {
+    --current-gold-color: var(--gold-curious);
+    --pattern-intensity: 0.2;
+    animation: explore-pattern 25s ease-in-out infinite;
+}
+
+/* Cognitive Load Adaptation */
+.main-navigation[data-cognitive-load="high"] {
+    /* Reduce to minimal orientation guides */
+    --pattern-intensity: 0.05;
+}
+
+.main-navigation[data-cognitive-load="high"]::before {
+    background-image:
+        linear-gradient(to right,
+            transparent 49%,
+            var(--gold-forgiving) 50%,
+            transparent 51%),
+        linear-gradient(to bottom,
+            transparent 49%,
+            var(--gold-forgiving) 50%,
+            transparent 51%) !important;
+    animation: none !important;
+    filter: blur(8px) saturate(0.7);
+}
+
+/* Physical energy consideration - Fitts' Law optimization */
+.nav-item {
+    /* Touch targets expand based on usage pattern */
+    padding: calc(8px + (var(--miss-rate, 0) * 4px) + (var(--urgency, 0) * 2px));
+
+    /* Reduce physical movement for common paths */
+    margin: calc(4px * (1 - var(--frequency-of-use, 0.5)));
+}
+
+/* Keyframe animations with human rhythm */
+@keyframes gentle-reveal {
+    0% {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+
+    100% {
+        opacity: var(--pattern-intensity, 0.15);
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes soft-drift {
+
+    0%,
+    100% {
+        background-position:
+            0 0,
+            0 0,
+            50% 50%;
+    }
+
+    50% {
+        background-position:
+            2px 1px,
+            1px 2px,
+            50% 50%;
+    }
+}
+
+@keyframes explore-pattern {
+
+    0%,
+    100% {
+        background-size:
+            50px 50px,
+            40px 40px,
+            180px 180px;
+    }
+
+    50% {
+        background-size:
+            52px 52px,
+            42px 42px,
+            220px 220px;
+    }
+}
