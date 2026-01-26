@@ -12,6 +12,23 @@ const path = require('path');
 const crypto = require('crypto');
 
 // ============================================================================
+// CUSTOM ERRORS
+// ============================================================================
+
+/**
+ * Error thrown when no GPU instance is available for generation
+ */
+class NoGPUAvailableError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = 'NoGPUAvailableError';
+    this.code = 'NO_GPU_AVAILABLE';
+    this.canPrewarm = details.canPrewarm || false;
+    this.poolStatus = details.poolStatus || null;
+  }
+}
+
+// ============================================================================
 // MAIN API ENDPOINTS
 // ============================================================================
 
@@ -21,7 +38,7 @@ const crypto = require('crypto');
  */
 async function handleGenerate(req, res) {
   const jobId = generateJobId();
-  const { muse, prompt, negativePrompt, settings, workflowType = 'image' } = req.body;
+  const { muse, prompt, negativePrompt, settings, workflowType = 'image', nsfw = false, workflowTemplate = null } = req.body;
 
   // Validate input
   if (!prompt || prompt.trim().length === 0) {
@@ -37,6 +54,8 @@ async function handleGenerate(req, res) {
       prompt,
       negativePrompt: negativePrompt || 'ugly, deformed, bad anatomy',
       workflowType,
+      nsfw: nsfw ? 1 : 0,
+      workflowTemplate: workflowTemplate || null,
       workflowJson: null, // Will be set after building
       seed: settings?.seed || Math.floor(Math.random() * 1000000000),
       steps: settings?.steps || 25,
@@ -101,6 +120,19 @@ function getJobStatus(req, res) {
     createdAt: job.created_at,
     error: job.error_message
   };
+
+  // Add structured error details for failed jobs (e.g., NO_GPU_AVAILABLE)
+  if (job.status === 'failed' && job.error_code) {
+    response.errorCode = job.error_code;
+    response.errorDetails = {
+      canPrewarm: !!job.can_prewarm
+    };
+    if (job.pool_status) {
+      try {
+        response.errorDetails.poolStatus = JSON.parse(job.pool_status);
+      } catch (e) { /* ignore parse errors */ }
+    }
+  }
 
   if (job.status === 'completed') {
     response.result = {
@@ -198,10 +230,20 @@ async function generateAsync(jobId, jobData, muse) {
   } catch (error) {
     console.error(`[Job ${jobId}] Generation failed:`, error);
 
-    require('./db').updateJobStatus(jobId, 'failed', {
+    // Build error data with structured details for GPU availability issues
+    const errorData = {
       error_message: error.message,
       completed_at: new Date().toISOString()
-    });
+    };
+
+    // Add structured error data for NoGPUAvailableError
+    if (error.code === 'NO_GPU_AVAILABLE') {
+      errorData.error_code = error.code;
+      errorData.can_prewarm = error.canPrewarm ? 1 : 0;
+      errorData.pool_status = JSON.stringify(error.poolStatus);
+    }
+
+    require('./db').updateJobStatus(jobId, 'failed', errorData);
 
     throw error;
   }
@@ -212,10 +254,13 @@ async function generateAsync(jobId, jobData, muse) {
 // ============================================================================
 
 /**
- * Claim GPU instance from warm pool or use local ComfyUI
+ * Claim GPU instance from warm pool (remote GPU only - no local fallback)
  */
 async function claimGPUInstance(workflowType) {
-  // Try warm pool first
+  // Get pool status for detailed error reporting
+  const poolStatus = warmPool.getStatus();
+
+  // Try warm pool - this is the ONLY option (no local fallback)
   try {
     const claim = await warmPool.claim(30); // 30 minute lease
 
@@ -232,14 +277,44 @@ async function claimGPUInstance(workflowType) {
     console.warn('[GPU] Warm pool claim failed:', err.message);
   }
 
-  // Fall back to local ComfyUI
-  console.log('[GPU] Using local ComfyUI instance');
-  return {
-    type: 'local',
-    connectionUrl: 'http://127.0.0.1:8188',
-    contractId: null,
-    isWarm: false
-  };
+  // NO LOCAL FALLBACK - Throw descriptive error
+  const isPrewarming = poolStatus.isPrewarming;
+  const instanceStatus = poolStatus.instance?.status || 'none';
+
+  let errorMessage;
+  let canPrewarm = false;
+
+  if (isPrewarming) {
+    errorMessage = 'GPU instance is starting up. Please wait a few minutes and try again.';
+  } else if (instanceStatus === 'starting' || instanceStatus === 'loading') {
+    errorMessage = 'GPU instance is initializing. Please wait 2-3 minutes and try again.';
+  } else if (instanceStatus === 'running' && !poolStatus.instance?.connectionUrl) {
+    errorMessage = 'GPU instance is running but network is not yet ready. Please wait 1-2 minutes.';
+  } else if (instanceStatus === 'running') {
+    errorMessage = 'GPU instance is running but ComfyUI is not yet responsive. Please wait a minute.';
+  } else {
+    errorMessage = 'No GPU instance available. Please prewarm an instance first.';
+    canPrewarm = true;
+  }
+
+  // If no instance available, proactively start prewarm in background so generation button triggers warming
+  if (canPrewarm) {
+    try {
+      // fire-and-forget
+      warmPool.prewarm().catch(e => console.warn('[GPU] auto-prewarm failed:', e && e.message ? e.message : e));
+    } catch (e) { /* ignore */ }
+  }
+
+  console.error(`[GPU] No instance available: ${errorMessage} (status: ${instanceStatus}, prewarming: ${isPrewarming})`);
+
+  throw new NoGPUAvailableError(errorMessage, {
+    canPrewarm,
+    poolStatus: {
+      instanceStatus,
+      isPrewarming,
+      desiredSize: poolStatus.desiredSize
+    }
+  });
 }
 
 // ============================================================================
@@ -264,10 +339,12 @@ function buildWorkflowForJob(jobData, muse) {
     checkpoint: jobData.checkpoint
   };
 
-  return comfyWorkflows.buildWorkflow(
-    jobData.workflowType === 'video' ? { ...baseParams, frames: jobData.frameCount, fps: jobData.fps } : baseParams,
-    jobData.workflowType
-  );
+  const params = jobData.workflowType === 'video' ? { ...baseParams, frames: jobData.frameCount, fps: jobData.fps } : baseParams;
+
+  // If a workflowTemplate is specified (or job marked nsfw), pass it through
+  const template = jobData.workflowTemplate || (jobData.nsfw ? 'nsfw_video' : null);
+
+  return comfyWorkflows.buildWorkflow(params, jobData.workflowType, template);
 }
 
 

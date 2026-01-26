@@ -1,0 +1,51 @@
+Loaded persistent tokens from C:\Users\samsc\.proxy-tokens.json
+Database initialized: C:\Users\samsc\OneDrive\Desktop\working protoype\data\warm_pool.db
+DB schema ready
+[DEBUG] Starting server... require.main === module is true
+[DEBUG] PORT: 3000
+[DEBUG] startProxy() called, server object: true
+Vast.ai proxy running on http://localhost:3000/ (ready)
+[DEBUG] Server is now listening
+[DEBUG] Prewarm endpoint hit
+[DEBUG] Headers: {"host":"localhost:3000","connection":"keep-alive","content-length":"2","x-admin-key":"secure_admin_key_change_me","sec-ch-ua-platform":"\"Windows\"","user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36","sec-ch-ua":"\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"","content-type":"application/json","sec-ch-ua-mobile":"?0","accept":"*/*","origin":"http://127.0.0.1:5501","sec-fetch-site":"cross-site","sec-fetch-mode":"cors","sec-fetch-dest":"empty","referer":"http://127.0.0.1:5501/","accept-encoding":"gzip, deflate, br, zstd","accept-language":"en-US,en;q=0.9"}
+[DEBUG] Key received: secu...
+[DEBUG] Expected key: secu...
+[DEBUG] Auth passed
+[Prewarm] Starting warm-pool prewarm...
+[DEBUG] About to call warmPool.prewarm()
+[PREWARM DEBUG] Function called
+[PREWARM DEBUG] VASTAI_API_KEY: 4986d1c01d...
+[PREWARM DEBUG] API key check passed
+[PREWARM DEBUG] Calling save()...
+[PREWARM DEBUG] isPrewarming set and save() completed
+[Prewarm] Success: {
+  status: 'already_present',
+  instance: {
+    contractId: '555',
+    status: 'running',
+    lastError: 'FetchError: request to https://console.vast.ai/api/v0/instances/555/ failed, reason: network',
+    lastHeartbeat: '2026-01-26T15:08:15.635Z'
+  }
+}
+[DEBUG] Prewarm endpoint hit
+[DEBUG] Headers: {"host":"localhost:3000","connection":"keep-alive","content-length":"2","x-admin-key":"secure_admin_key_change_me","sec-ch-ua-platform":"\"Windows\"","user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36","sec-ch-ua":"\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"","content-type":"application/json","sec-ch-ua-mobile":"?0","accept":"*/*","origin":"http://127.0.0.1:5501","sec-fetch-site":"cross-site","sec-fetch-mode":"cors","sec-fetch-dest":"empty","referer":"http://127.0.0.1:5501/","accept-encoding":"gzip, deflate, br, zstd","accept-language":"en-US,en;q=0.9"}
+[DEBUG] Key received: secu...
+[DEBUG] Expected key: secu...
+[DEBUG] Auth passed
+[Prewarm] Starting warm-pool prewarm...
+[DEBUG] About to call warmPool.prewarm()
+[PREWARM DEBUG] Function called
+[PREWARM DEBUG] VASTAI_API_KEY: 4986d1c01d...
+[PREWARM DEBUG] API key check passed
+[Prewarm] Success: { status: 'already_prewarming' }
+[DEBUG] Prewarm endpoint hit
+[DEBUG] Headers: {"host":"localhost:3000","connection":"keep-alive","content-length":"2","x-admin-key":"secure_admin_key_change_me","sec-ch-ua-platform":"\"Windows\"","user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36","sec-ch-ua":"\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"","content-type":"application/json","sec-ch-ua-mobile":"?0","accept":"*/*","origin":"http://127.0.0.1:5501","sec-fetch-site":"cross-site","sec-fetch-mode":"cors","sec-fetch-dest":"empty","referer":"http://127.0.0.1:5501/","accept-encoding":"gzip, deflate, br, zstd","accept-language":"en-US,en;q=0.9"}
+[DEBUG] Key received: secu...
+[DEBUG] Expected key: secu...
+[DEBUG] Auth passed
+[Prewarm] Starting warm-pool prewarm...
+[DEBUG] About to call warmPool.prewarm()
+[PREWARM DEBUG] Function called
+[PREWARM DEBUG] VASTAI_API_KEY: 4986d1c01d...
+[PREWARM DEBUG] API key check passed
+[Prewarm] Success: { status: 'already_prewarming' }

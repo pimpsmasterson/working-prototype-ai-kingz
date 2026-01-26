@@ -35,10 +35,10 @@ describe('Warm-pool claim endpoint', function() {
   it('POST /api/proxy/warm-pool/claim succeeds when instance available', async function() {
     const warmPool = require('../server/warm-pool');
 
-    // Set up a running instance
+    // Set up a ready instance (ComfyUI responsive)
     warmPool._internal.state.instance = {
       contractId: '123',
-      status: 'running',
+      status: 'ready',
       connectionUrl: 'http://1.2.3.4:8188',
       createdAt: new Date().toISOString()
     };

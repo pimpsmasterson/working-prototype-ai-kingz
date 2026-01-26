@@ -2,64 +2,206 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Warm Pool Admin</title>
+  <title>AI KINGS - GPU Admin Dashboard</title>
   <style>
-    body{font-family:Arial;margin:20px}
-    label{display:block;margin:8px 0}
-    input[type=number]{width:80px}
-    .status{margin-top:12px;padding:10px;background:#f4f4f4;border-radius:6px}
-    .danger{color:#a00}
+    body{font-family:Arial;margin:20px;background:#f9f9f9}
+    .container{max-width:1200px;margin:0 auto;background:white;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}
+    h1{color:#333;text-align:center;margin-bottom:30px}
+    .section{margin-bottom:30px;padding:20px;border:1px solid #ddd;border-radius:6px}
+    .status{margin-top:12px;padding:15px;background:#f4f4f4;border-radius:6px;font-size:14px}
+    .success{background:#d4edda;color:#155724}
+    .warning{background:#fff3cd;color:#856404}
+    .danger{background:#f8d7da;color:#721c24}
+    .info{background:#d1ecf1;color:#0c5460}
+    button{background:#007bff;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;font-size:16px;margin:5px}
+    button:hover{background:#0056b3}
+    button.danger{background:#dc3545}
+    button.danger:hover{background:#c82333}
+    button.success{background:#28a745}
+    button.success:hover{background:#218838}
+    .prewarm-section{text-align:center;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:white;padding:40px;border-radius:8px;margin-bottom:30px}
+    .prewarm-section h2{margin-top:0;font-size:24px}
+    .prewarm-section p{font-size:18px;margin-bottom:20px}
+    .gpu-status{display:flex;justify-content:space-around;margin-top:20px}
+    .gpu-card{background:white;padding:20px;border-radius:6px;box-shadow:0 2px 5px rgba(0,0,0,0.1);width:30%;text-align:center}
+    .gpu-card h3{margin-top:0}
+    .gpu-card .status{margin-top:10px;font-weight:bold}
+    label{display:block;margin:8px 0;font-weight:bold}
+    input[type=number]{width:80px;padding:5px}
+    input[type=password]{width:300px;padding:5px}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd}
+    th{background:#f8f8f8}
   </style>
 </head>
 <body>
-  <h1>Warm Pool Admin</h1>
-  <p>Enter your <strong>admin key</strong> (set the server env var <code>ADMIN_API_KEY</code>) and click <em>Refresh</em>.</p>
-
-  <label>Admin Key: <input id="adminKey" type="password" /></label>
-  <button id="btnRefresh">Refresh</button>
-
-  <div class="status" id="statusBox">Not loaded</div>
-
-  <div id="controls" style="display:none">
-    <label>Desired pool size: <input id="desiredSize" type="number" min="0" /></label>
-    <label><input id="safeMode" type="checkbox" /> Safe mode (aggressive shutdown)</label>
-    <div style="margin-top:10px">
-      <button id="btnSave">Save</button>
-      <button id="btnTerminate">Terminate Instance</button>
-    </div>
-  </div>
-
-  <hr />
-  <h2>Admin Logs</h2>
-
-  <div id="logsControls">
-    <label>Since (ISO date/time): <input id="logsSince" type="datetime-local" /></label>
-    <label>Action (optional): <input id="logsAction" type="text" placeholder="e.g. terminate, set_warm_pool" /></label>
-    <label>Limit: <input id="logsLimit" type="number" min="1" max="100" value="50" /></label>
-    <div style="margin-top:8px">
-      <button id="btnLoadLogs">Load Logs</button>
-    </div>
-  </div>
-
-  <div id="logsSection" style="margin-top:12px; display:none">
-    <div id="logsPager" style="margin-bottom:6px">
-      <button id="logsPrev">Prev</button>
-      <span id="logsPageInfo">Page 1</span>
-      <button id="logsNext">Next</button>
+  <div class="container">
+    <h1>🎨 AI KINGS - GPU Management Dashboard</h1>
+    <div style="text-align: center; margin-bottom: 20px; padding: 10px; background: #e3f2fd; border-radius: 6px;">
+      <p style="margin: 0; color: #1976d2; font-weight: bold;">Admin Panel Active - Server: <span id="server-url">http://localhost:3000</span></p>
     </div>
 
-    <table id="logsTable" border="1" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">
-      <thead>
-        <tr>
-          <th>Timestamp</th><th>Action</th><th>Route</th><th>IP</th><th>Outcome</th><th>Details</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <div class="prewarm-section">
+      <h2>🚀 One-Click NSFW GPU Setup</h2>
+      <p>Automatically rent and configure a GPU with Pony Diffusion V6 XL, fetish LoRAs, and ComfyUI workflows for adult content generation.</p>
+      <button id="btnPrewarm" class="success" style="font-size:20px;padding:15px 30px">Prewarm GPU Now</button>
+      <div id="prewarmStatus" class="status info" style="margin-top:20px;display:none">Initializing...</div>
+    </div>
 
-    <div id="logsStatus" style="margin-top:8px"></div>
+    <div class="section" id="emergencySection">
+      <h2 style="color: #c82333;">🚨 Proxy Health & Emergency</h2>
+      <p>If you see "Failed to fetch" or incorrect instance states (like "already_present"), use these controls.</p>
+      <div style="margin-top:10px">
+        <button id="btnResetState" class="danger">Reset WarmPool State (Clear Cache)</button>
+        <span id="proxyPingStatus" style="margin-left:15px; font-weight:bold">Proxy Status: <span id="proxyStatusDot">⚪</span> <span id="proxyStatusText">Unknown</span></span>
+      </div>
+    </div>
+
+    <div class="section" id="pm2Section">
+      <h2>🔄 Server Management (PM2)</h2>
+      <p>Control the proxy server via PM2. Server must be started with <code>npm run start:pm2</code> for these controls to work.</p>
+      <div id="pm2StatusDisplay" class="status info" style="margin-bottom:15px">
+        PM2 Status: <span id="pm2StatusText">Unknown</span>
+      </div>
+      <div style="margin-top:10px">
+        <button id="btnPm2Status" class="success">Check PM2 Status</button>
+        <button id="btnPm2Restart" style="background:#ff9800">Restart Server</button>
+        <button id="btnPm2Stop" class="danger">Stop Server</button>
+        <button id="btnPm2Start" class="success">Start Server</button>
+      </div>
+      <div id="pm2Result" class="status" style="margin-top:15px;display:none"></div>
+    </div>
+
+    <div class="gpu-status">
+      <div class="gpu-card">
+        <h3>Current Instance</h3>
+        <div id="currentInstance">None</div>
+        <div id="instanceStatus" class="status">No active instance</div>
+      </div>
+      <div class="gpu-card">
+        <h3>GPU Specs</h3>
+        <div id="gpuSpecs">N/A</div>
+        <div id="gpuCost" class="status">Cost: $0/hr</div>
+      </div>
+      <div class="gpu-card">
+        <h3>Setup Progress</h3>
+        <div id="setupProgress">Not started</div>
+        <div id="progressBar" style="background:#eee;border-radius:10px;height:10px;margin-top:10px">
+          <div id="progressFill" style="background:#28a745;height:100%;width:0%;border-radius:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🔐 Admin Authentication</h2>
+      <p>Enter your <strong>admin key</strong> (configured in server environment as <code>ADMIN_API_KEY</code>) and click <em>Refresh</em>.</p>
+      <form id="adminAuthForm" onsubmit="return false;" style="display:inline">
+        <input type="text" name="username" value="admin" style="display:none" autocomplete="username">
+        <label>Admin Key: <input id="adminKey" type="password" autocomplete="current-password" /></label>
+        <button id="btnRefresh" type="submit">Refresh Status</button>
+      </form>
+      <div class="status" id="statusBox">Not authenticated</div>
+    </div>
+
+    <div class="section">
+      <h2>🧭 Navigation</h2>
+      <button id="btnShowPool">Pool Management</button>
+      <button id="btnShowConfig">Configuration</button>
+      <button id="btnShowLogs">Audit Logs</button>
+    </div>
+
+    <div id="poolSection" class="section">
+      <h2>⚙️ Pool Settings</h2>
+      <label>Desired pool size: <input id="desiredSize" type="number" min="0" /></label>
+      <label><input id="safeMode" type="checkbox" /> Safe mode (aggressive shutdown)</label>
+      <div style="margin-top:10px">
+        <button id="btnSave">Save Settings</button>
+        <button id="btnTerminate" class="danger">Terminate Instance</button>
+        <button id="btnHealthCheck" class="success">Run Health Check</button>
+      </div>
+      <div id="healthCheckResults" style="margin-top:15px;display:none">
+        <h3>Health Check Results</h3>
+        <div id="healthStatus" class="status info">Running health check...</div>
+        <div id="healthDetails" style="margin-top:10px;font-family:monospace;font-size:12px;max-height:300px;overflow:auto"></div>
+      </div>
+    </div>
+
+    <div id="configSection" style="display:none" class="section">
+      <h2>🔧 Configuration Management</h2>
+      <div style="margin-bottom:15px">
+        <button id="btnLoadConfig">Load Current Config</button>
+        <button id="btnUpdateConfig" class="success">Update Config</button>
+      </div>
+      <form id="configForm" style="display:none" onsubmit="return false;">
+        <h3>Runtime Configuration (non-persistent)</h3>
+        <input type="text" name="username" value="token-user" style="display:none" autocomplete="username">
+        <label>HuggingFace Token: <input id="hfToken" type="password" placeholder="hf_..." style="width:400px" autocomplete="new-password" /></label><br>
+        <label>Civitai Token: <input id="civitaiToken" type="password" placeholder="..." style="width:400px" autocomplete="new-password" /></label><br>
+        <label>ComfyUI Provision Script URL: <input id="provisionScript" type="text" placeholder="https://..." style="width:400px" /></label><br>
+        <label>Min CUDA Capability: <input id="minCudaCap" type="number" step="0.1" min="7.0" max="9.0" placeholder="7.0" style="width:100px" /></label><br>
+        <div style="margin-top:10px">
+          <button id="btnSaveConfig" type="button">Save Configuration</button>
+          <button id="btnCancelConfig" type="button">Cancel</button>
+        </div>
+      </form>
+      <div id="configDisplay" style="margin-top:15px;display:none">
+        <h3>Current Configuration</h3>
+        <pre id="configJson" style="background:#f8f8f8;padding:10px;border-radius:4px;max-height:200px;overflow:auto"></pre>
+      </div>
+    </div>
+
+    <div id="logsSectionContainer" class="section">
+      <h2>📋 Admin Audit Logs</h2>
+      <div id="logsControls">
+        <label>Since (ISO date/time): <input id="logsSince" type="datetime-local" /></label>
+        <label>Action (optional): <input id="logsAction" type="text" placeholder="e.g. terminate, set_warm_pool" /></label>
+        <label>Limit: <input id="logsLimit" type="number" min="1" max="100" value="50" /></label>
+        <div style="margin-top:8px">
+          <button id="btnLoadLogs">Load Logs</button>
+        </div>
+      </div>
+
+      <div id="logsSection" style="margin-top:12px; display:none">
+        <div id="logsPager" style="margin-bottom:6px">
+          <button id="logsPrev">Prev</button>
+          <span id="logsPageInfo">Page 1</span>
+          <button id="logsNext">Next</button>
+        </div>
+
+        <table id="logsTable" border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Timestamp</th><th>Action</th><th>Route</th><th>IP</th><th>Outcome</th><th>Details</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div id="logsStatus" style="margin-top:8px"></div>
+      </div>
+    </div>
   </div>
 
   <script src="/assets/js/admin-warm-pool.js"></script>
+  <script>
+    // Auto-check proxy status on page load
+    window.addEventListener('DOMContentLoaded', function() {
+      const serverUrlSpan = document.getElementById('server-url');
+      if (serverUrlSpan) {
+        serverUrlSpan.textContent = window.location.origin;
+      }
+      
+      // Ping health endpoint to verify connectivity
+      fetch('/api/proxy/health')
+        .then(res => res.json())
+        .then(data => {
+          console.log('✅ Server health check passed:', data);
+        })
+        .catch(err => {
+          console.warn('⚠️ Server health check failed:', err);
+          console.warn('Make sure the server is running with: npm run start:pm2');
+        });
+    });
+  </script>
 </body>
 </html>

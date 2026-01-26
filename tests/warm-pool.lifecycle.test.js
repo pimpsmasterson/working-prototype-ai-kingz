@@ -4,6 +4,8 @@ const { resetDb, nock, nockCleanAll } = require('./helpers/test-helper');
 const db = require('../server/db');
 
 describe('Warm-pool lifecycle (mocked)', function() {
+  this.timeout(10000); // Increase timeout for async operations
+
   beforeEach(function() {
     resetDb();
     nock.cleanAll();
@@ -14,20 +16,34 @@ describe('Warm-pool lifecycle (mocked)', function() {
   it('prewarm happy-path — rents an offer and becomes running', async function() {
     process.env.VASTAI_API_KEY = 'dummy_key';
 
+    // Mock SSH key registration
+    nock('https://console.vast.ai')
+      .post('/api/v0/ssh/')
+      .reply(200, { success: true });
+
     // Mock bundles -> one offer
     nock('https://console.vast.ai')
       .post('/api/v0/bundles/')
-      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 8192 }] });
+      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 8192, disk_space: 250 }] });
 
     // Mock asks PUT -> rent
     nock('https://console.vast.ai')
       .put('/api/v0/asks/123/')
       .reply(200, { new_contract: 777 });
 
-    // Mock instances GET -> running with public_ip
+    // Mock instances GET -> running with public_ip (allow multiple calls for readiness polling)
     nock('https://console.vast.ai')
       .get('/api/v0/instances/777/')
+      .times(10)
       .reply(200, { status: 'running', public_ipaddr: '1.2.3.4' });
+
+    // Mock ComfyUI readiness check
+    nock('http://1.2.3.4:8188')
+      .get('/system_stats')
+      .reply(200, {
+        system: { ram_total: 32000 },
+        devices: [{ name: 'NVIDIA GPU' }]
+      });
 
     const { reloadWarmPoolWithEnv } = require('./helpers/test-helper');
     const warmPool = reloadWarmPoolWithEnv({ VASTAI_API_KEY: 'dummy_key' });
@@ -37,7 +53,7 @@ describe('Warm-pool lifecycle (mocked)', function() {
 
     const status = warmPool.getStatus();
     assert.ok(status.instance, 'instance should be present');
-    assert.strictEqual(status.instance.status, 'running');
+    assert.strictEqual(status.instance.status, 'ready');
     assert.ok(status.instance.connectionUrl && status.instance.connectionUrl.includes('1.2.3.4'));
 
     const rows = db.db.prepare('SELECT * FROM usage_events WHERE event_type = ?').all('instance_started');

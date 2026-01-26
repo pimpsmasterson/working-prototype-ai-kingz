@@ -7,7 +7,8 @@ class VastAITest {
     constructor() {
         this.apiKey = '4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360';
         this.baseUrl = 'https://console.vast.ai/api/v0';
-        this.sshKey = 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNKygrGeKHZRpSqTkdaP3btkpDPzyrP57j8iqh1KA6thiw3WAVJd2BS0Sd0WAeF1LuMqGEHEU2+5S5IneL11aqSHTGYf/AyjS4lTaj5maxq11fEaYNHjRiaU8lfA4fq0gWQpgrX5sOfI2Ikjo8ZKLh4UFtFQO2b+1uAKfTTxS5oh4AfVX/4mkLTyquZDjl5v9fVAX10Ecc+HELO1582t3XtKljJjC9Jd3M1foHLTVpQ7Xj7o1QpEGCVYBurwkWwhSdpks+82RNLlE7CzhPHmtlLykwFsK650dDc8uYWbIXM5cI7Jn4q8YO8018ggX0uyzNzrr7F7MEjTjlSLSLcJ03SYqXty5EAJPDPGtZaj9j5DGHNKa83l7XF/BDcJiGzCtowoMvNNUGTgcTG78Bm6E+x94ADsS597Yumde7oWIwYBZGYeciNnr9MWUj3S6smidMRyU3i57SpWNw6wJz8zcLuaiKtTU3/AQFcUISl0bjzKtqyEYULxdmcG/In0VQMrYmGl9ZldB4fB0YVVSijQGzukghn7CpomhRsT1llXHB4nyPlx8kvAMQKNHT+NcnoSox4qgjtsgTDz6NBIF0T7b49AdKStTTsJTXfheD60E3A3Vw3/J1QDV8ToW4zuzrFm8cdTKCBFiCNtUiB2oYyNykvPWNW571YOWW1MMWT4kJpw== vast-ai-comfyui';
+        const vastaiSsh = require('./lib/vastai-ssh');
+        this.sshKey = vastaiSsh.getKey();
     }
 
     async testConnection() {

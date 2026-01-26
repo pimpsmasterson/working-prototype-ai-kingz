@@ -13,8 +13,9 @@
 - **Character variations** - Same character, different outfits/scenarios
 - **Generation history** - Track all creations per character
 
-### 🚀 **Cloud GPU Management (Warm Pool)**
-- **Automatic GPU rental** from Vast.ai marketplace
+### 🚀 **Fully Automated Cloud GPU Management (Warm Pool)**
+- **One-Click GPU Rental** from Vast.ai marketplace via admin panel
+- **Automated NSFW Setup** - Pre-configured ComfyUI with Pony Diffusion V6 XL and fetish LoRAs
 - **Idle shutdown** - Auto-terminate after 15 minutes to save costs
 - **Safe mode** - Emergency shutdown for cost control
 - **Real-time monitoring** - 30-second health checks
@@ -139,6 +140,7 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
+COMFYUI_PROVISION_SCRIPT=https://raw.githubusercontent.com/YOUR_USERNAME/ai-kings/main/scripts/fetish-king-nsfw-provision.sh
 ```
 
 ## 📊 API Endpoints
@@ -185,6 +187,46 @@ curl http://localhost:3000/api/proxy/generate/JOB_ID
 - `GET /admin/warm-pool` - Admin dashboard
 - `POST /api/proxy/admin/set-tokens` - Configure API tokens
 - `POST /api/proxy/admin/warm-pool` - Manage warm pool settings
+
+## 🤖 Automated NSFW GPU Setup
+
+The platform features fully automated GPU provisioning for NSFW content generation:
+
+### Model Stack
+- **Base Model**: Pony Diffusion V6 XL - Optimized for detailed, stylized adult content
+- **LoRAs**: Curated selection of fetish-specific LoRAs (shared clothes, x-ray, cunnilingus, etc.)
+- **Video**: AnimateDiff integration for dynamic NSFW animations
+- **Workflows**: Pre-built ComfyUI workflows for image and video generation
+
+### Automated Process
+1. **Admin Panel**: Click "Prewarm GPU" in the admin dashboard
+2. **GPU Rental**: Automatically selects and rents RTX 3070/3080 from Vast.ai
+3. **Provisioning**: Downloads models, LoRAs, and installs ComfyUI nodes
+4. **Workflow Setup**: Deploys NSFW-optimized generation workflows
+5. **Ready State**: GPU is fully configured for fetish content generation
+
+### Manual Setup (if automated provisioning fails)
+If the automated setup doesn't work, you can manually configure the GPU:
+
+1. **SSH into the instance** using the Vast.ai web interface
+2. **Run the provisioning script**:
+   ```bash
+   wget https://raw.githubusercontent.com/YOUR_USERNAME/ai-kings/main/scripts/fetish-king-nsfw-provision.sh
+   chmod +x fetish-king-nsfw-provision.sh
+   ./fetish-king-nsfw-provision.sh
+   ```
+3. **Restart ComfyUI** if needed
+
+### Troubleshooting
+- **Instance not accessible**: Wait 5-10 minutes for provisioning to complete
+- **Provisioning failed**: Check Vast.ai logs or SSH in to debug
+- **Models not downloading**: Verify HuggingFace/Civitai tokens are set
+
+### Admin Dashboard Features
+- **One-Click GPU Rental**: No manual commands or IDE required
+- **Real-Time Status**: Monitor provisioning progress
+- **Cost Control**: Automatic shutdown after idle periods
+- **Audit Trail**: All actions logged with timestamps
 
 ## 🤝 Contributing
 

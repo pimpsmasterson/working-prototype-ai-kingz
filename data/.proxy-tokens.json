@@ -1,0 +1,5 @@
+{
+  "huggingface": "hf_test",
+  "civitai": "cv_test",
+  "vastai": "dummy_vast_key"
+}

@@ -5,6 +5,9 @@ const nock = require('nock');
 const db = require('../../server/db');
 
 process.env.NODE_ENV = 'test';
+// Tests expect smaller ephemeral disk sizes; allow overriding the warm-pool disk
+// during tests to avoid filtering out mocked offers. Default to 120GB for tests.
+process.env.WARM_POOL_DISK_GB = process.env.WARM_POOL_DISK_GB || '120';
 
 function resetDb() {
   try {

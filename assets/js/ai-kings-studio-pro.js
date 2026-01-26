@@ -65,6 +65,11 @@ class StudioAppPro {
             console.log('Studio App Pro initialized successfully');
         } catch (error) {
             console.error('Failed to initialize Studio App Pro:', error);
+            if (error && error.stack) {
+                console.error(error.stack);
+            } else {
+                try { console.error(String(error)); } catch (e) { /* ignore */ }
+            }
             this.showError('Failed to initialize studio. Check console for details.');
         }
     }
@@ -84,24 +89,20 @@ class StudioAppPro {
     configureCloudEndpoint() {
         if (this.cloudConfig && this.cloudConfig.service === 'vastai') {
             // Use Vast.ai
-            this.comfyUI.setEndpoint('http://localhost:3000/api/proxy', {
-                serviceType: 'vastai',
-                apiKey: this.cloudConfig.apiKey || '4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360'
-            });
-            console.log('Connected to Vast.ai');
-        } else {
-            // Auto-configure Vast.ai with provided API key if no config exists
-            console.log('No cloud config found, auto-configuring Vast.ai...');
-            this.cloudConfig = {
-                service: 'vastai',
-                apiKey: '4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360'
-            };
-            localStorage.setItem('aikings_cloud_config', JSON.stringify(this.cloudConfig));
-
-            this.comfyUI.setEndpoint('http://localhost:3000/api/proxy', {
+            if (!this.cloudConfig.apiKey) {
+                console.error('Vast.ai API key not configured. Please set up your API key.');
+                this.showError('Vast.ai API key is required. Please configure it in settings.');
+                return;
+            }
+            this.comfyUI.setEndpoint('/api/proxy', {
                 serviceType: 'vastai',
                 apiKey: this.cloudConfig.apiKey
             });
+            console.log('Connected to Vast.ai');
+        } else {
+            // Require user to configure API key - don't use hard-coded defaults
+            console.warn('No cloud config found. Please configure your Vast.ai API key in settings.');
+            this.showError('Please configure your Vast.ai API key in settings to continue.');
             console.log('Auto-connected to Vast.ai with provided API key');
         }
     }
@@ -111,6 +112,23 @@ class StudioAppPro {
         if (this.generateBtn) {
             this.generateBtn.addEventListener('click', () => this.generateContent());
         }
+
+        // Workflow selector buttons
+        document.querySelectorAll('.workflow-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.workflow-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'transparent';
+                    b.style.color = 'rgba(255,255,255,0.6)';
+                    b.style.borderColor = 'rgba(255,255,255,0.1)';
+                });
+                btn.classList.add('active');
+                btn.style.background = 'rgba(255,255,255,0.1)';
+                btn.style.color = 'white';
+                btn.style.borderColor = 'rgba(255,255,255,0.2)';
+                console.log('Workflow changed to:', btn.getAttribute('data-type'));
+            });
+        });
 
         // Enter key on prompt input
         if (this.promptInput) {
@@ -172,7 +190,7 @@ class StudioAppPro {
 
     async checkServerTokens() {
         try {
-            const r = await fetch('http://localhost:3000/api/proxy/check-tokens');
+            const r = await fetch('/api/proxy/check-tokens');
             if (!r.ok) return;
             const info = await r.json();
             if (!info.huggingface || !info.civitai) {
@@ -254,6 +272,9 @@ class StudioAppPro {
 
     async generateWithComfyUI(muse, userPrompt, variationId = null) {
         try {
+            // Ensure GPU is ready before starting generation (auto-prewarm if needed)
+            await this.ensureGPUReady();
+
             // Build request payload for new backend endpoint
             const workflowType = this.getWorkflowType(); // 'image' or 'video' from UI toggle
 
@@ -284,7 +305,7 @@ class StudioAppPro {
             };
 
             // Submit to generation handler
-            const response = await fetch('http://localhost:3000/api/proxy/generate', {
+            const response = await fetch('/api/proxy/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -307,9 +328,7 @@ class StudioAppPro {
         } catch (error) {
             console.error('Generation error:', error);
             this.showError(`Generation failed: ${error.message}`);
-
-            // Fallback to mock generation
-            return await this.mockGeneration(muse, userPrompt);
+            throw error; // No more mock fallback
         }
     }
 
@@ -317,11 +336,22 @@ class StudioAppPro {
      * Poll job status until complete
      */
     async pollJobStatus(jobId, maxAttempts = 120) {
+        const progressContainer = document.getElementById('generation-progress-container');
+        const progressFill = document.getElementById('generation-progress-fill');
+        const progressText = document.getElementById('generation-progress-text');
+
+        if (progressContainer) {
+            progressContainer.style.display = 'flex';
+            if (typeof gsap !== 'undefined') {
+                gsap.fromTo(progressContainer, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+            }
+        }
+
         for (let i = 0; i < maxAttempts; i++) {
             await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second intervals
 
             try {
-                const response = await fetch(`http://localhost:3000/api/proxy/generate/${jobId}`);
+                const response = await fetch(`/api/proxy/generate/${jobId}`);
 
                 if (!response.ok) {
                     throw new Error(`Status check failed: ${response.status}`);
@@ -334,7 +364,16 @@ class StudioAppPro {
                     `${status.workflowType === 'video' ? 'Rendering video' : 'Generating image'}... ${status.progress}%`
                 );
 
+                if (progressFill) progressFill.style.width = `${status.progress}%`;
+                if (progressText) progressText.textContent = `${status.workflowType === 'video' ? 'RENDERING' : 'GENERATING'}... ${status.progress}%`;
+
                 if (status.status === 'completed') {
+                    if (progressContainer) {
+                        if (typeof gsap !== 'undefined') {
+                            await gsap.to(progressContainer, { opacity: 0, duration: 0.3 }).vars.onComplete;
+                        }
+                        progressContainer.style.display = 'none';
+                    }
                     return {
                         success: true,
                         imageUrl: status.result.url,
@@ -345,6 +384,13 @@ class StudioAppPro {
                 }
 
                 if (status.status === 'failed') {
+                    if (progressContainer) progressContainer.style.display = 'none';
+
+                    // Handle GPU-specific errors with actionable message
+                    if (status.errorCode === 'NO_GPU_AVAILABLE' && status.errorDetails?.canPrewarm) {
+                        throw new Error('No GPU available. The system will auto-start one on your next attempt.');
+                    }
+
                     throw new Error(status.error || 'Generation failed');
                 }
 
@@ -352,27 +398,28 @@ class StudioAppPro {
 
             } catch (error) {
                 console.error(`Polling attempt ${i + 1} failed:`, error);
-                if (i === maxAttempts - 1) throw error; // Re-throw on last attempt
+                if (i === maxAttempts - 1) {
+                    if (progressContainer) progressContainer.style.display = 'none';
+                    throw error;
+                }
             }
         }
 
+        if (progressContainer) progressContainer.style.display = 'none';
         throw new Error('Generation timeout after 6 minutes');
     }
 
     /**
      * Get workflow type from UI (image or video)
-     * For MVP, defaults to 'image'
-     * Future: Add toggle button in Studio UI
      */
     getWorkflowType() {
-        // Check if video toggle is enabled in UI
-        // For MVP, default to 'image'
-        return 'image';
+        const activeBtn = document.querySelector('.workflow-btn.active');
+        return activeBtn ? activeBtn.getAttribute('data-type') : 'image';
     }
 
     async tryClaimWarmPool() {
         try {
-            const r = await fetch('http://localhost:3000/api/proxy/warm-pool/claim', {
+            const r = await fetch('/api/proxy/warm-pool/claim', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ maxSessionMinutes: 30 })
@@ -389,6 +436,85 @@ class StudioAppPro {
             console.error('tryClaimWarmPool error:', error);
             return null;
         }
+    }
+
+    /**
+     * Check GPU availability status
+     */
+    async checkGPUStatus() {
+        try {
+            const response = await fetch('/api/proxy/gpu-status');
+            if (!response.ok) {
+                return { canGenerate: false, canPrewarm: true, status: 'unavailable', message: 'Unable to check GPU status' };
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('GPU status check failed:', error);
+            return { canGenerate: false, canPrewarm: true, status: 'unavailable', message: 'Unable to check GPU status' };
+        }
+    }
+
+    /**
+     * Ensure GPU is ready for generation, auto-prewarming if necessary
+     */
+    async ensureGPUReady() {
+        const status = await this.checkGPUStatus();
+
+        if (status.canGenerate) {
+            console.log('[GPU] Instance ready for generation');
+            return;
+        }
+
+        // GPU not ready - need to prewarm or wait
+        if (status.canPrewarm) {
+            // No instance available - start prewarming
+            this.showInfo('Starting GPU instance... This may take 2-5 minutes.');
+            this.updateGenerateButton('generating', 'Starting GPU...');
+
+            try {
+                const prewarmRes = await fetch('/api/proxy/warm-pool/prewarm', { method: 'POST' });
+                if (!prewarmRes.ok) {
+                    const error = await prewarmRes.json();
+                    throw new Error(error.error || 'Failed to start GPU instance');
+                }
+                console.log('[GPU] Prewarm initiated');
+            } catch (error) {
+                console.error('[GPU] Prewarm failed:', error);
+                throw new Error('Failed to start GPU instance: ' + error.message);
+            }
+        } else {
+            // Instance is starting/initializing - just need to wait
+            this.showInfo(status.message + (status.estimatedReadyTime ? ` (${status.estimatedReadyTime})` : ''));
+            this.updateGenerateButton('generating', status.message);
+        }
+
+        // Poll until ready (max 5 minutes)
+        const maxWaitMs = 5 * 60 * 1000;
+        const pollIntervalMs = 5000;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitMs) {
+            await new Promise(r => setTimeout(r, pollIntervalMs));
+
+            const newStatus = await this.checkGPUStatus();
+
+            if (newStatus.canGenerate) {
+                this.showSuccess('GPU instance is ready!');
+                console.log('[GPU] Instance ready after waiting');
+                return;
+            }
+
+            // Update progress message
+            if (newStatus.status === 'starting') {
+                this.updateGenerateButton('generating', 'GPU starting...');
+            } else if (newStatus.status === 'initializing') {
+                this.updateGenerateButton('generating', 'Initializing ComfyUI...');
+            } else if (newStatus.status === 'prewarming') {
+                this.updateGenerateButton('generating', 'Preparing GPU...');
+            }
+        }
+
+        throw new Error('GPU instance startup timed out after 5 minutes. Please try again.');
     }
 
     async pollComfyUIStatus(response) {
@@ -480,13 +606,27 @@ class StudioAppPro {
 
         const emptyState = this.stage.querySelector('.empty-stage-state');
         const activeContent = this.stage.querySelector('.active-content');
-        const img = activeContent?.querySelector('img');
+        const img = document.getElementById('stage-image');
+        const video = document.getElementById('stage-video');
 
         if (emptyState) emptyState.style.display = 'none';
-        if (activeContent) activeContent.style.display = 'block';
+        if (activeContent) activeContent.style.display = 'flex';
 
-        if (img && result.imageUrl) {
+        if (result.workflowType === 'video') {
+            if (img) img.style.display = 'none';
+            if (video) {
+                video.src = result.imageUrl;
+                video.style.display = 'block';
+                video.play().catch(e => console.warn('Autoplay failed:', e));
+                
+                if (typeof gsap !== 'undefined') {
+                    gsap.from(video, { scale: 0.95, opacity: 0, duration: 0.5 });
+                }
+            }
+        } else if (img && result.imageUrl) {
+            if (video) video.style.display = 'none';
             img.src = result.imageUrl;
+            img.style.display = 'block';
 
             // Animate entrance
             if (typeof gsap !== 'undefined') {

@@ -86,237 +86,42 @@ class MuseProfile {
 
         // Style & Preferences
         this.style = {
-            fashionStyle: data.style?.fashionStyle || 'casual', // casual, elegant, sporty, gothic, punk, etc.
-            preferredOutfits: data.style?.preferredOutfits || [], // Array of outfit descriptions
-            lingerie: data.style?.lingerie || '', // Preferred lingerie style
-            footwear: data.style?.footwear || '',
-            nails: data.style?.nails || 'natural', // natural, manicured, long, painted
-
-            // Context for generation
-            personality: data.style?.personality || '', // Confident, shy, playful, dominant, etc.
-            vibe: data.style?.vibe || 'sensual', // sensual, romantic, fierce, playful, etc.
+            fashionStyle: data.style && data.style.fashionStyle ? data.style.fashionStyle : 'casual',
+            lingerie: data.style && data.style.lingerie ? data.style.lingerie : '',
+            footwear: data.style && data.style.footwear ? data.style.footwear : '',
+            nails: data.style && data.style.nails ? data.style.nails : 'natural',
+            personality: data.style && data.style.personality ? data.style.personality : '',
+            vibe: data.style && data.style.vibe ? data.style.vibe : ''
         };
 
-        // AI Generation Settings
+        // AI Settings
         this.aiSettings = {
-            // Reference Images
-            referenceImages: data.aiSettings?.referenceImages || [], // Array of {url, type, weight}
-            primaryReference: data.aiSettings?.primaryReference || null,
-
-            // Model-Specific
-            loraModels: data.aiSettings?.loraModels || [], // {name, weight, trigger}
-            embeddings: data.aiSettings?.embeddings || [], // {name, trigger}
-            controlNetSettings: data.aiSettings?.controlNetSettings || null,
-            ipAdapterSettings: data.aiSettings?.ipAdapterSettings || null,
-
-            // Prompt Templates
-            positivePromptPrefix: data.aiSettings?.positivePromptPrefix || '',
-            negativePromptAdditions: data.aiSettings?.negativePromptAdditions || '',
-            qualityTags: data.aiSettings?.qualityTags || 'masterpiece, best quality, high resolution, detailed',
-            styleTags: data.aiSettings?.styleTags || '',
-
-            // Generation Preferences
-            preferredCheckpoint: data.aiSettings?.preferredCheckpoint || '',
-            preferredVAE: data.aiSettings?.preferredVAE || '',
-            sampler: data.aiSettings?.sampler || 'DPM++ 2M Karras',
-            steps: data.aiSettings?.steps || 30,
-            cfgScale: data.aiSettings?.cfgScale || 7,
-
-            // ComfyUI Workflow
-            customWorkflow: data.aiSettings?.customWorkflow || null, // Custom ComfyUI workflow JSON
-            workflowTemplate: data.aiSettings?.workflowTemplate || 'default',
+            qualityTags: data.aiSettings && data.aiSettings.qualityTags ? data.aiSettings.qualityTags : 'masterpiece, best quality, high resolution',
+            styleTags: data.aiSettings && data.aiSettings.styleTags ? data.aiSettings.styleTags : 'photorealistic, cinematic lighting',
+            positivePrefix: data.aiSettings && data.aiSettings.positivePrefix ? data.aiSettings.positivePrefix : '',
+            negativeAdditions: data.aiSettings && data.aiSettings.negativeAdditions ? data.aiSettings.negativeAdditions : '',
+            preferredCheckpoint: data.aiSettings && data.aiSettings.preferredCheckpoint ? data.aiSettings.preferredCheckpoint : '',
+            preferredVAE: data.aiSettings && data.aiSettings.preferredVAE ? data.aiSettings.preferredVAE : '',
+            sampler: data.aiSettings && data.aiSettings.sampler ? data.aiSettings.sampler : 'DPM++ 2M Karras',
+            steps: data.aiSettings && data.aiSettings.steps ? data.aiSettings.steps : 30,
+            cfgScale: data.aiSettings && data.aiSettings.cfgScale ? data.aiSettings.cfgScale : 7,
+            loraModels: data.aiSettings && data.aiSettings.loraModels ? data.aiSettings.loraModels : [],
+            primaryReference: data.aiSettings && data.aiSettings.primaryReference ? data.aiSettings.primaryReference : null,
+            referenceImages: data.aiSettings && data.aiSettings.referenceImages ? data.aiSettings.referenceImages : []
         };
 
         // Variations
-        this.variations = data.variations || []; // Array of {id, name, description, overrides}
+        this.variations = data.variations || [];
 
         // Generation History
-        this.generationHistory = data.generationHistory || []; // Array of {timestamp, prompt, imageUrl, settings}
+        this.generationHistory = data.generationHistory || [];
 
         // Notes
         this.notes = data.notes || '';
     }
 
-    // Generate AI prompt from muse profile
-    generatePrompt(userPrompt = '', variation = null) {
-        const parts = [];
-
-        // Apply variation overrides if specified
-        const profile = variation ? this.applyVariation(variation) : this;
-
-        // Quality tags first
-        if (profile.aiSettings.qualityTags) {
-            parts.push(profile.aiSettings.qualityTags);
-        }
-
-        // Character description
-        const charDesc = this.buildCharacterDescription(profile);
-        parts.push(charDesc);
-
-        // Style tags
-        if (profile.aiSettings.styleTags) {
-            parts.push(profile.aiSettings.styleTags);
-        }
-
-        // Positive prefix (custom tags from user)
-        if (profile.aiSettings.positivePromptPrefix) {
-            parts.push(profile.aiSettings.positivePromptPrefix);
-        }
-
-        // User's scene description
-        if (userPrompt) {
-            parts.push(userPrompt);
-        }
-
-        return parts.join(', ');
-    }
-
-    buildCharacterDescription(profile) {
-        const desc = [];
-
-        // Name and basic identity
-        desc.push(`${profile.name}`);
-
-        // Age appearance
-        if (profile.basic.ageAppearance) {
-            desc.push(`${profile.basic.ageAppearance} years old`);
-        }
-
-        // Ethnicity/Nationality
-        if (profile.basic.ethnicity) {
-            desc.push(profile.basic.ethnicity);
-        }
-
-        // Body description
-        const bodyDesc = [];
-        if (profile.body.height && profile.body.height !== 'average') {
-            bodyDesc.push(profile.body.height);
-        }
-        if (profile.body.build) {
-            bodyDesc.push(profile.body.build);
-        }
-        if (profile.body.bodyShape) {
-            bodyDesc.push(`${profile.body.bodyShape} figure`);
-        }
-        if (bodyDesc.length > 0) {
-            desc.push(bodyDesc.join(' '));
-        }
-
-        // Measurements (if specified)
-        if (profile.body.bust && profile.body.waist && profile.body.hips) {
-            desc.push(`${profile.body.bust}-${profile.body.waist}-${profile.body.hips}`);
-        } else if (profile.body.bustCup) {
-            desc.push(`${profile.body.bustCup} cup`);
-        }
-
-        // Skin
-        if (profile.body.skinTone) {
-            desc.push(`${profile.body.skinTone} skin`);
-        }
-
-        // Hair
-        if (profile.face.hairLength && profile.face.hairColor && profile.face.hairStyle) {
-            desc.push(`${profile.face.hairLength} ${profile.face.hairColor} ${profile.face.hairStyle} hair`);
-        }
-
-        // Eyes
-        if (profile.face.eyeColor && profile.face.eyeShape) {
-            desc.push(`${profile.face.eyeShape} ${profile.face.eyeColor} eyes`);
-        }
-
-        // Face features
-        if (profile.face.lips && profile.face.lips !== 'medium') {
-            desc.push(`${profile.face.lips} lips`);
-        }
-
-        // Makeup
-        if (profile.face.makeup && profile.face.makeup !== 'none') {
-            desc.push(`${profile.face.makeup} makeup`);
-        }
-
-        // Tattoos
-        if (profile.features.tattoos && profile.features.tattoos.length > 0) {
-            const tattooDesc = profile.features.tattoos.map(t =>
-                `${t.description} tattoo on ${t.location}`
-            ).join(', ');
-            desc.push(tattooDesc);
-        }
-
-        // Piercings
-        if (profile.features.piercings && profile.features.piercings.length > 0) {
-            const piercingDesc = profile.features.piercings.map(p =>
-                `${p.location} piercing`
-            ).join(', ');
-            desc.push(piercingDesc);
-        }
-
-        // Unique traits
-        if (profile.features.uniqueTraits) {
-            desc.push(profile.features.uniqueTraits);
-        }
-
-        // Fashion style / outfit context
-        if (profile.style.fashionStyle) {
-            desc.push(`${profile.style.fashionStyle} style`);
-        }
-
-        return desc.join(', ');
-    }
-
-    generateNegativePrompt() {
-        const negative = [
-            'ugly', 'deformed', 'disfigured', 'poorly drawn',
-            'bad anatomy', 'wrong anatomy', 'extra limb', 'missing limb',
-            'floating limbs', 'disconnected limbs', 'mutation', 'mutated',
-            'blur', 'blurry', 'text', 'watermark', 'signature',
-            'low quality', 'worst quality', 'low resolution'
-        ];
-
-        // Add custom negative prompt additions
-        if (this.aiSettings.negativePromptAdditions) {
-            negative.push(this.aiSettings.negativePromptAdditions);
-        }
-
-        return negative.join(', ');
-    }
-
-    applyVariation(variationId) {
-        const variation = this.variations.find(v => v.id === variationId);
-        if (!variation) return this;
-
-        // Create a deep copy and apply overrides
-        const modified = JSON.parse(JSON.stringify(this));
-        Object.assign(modified, variation.overrides);
-
-        return new MuseProfile(modified);
-    }
-
-    addVariation(name, description, overrides) {
-        const variation = {
-            id: 'var_' + Date.now(),
-            name,
-            description,
-            overrides,
-            createdAt: new Date().toISOString()
-        };
-        this.variations.push(variation);
-        this.updatedAt = new Date().toISOString();
-        return variation;
-    }
-
-    addToHistory(entry) {
-        this.generationHistory.unshift({
-            id: 'gen_' + Date.now(),
-            timestamp: new Date().toISOString(),
-            ...entry
-        });
-
-        // Keep last 50 generations
-        if (this.generationHistory.length > 50) {
-            this.generationHistory = this.generationHistory.slice(0, 50);
-        }
-
-        this.updatedAt = new Date().toISOString();
+    static fromJSON(json) {
+        return new MuseProfile(json);
     }
 
     toJSON() {
@@ -341,8 +146,101 @@ class MuseProfile {
         };
     }
 
-    static fromJSON(json) {
-        return new MuseProfile(json);
+    addVariation(name, description, overrides) {
+        const variation = {
+            id: 'var_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            name: name,
+            description: description || '',
+            overrides: overrides || {},
+            createdAt: new Date().toISOString()
+        };
+        this.variations.push(variation);
+        return variation;
+    }
+
+    addToHistory(entry) {
+        const historyEntry = {
+            ...entry,
+            timestamp: new Date().toISOString()
+        };
+        this.generationHistory.unshift(historyEntry);
+        // Keep only last 100 entries
+        if (this.generationHistory.length > 100) {
+            this.generationHistory = this.generationHistory.slice(0, 100);
+        }
+    }
+
+    generatePrompt(userPrompt, variationId = null) {
+        const parts = [];
+
+        // Add quality tags
+        if (this.aiSettings.qualityTags) {
+            parts.push(this.aiSettings.qualityTags);
+        }
+
+        // Add style tags
+        if (this.aiSettings.styleTags) {
+            parts.push(this.aiSettings.styleTags);
+        }
+
+        // Add positive prefix
+        if (this.aiSettings.positivePrefix) {
+            parts.push(this.aiSettings.positivePrefix);
+        }
+
+        // Build character description
+        const charDesc = [];
+
+        // Basic attributes
+        if (this.basic.age) charDesc.push(`${this.basic.age} year old`);
+        if (this.basic.ethnicity) charDesc.push(this.basic.ethnicity);
+        charDesc.push('woman');
+
+        // Face attributes
+        if (this.face.hairColor && this.face.hairLength) {
+            charDesc.push(`${this.face.hairLength} ${this.face.hairColor} hair`);
+        }
+        if (this.face.eyeColor) charDesc.push(`${this.face.eyeColor} eyes`);
+
+        // Body attributes
+        if (this.body.build) charDesc.push(`${this.body.build} build`);
+        if (this.body.skinTone) charDesc.push(`${this.body.skinTone} skin`);
+
+        if (charDesc.length > 0) {
+            parts.push(charDesc.join(', '));
+        }
+
+        // Apply variation overrides if specified
+        if (variationId) {
+            const variation = this.variations.find(v => v.id === variationId);
+            if (variation && variation.overrides) {
+                // Add variation-specific style
+                if (variation.overrides.style) {
+                    parts.push(variation.overrides.style.fashionStyle || '');
+                }
+            }
+        }
+
+        // Add user prompt
+        if (userPrompt) {
+            parts.push(userPrompt);
+        }
+
+        return parts.filter(p => p).join(', ');
+    }
+
+    generateNegativePrompt() {
+        const negativeParts = [
+            'ugly', 'deformed', 'bad anatomy', 'bad proportions',
+            'extra limbs', 'mutated hands', 'poorly drawn face',
+            'blurry', 'watermark', 'text', 'signature'
+        ];
+
+        if (this.aiSettings.negativeAdditions) {
+            negativeParts.push(this.aiSettings.negativeAdditions);
+        }
+
+        return negativeParts.join(', ');
     }
 }
 
@@ -492,569 +390,8 @@ class MuseStorageManager {
     }
 }
 
-// ============================================================================
-// COMFYUI INTEGRATION WITH CLOUD SUPPORT
-// ============================================================================
-
-class ComfyUIIntegration {
-    constructor() {
-        this.baseUrl = 'http://127.0.0.1:8188'; // Default ComfyUI endpoint
-        this.apiKey = null;
-        this.serviceType = 'local'; // 'local', 'vastai'
-        this.authHeaders = {};
-        this.workflows = {};
-        this.vastai = {
-            instanceId: null,
-            instanceStatus: 'stopped',
-            connectionUrl: null,
-            lastHealthCheck: null
-        };
-    }
-
-    // Enhanced endpoint configuration with cloud support
-    setEndpoint(url, options = {}) {
-        this.baseUrl = url;
-        this.serviceType = options.serviceType || 'local';
-        this.apiKey = options.apiKey || null;
-
-        // Load saved vastai config if available
-        const savedConfig = localStorage.getItem('vastai_config');
-        if (savedConfig) {
-            try {
-                this.vastai = JSON.parse(savedConfig);
-                console.log('Loaded saved Vast.ai config:', this.vastai);
-            } catch (e) {
-                console.error('Failed to parse saved vastai config:', e);
-            }
-        }
-
-        // Set authentication headers based on service
-        this.setAuthHeaders();
-
-        // Initialize cloud service if needed
-        if (this.serviceType === 'vastai' && this.apiKey) {
-            this.initializeVastAI();
-        }
-    }
-
-    setAuthHeaders() {
-        this.authHeaders = {};
-
-        switch (this.serviceType) {
-            case 'vastai':
-                if (this.apiKey) {
-                    this.authHeaders['Authorization'] = `Bearer ${this.apiKey}`;
-                }
-                break;
-            // Add other services...
-        }
-    }
-
-    async initializeVastAI() {
-        try {
-            // Load saved Vast.ai configuration
-            const vastConfig = localStorage.getItem('vastai_config');
-            if (vastConfig) {
-                this.vastai = { ...this.vastai, ...JSON.parse(vastConfig) };
-            }
-
-            // Check if we have a running instance
-            if (this.vastai.instanceId) {
-                await this.checkVastAIInstance();
-            }
-        } catch (error) {
-            console.error('Failed to initialize Vast.ai:', error);
-        }
-    }
-
-    async checkVastAIInstance() {
-        if (!this.vastai.instanceId || !this.apiKey) return;
-
-        try {
-            const response = await fetch(`http://localhost:3000/api/proxy/instances/${this.vastai.instanceId}/`, {
-                headers: this.authHeaders
-            });
-
-            if (response.ok) {
-                const instance = await response.json();
-                this.vastai.instanceStatus = instance.actual_status;
-                this.vastai.lastHealthCheck = new Date().toISOString();
-
-                // Update connection URL if running
-                if (instance.actual_status === 'running') {
-                    this.vastai.connectionUrl = `http://${instance.public_ipaddr}:${instance.port}`;
-                    this.baseUrl = this.vastai.connectionUrl;
-                }
-
-                // Save updated config
-                localStorage.setItem('vastai_config', JSON.stringify(this.vastai));
-            }
-        } catch (error) {
-            console.error('Vast.ai instance check failed:', error);
-            this.vastai.instanceStatus = 'error';
-        }
-    }
-
-    async startVastAIInstance(templateId = null) {
-        if (!this.apiKey) throw new Error('Vast.ai API key required');
-
-        // Prevent concurrent launches
-        if (this.vastai.isLaunching) {
-            console.warn('An instance launch is already in progress.');
-            return null;
-        }
-
-        // If an instance ID exists, check its status first
-        if (this.vastai.instanceId) {
-            await this.checkVastAIInstance();
-            if (this.vastai.instanceStatus === 'starting' || this.vastai.instanceStatus === 'running') {
-                console.log('Instance already exists and is starting/running:', this.vastai.instanceId);
-                return this.vastai.instanceId;
-            }
-        }
-
-        try {
-            // Mark launching state immediately to avoid race conditions
-            this.vastai.isLaunching = true;
-            this.vastai.instanceStatus = 'starting';
-            localStorage.setItem('vastai_config', JSON.stringify(this.vastai));
-
-            // Disable start buttons in UI if present
-            try { document.querySelectorAll('#start-vastai-instance').forEach(b => b.disabled = true); } catch(e){}
-
-            console.log('🔍 Searching for available GPU offers...');
-            
-            // Step 1: Search for available offers
-            const searchParams = {
-                verified: { eq: true },
-                rentable: { eq: true },
-                rented: { eq: false },
-                type: 'bid',
-                dph_total: { lte: 1.0 }, // Max $1/hour
-                gpu_ram: { gte: 8192 }, // Min 8GB VRAM
-                reliability: { gte: 0.90 },
-                order: [['dph_total', 'asc']] // Sort by price
-            };
-
-            const searchResponse = await fetch('http://localhost:3000/api/proxy/bundles', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(searchParams)
-            });
-
-            if (!searchResponse.ok) {
-                throw new Error(`Offer search failed: ${searchResponse.status}`);
-            }
-
-            const searchData = await searchResponse.json();
-            const offers = searchData.offers || [];
-            
-            if (offers.length === 0) {
-                throw new Error('No suitable GPU offers found');
-            }
-
-            const selectedOffer = offers[0];
-            console.log(`✅ Selected: ${selectedOffer.gpu_name} for $${selectedOffer.dph_total}/hr`);
-
-            // Step 2: Rent the instance
-            const rentResponse = await fetch(`http://localhost:3000/api/proxy/asks/${selectedOffer.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    image: 'pytorch/pytorch:latest',
-                    runtype: 'ssh',
-                    target_state: 'running',
-                    onstart: `
-cd /root &&
-git clone https://github.com/comfyanonymous/ComfyUI.git &&
-cd ComfyUI &&
-pip install -r requirements.txt &&
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 &&
-nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 &
-                    `.trim(),
-                    env: { 'PYTHONPATH': '/root/ComfyUI' },
-                    disk: 32
-                })
-            });
-
-            if (!rentResponse.ok) {
-                const errorText = await rentResponse.text();
-                throw new Error(`Instance rental failed: ${rentResponse.status} - ${errorText}`);
-            }
-
-            const result = await rentResponse.json();
-            this.vastai.instanceId = result.new_contract || result.id || null;
-            this.vastai.instanceStatus = 'starting';
-
-            // Save config
-            localStorage.setItem('vastai_config', JSON.stringify(this.vastai));
-
-            console.log('✅ Vast.ai instance starting:', this.vastai.instanceId || result.new_contract || result.id);
-            
-            // Start polling for instance readiness
-            this.startInstancePolling();
-            
-            return this.vastai.instanceId;
-        } catch (error) {
-            console.error('Failed to start Vast.ai instance:', error);
-            // Reset launching state on error
-            this.vastai.isLaunching = false;
-            this.vastai.instanceStatus = 'error';
-            localStorage.setItem('vastai_config', JSON.stringify(this.vastai));
-            throw error;
-        } finally {
-            // Re-enable start buttons in UI
-            try { document.querySelectorAll('#start-vastai-instance').forEach(b => b.disabled = false); } catch(e){}
-            // Keep isLaunching true until instance transitions via polling
-        }
-
-        } catch (error) {
-            console.error('Failed to start Vast.ai instance:', error);
-            throw error;
-        }
-    }
-
-    async stopVastAIInstance() {
-        if (!this.vastai.instanceId || !this.apiKey) return;
-
-        try {
-            // Stop polling
-            this.stopInstancePolling();
-            
-            // Proxy the delete request through the server to avoid CORS and to use server-side auth
-            const response = await fetch(`http://localhost:3000/api/proxy/instances/${this.vastai.instanceId}/`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                this.vastai.instanceStatus = 'stopped';
-                this.vastai.connectionUrl = null;
-                this.vastai.instanceId = null;
-                this.baseUrl = 'http://127.0.0.1:8188'; // Reset to local
-
-                // Save updated config
-                localStorage.setItem('vastai_config', JSON.stringify(this.vastai));
-
-                console.log('Vast.ai instance stopped');
-            }
-        } catch (error) {
-            console.error('Failed to stop Vast.ai instance:', error);
-            throw error;
-        }
-    }
-
-    startInstancePolling() {
-        // Clear existing polling if any
-        this.stopInstancePolling();
-        
-        console.log('⏱️ Starting instance status polling...');
-        this.pollingInterval = setInterval(async () => {
-            await this.checkVastAIInstance();
-            
-            // If instance is ready, stop polling
-            if (this.vastai.connectionUrl) {
-                console.log('✅ Instance is ready! URL:', this.vastai.connectionUrl);
-                this.stopInstancePolling();
-            }
-        }, 30000); // Check every 30 seconds
-    }
-
-    stopInstancePolling() {
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
-            this.pollingInterval = null;
-        }
-    }
-
-    async listVastAIInstances() {
-        if (!this.apiKey) return [];
-
-        try {
-            const response = await fetch('http://localhost:3000/api/proxy/instances', {
-                headers: this.authHeaders
-            });
-
-            if (response.ok) {
-                const instances = await response.json();
-                return instances.instances || [];
-            }
-        } catch (error) {
-            console.error('Failed to list Vast.ai instances:', error);
-        }
-
-        return [];
-    }
-
-    async generateWithMuse(muse, userPrompt, variation = null, settings = {}) {
-        // Ensure Vast.ai instance is running if using cloud
-        if (this.serviceType === 'vastai') {
-            await this.ensureVastAIInstance();
-        }
-
-        const prompt = muse.generatePrompt(userPrompt, variation);
-        const negativePrompt = muse.generateNegativePrompt();
-
-        // Build ComfyUI workflow
-        const workflow = this.buildWorkflow(muse, prompt, negativePrompt, settings);
-
-        // Submit to ComfyUI
-        return await this.submitWorkflow(workflow);
-    }
-
-    async ensureVastAIInstance() {
-        // Check current status
-        await this.checkVastAIInstance();
-
-        if (this.vastai.instanceStatus === 'stopped') {
-            console.log('Starting Vast.ai instance...');
-            await this.startVastAIInstance();
-
-            // Wait for instance to be ready (this could take several minutes)
-            let attempts = 0;
-            while (attempts < 60) { // 5 minutes max
-                await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
-                await this.checkVastAIInstance();
-
-                if (this.vastai.instanceStatus === 'running') {
-                    console.log('Vast.ai instance ready!');
-                    return;
-                }
-
-                attempts++;
-            }
-
-            throw new Error('Vast.ai instance failed to start within timeout');
-        } else if (this.vastai.instanceStatus === 'running') {
-            // Instance is already running
-            return;
-        } else {
-            throw new Error(`Vast.ai instance status: ${this.vastai.instanceStatus}`);
-        }
-    }
-
-    async generateWithMuse(muse, userPrompt, variation = null, settings = {}) {
-        const prompt = muse.generatePrompt(userPrompt, variation);
-        const negativePrompt = muse.generateNegativePrompt();
-
-        // Build ComfyUI workflow
-        const workflow = this.buildWorkflow(muse, prompt, negativePrompt, settings);
-
-        // Submit to ComfyUI
-        return await this.submitWorkflow(workflow);
-    }
-
-    buildWorkflow(muse, positivePrompt, negativePrompt, settings) {
-        // Use custom workflow if defined, otherwise use default template
-        if (muse.aiSettings.customWorkflow) {
-            return this.injectPromptsIntoWorkflow(
-                muse.aiSettings.customWorkflow,
-                positivePrompt,
-                negativePrompt
-            );
-        }
-
-        // Default workflow template
-        return this.createDefaultWorkflow(muse, positivePrompt, negativePrompt, settings);
-    }
-
-    createDefaultWorkflow(muse, positivePrompt, negativePrompt, settings) {
-        // This is a simplified example - actual ComfyUI workflows are more complex
-        const workflow = {
-            "3": { // KSampler node
-                "inputs": {
-                    "seed": settings.seed || Math.floor(Math.random() * 1000000000),
-                    "steps": muse.aiSettings.steps || 30,
-                    "cfg": muse.aiSettings.cfgScale || 7,
-                    "sampler_name": muse.aiSettings.sampler || "dpmpp_2m_karras",
-                    "scheduler": "karras",
-                    "denoise": 1,
-                    "model": ["4", 0],
-                    "positive": ["6", 0],
-                    "negative": ["7", 0],
-                    "latent_image": ["5", 0]
-                },
-                "class_type": "KSampler"
-            },
-            "4": { // Load Checkpoint
-                "inputs": {
-                    "ckpt_name": muse.aiSettings.preferredCheckpoint || "model.safetensors"
-                },
-                "class_type": "CheckpointLoaderSimple"
-            },
-            "5": { // Empty Latent Image
-                "inputs": {
-                    "width": settings.width || 512,
-                    "height": settings.height || 768,
-                    "batch_size": 1
-                },
-                "class_type": "EmptyLatentImage"
-            },
-            "6": { // Positive Prompt
-                "inputs": {
-                    "text": positivePrompt,
-                    "clip": ["4", 1]
-                },
-                "class_type": "CLIPTextEncode"
-            },
-            "7": { // Negative Prompt
-                "inputs": {
-                    "text": negativePrompt,
-                    "clip": ["4", 1]
-                },
-                "class_type": "CLIPTextEncode"
-            },
-            "8": { // VAE Decode
-                "inputs": {
-                    "samples": ["3", 0],
-                    "vae": ["4", 2]
-                },
-                "class_type": "VAEDecode"
-            },
-            "9": { // Save Image
-                "inputs": {
-                    "filename_prefix": `AIKings_${muse.name}`,
-                    "images": ["8", 0]
-                },
-                "class_type": "SaveImage"
-            }
-        };
-
-        // Add LoRA nodes if specified
-        if (muse.aiSettings.loraModels && muse.aiSettings.loraModels.length > 0) {
-            // TODO: Inject LoRA nodes into workflow
-        }
-
-        // Add IPAdapter nodes if reference images exist
-        if (muse.aiSettings.primaryReference) {
-            // TODO: Inject IPAdapter nodes
-        }
-
-        return workflow;
-    }
-
-    injectPromptsIntoWorkflow(workflow, positivePrompt, negativePrompt) {
-        // Clone workflow
-        const modified = JSON.parse(JSON.stringify(workflow));
-
-        // Find and update prompt nodes
-        Object.keys(modified).forEach(nodeId => {
-            const node = modified[nodeId];
-            if (node.class_type === 'CLIPTextEncode') {
-                // Determine if positive or negative based on common patterns
-                const currentText = (node.inputs.text || '').toLowerCase();
-                if (currentText.includes('negative') || currentText.includes('bad') || currentText.includes('worst')) {
-                    node.inputs.text = negativePrompt;
-                } else {
-                    node.inputs.text = positivePrompt;
-                }
-            }
-        });
-
-        return modified;
-    }
-
-    async submitWorkflow(workflow) {
-        try {
-            if (this.serviceType === 'vastai') {
-                // Check instance status before submitting
-                await this.checkVastAIInstance();
-                
-                // Auto-launch instance if not available
-                if (!this.vastai.connectionUrl) {
-                    // Check if already launching
-                    if (this.vastai.instanceStatus === 'starting' && this.vastai.instanceId) {
-                        throw new Error('Instance is already launching (ID: ' + this.vastai.instanceId + '). Please wait 5-10 minutes, then try again.');
-                    }
-                    
-                    console.log('⚠️ No Vast.ai instance running. Auto-launching...');
-                    const contractId = await this.startVastAIInstance();
-                    if (contractId) {
-                        throw new Error('Instance launching. Please wait 5-10 minutes for setup, then try again.');
-                    }
-                    throw new Error('Failed to launch Vast.ai instance. Check console for details.');
-                }
-                
-                // When using Vast.ai, forward the request via the server proxy to the running instance
-                const forwardBody = {
-                    targetUrl: `${this.vastai.connectionUrl}/prompt`,
-                    payload: {
-                        prompt: workflow,
-                        client_id: 'aikings_' + Date.now()
-                    }
-                };
-
-                const response = await fetch('http://localhost:3000/api/proxy/forward', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(forwardBody)
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`ComfyUI request failed: ${response.status} - ${errorText}`);
-                }
-
-                return await response.json();
-            } else {
-                // Local ComfyUI
-                const url = `${this.baseUrl}/prompt`;
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...this.authHeaders
-                    },
-                    body: JSON.stringify({
-                        prompt: workflow,
-                        client_id: 'aikings_' + Date.now()
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`ComfyUI request failed: ${response.status} - ${errorText}`);
-                }
-
-                return await response.json();
-            }
-        } catch (error) {
-            console.error('ComfyUI submission error:', error);
-
-            // Enhanced error handling for cloud services
-            if (this.serviceType === 'vastai') {
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    throw new Error('Cannot connect to Vast.ai instance. It may still be starting up.');
-                }
-            }
-
-            throw error;
-        }
-    }
-
-    async getHistory(promptId) {
-        try {
-            const response = await fetch(`${this.baseUrl}/history/${promptId}`);
-            if (!response.ok) {
-                throw new Error(`Failed to get history: ${response.status}`);
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('ComfyUI history error:', error);
-            throw error;
-        }
-    }
-
-    async getImage(filename, subfolder = '', type = 'output') {
-        const params = new URLSearchParams({
-            filename,
-            subfolder,
-            type
-        });
-        return `${this.baseUrl}/view?${params.toString()}`;
-    }
-}
+// ComfyUIIntegration is loaded from assets/js/comfyui-integration.js
 
 // Export classes
 window.MuseProfile = MuseProfile;
 window.MuseStorageManager = MuseStorageManager;
-window.ComfyUIIntegration = ComfyUIIntegration;

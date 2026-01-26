@@ -49,21 +49,36 @@ describe('Proxy API Endpoints', function() {
   });
 
   it('POST /api/proxy/warm-pool/prewarm calls warm-pool prewarm', async function() {
+    // Set valid admin API key
+    process.env.ADMIN_API_KEY = 'test_admin_key';
+
+    // Mock SSH key registration
+    nock('https://console.vast.ai')
+      .post('/api/v0/ssh/')
+      .reply(200, { success: true });
+
     // Mock Vast.ai responses that prewarm calls
     nock('https://console.vast.ai')
       .post('/api/v0/bundles/')
-      .reply(200, { offers: [{ id: 123, dph_total: 0.1, gpu_ram: 16384 }] });
-    
+      .reply(200, { offers: [{ id: 123, dph_total: 0.1, gpu_ram: 16384, disk_space: 250, rentable: true, rented: false }] });
+
     nock('https://console.vast.ai')
       .put('/api/v0/asks/123/')
       .reply(200, { new_contract: 456 });
-    
-    // Mock checkInstance call that happens immediately after prewarm
+
+    // Mock checkInstance call that happens immediately after prewarm (allow multiple for polling)
     nock('https://console.vast.ai')
       .get('/api/v0/instances/456/')
-      .reply(200, { instances: [{ id: 456, actual_status: 'starting' }] });
+      .times(10)
+      .reply(200, { status: 'running', public_ipaddr: '5.6.7.8' });
 
-    const res = await request.post('/api/proxy/warm-pool/prewarm');
+    // Mock ComfyUI readiness
+    nock('http://5.6.7.8:8188')
+      .get('/system_stats')
+      .reply(200, { system: { ram_total: 32000 }, devices: [{ name: 'GPU' }] });
+
+    const res = await request.post('/api/proxy/warm-pool/prewarm')
+      .set('x-admin-api-key', 'test_admin_key');
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.status, 'started');
   });

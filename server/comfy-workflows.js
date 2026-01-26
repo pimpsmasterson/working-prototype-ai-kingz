@@ -87,7 +87,58 @@ function buildVideoWorkflow(params = {}) {
   };
 }
 
-function buildWorkflow(params = {}, type = 'image') {
+function buildNsfwVideoWorkflow(params = {}) {
+  // NSFW video template tuned for Wan 2.5 and motion LoRAs
+  const {
+    prompt = 'photorealistic adult loop',
+    negativePrompt = 'censored, blurred, lowres',
+    width = 512,
+    height = 512,
+    steps = 30,
+    cfgScale = 7,
+    seed = Math.floor(Math.random() * 1000000000),
+    frames = 16,
+    fps = 8,
+    checkpoint = 'wan_2.5.safetensors'
+  } = params;
+
+  return {
+    "1": { "inputs": { "ckpt_name": checkpoint }, "class_type": "CheckpointLoaderSimple" },
+    "2": { "inputs": { "text": prompt, "clip": ["1", 1] }, "class_type": "CLIPTextEncode" },
+    "3": { "inputs": { "text": negativePrompt, "clip": ["1", 1] }, "class_type": "CLIPTextEncode" },
+    "4": { "inputs": { "model_name": checkpoint }, "class_type": "AnimateDiffLoader" },
+    "5": { "inputs": { "width": width, "height": height, "batch_size": frames }, "class_type": "EmptyLatentImage" },
+    "6": {
+      "inputs": {
+        "seed": seed,
+        "steps": steps,
+        "cfg": cfgScale,
+        "sampler_name": "euler",
+        "scheduler": "normal",
+        "denoise": 1.0,
+        "model": ["4", 0],
+        "positive": ["2", 0],
+        "negative": ["3", 0],
+        "latent_image": ["5", 0]
+      },
+      "class_type": "KSampler"
+    },
+    "7": { "inputs": { "samples": ["6", 0], "vae": ["1", 2] }, "class_type": "VAEDecode" },
+    "8": {
+      "inputs": {
+        "images": ["7", 0],
+        "fps": fps,
+        "format": "video/h264-mp4",
+        "filename_prefix": "aikings_nsfw"
+      },
+      "class_type": "VHS_VideoCombine"
+    }
+  };
+}
+
+function buildWorkflow(params = {}, type = 'image', template = null) {
+  // If an explicit template is requested, prefer it
+  if (template === 'nsfw_video') return buildNsfwVideoWorkflow(params);
   if (type === 'video') return buildVideoWorkflow(params);
   return buildImageWorkflow(params);
 }

@@ -1,0 +1,8 @@
+Loaded persistent tokens from C:\Users\samsc\.proxy-tokens.json
+Database initialized: C:\Users\samsc\OneDrive\Desktop\working protoype\data\warm_pool.db
+DB schema ready
+[DEBUG] Starting server... require.main === module is true
+[DEBUG] PORT: 3000
+[DEBUG] startProxy() called, server object: true
+Vast.ai proxy running on http://localhost:3000/ (ready)
+[DEBUG] Server is now listening

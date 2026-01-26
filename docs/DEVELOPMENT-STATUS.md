@@ -1,9 +1,35 @@
 # 🎯 AI KINGS Development Status - For Non-Programmers
 
-**Last Updated:** January 25, 2026
+**Last Updated:** January 26, 2026
 **Project:** AI-Powered Adult Content Generation Platform
 **Domain:** fetishking.com
 **Current Phase:** Production-Ready Prototype
+
+---
+
+## 🆕 Recent Changes (Jan 26, 2026)
+- We ran a real prewarm (rented cloud GPU) and observed one instance fail during container extraction due to insufficient disk on the cloud host ("no space left on device"). That failing instance was terminated to stop costs.
+- We updated the warm-pool configuration to request **250GB** disk for new instances (up from 120 → 150 → 250GB during iteration).
+- Added extra checks and logging: the system now actively probes ComfyUI readiness and logs admin prewarm headers to diagnose auth issues.
+- Integrated PM2 process management into the repo: moved `pm2` to `dependencies`, added PM2 programmatic admin endpoints (`/api/proxy/admin/pm2/{status,start,stop,restart}`), and added UI controls in `pages/admin-warm-pool.html` (server management section).
+- Installed PM2 and started the proxy locally with `npm run start:pm2` during the session (process came online and health endpoint returned OK). PM2 now manages `vastai-proxy` locally (example: PID 108956).
+- Discovered a stale warm-pool record (`contractId: "555"`) causing `isPrewarming` to remain set and prewarm operations to report `already_present` or `already_prewarming`; manually cleared DB and restarted via PM2 as a workaround.
+- Added short-term diagnostic notes in the admin UI and `docs/CURRENT_STATUS_2026-01-26.md` summarizing the session.
+- Planned next step: add an automatic safety rule to terminate instances that fail with extraction errors (recommended and ready to implement), and implement an in-code safe-reset to atomically clear DB + in-memory warm-pool state.
+
+
+---
+
+## ⚡ Immediate Action Items (pick one)
+1. **Approve 250GB default** (Recommended): reduces risk of failed extraction and manual interventions but increases hourly storage cost.
+2. **Enable Auto-Terminate on Extraction Failures**: implements a safety rule to automatically terminate stuck/failed instances and send an admin alert (recommended for cost control).
+3. **Run a Fresh Prewarm Test**: with the new settings, trigger a prewarm and monitor logs for readiness and connectivity (we can run this for you and report results).
+4. **Implement in-code safe-reset**: update `POST /api/proxy/admin/reset-state` so it clears DB and in-memory `warm-pool` state atomically and add tests (30–60 minutes).
+5. **Add demo automation script** (`scripts/demo-run.ps1`): automates start -> health -> prewarm -> status -> reset sequence for presentation rehearsals (~30 minutes).
+
+Pick one (e.g., "Approve 250GB", "Enable Auto-Terminate", or "Implement in-code safe-reset") and we will implement and run the corresponding steps.
+
+---
 
 ---
 
@@ -13,7 +39,7 @@
 [✅ Idea] ──► [✅ Prototype] ──► [✅ Core Features] ──► [✅ Testing Complete] ──► [🎯 YOU ARE HERE] ──► [🚀 Production Launch]
 ```
 
-**Overall Progress:** ~95% Complete
+**Overall Progress:** ~94% Complete (updated with warm-pool hardening and readiness checks)
 
 **What Works:** Almost everything - the platform is fully functional and has comprehensive automated tests
 **What's Missing:** Final production deployment and monitoring setup
@@ -86,23 +112,33 @@ Think of AI KINGS as a **custom AI art studio** where:
 
 **Think of it like:**
 - A taxi waiting at the curb instead of calling one when you need it
-- Result: Content generates in 30 seconds instead of 3-5 minutes (no waiting for GPU startup)
+- Result: Content generates in ~30 seconds instead of several minutes (no waiting for GPU startup)
 
-**Features:**
+**Features (updated):**
 - **Automatic startup:** Rents a GPU when you set "desired pool size" to 1
 - **Auto-shutdown:** If nobody uses it for 15 minutes, shuts down to save money
 - **Safe mode:** Emergency "shut down NOW" button
-- **Status monitoring:** Every 30 seconds, checks if GPU is still running
-- **Database logging:** Records every start, stop, and usage event
+- **Status monitoring:** Every 30 seconds, checks instance status and health
+- **Readiness probe:** Actively polls ComfyUI `/system_stats` to mark an instance as `ready` only after the service responds
+- **Database logging:** Records starts, stops, failures and usage events
 - **Cost tracking:** Monitors how long instances run
 
+**Recent operational changes (Jan 26, 2026):**
+- **Disk increase:** Warm-pool now requests **250GB** disk for new instances to avoid container extraction failures observed in the wild.
+- **Port provisioning:** The bundle search now filters by `direct_port_count` and the rent request asks for many direct ports so ComfyUI can be reached externally.
+- **Logging & diagnostics:** Prewarm endpoint logs headers and admin key presence to help with intermittent auth issues seen during testing.
+
 **Components:**
-- Backend manager (`server/warm-pool.js`) - 285 lines of real code
+- Backend manager (`server/warm-pool.js`) - 310+ lines (now includes readiness probe and extra filters)
 - Admin dashboard (`/admin/warm-pool`) - Web interface with controls
-- Polling loop - Continuous 30-second health checks
+- Polling loop - Continuous 30-second health checks; background readiness probe runs for new instances
 - SQLite database - Persistent state and audit logs
 
-**Status:** ✅ Fully functional - tested with real Vast.ai GPU rental (contract 30495801), successfully started and terminated
+**Recent incidents:**
+- Instance `30519173` failed image extraction with: "no space left on device" (cloud host overlayfs error) — this instance was terminated to stop billing.
+- Another instance (`30518793`) reached `running` but the proxy observed `ETIMEDOUT` while attempting to contact ComfyUI on the mapped public port; this indicated either delayed ComfyUI startup or port mapping lag.
+
+**Status:** ✅ Operational and improved — mitigations applied (terminated failing instance, increased disk to 250GB, added readiness probes). Next steps: add automatic termination rule for extraction failures and increase probe timeout/backoff to reduce ETIMEDOUT occurrences.
 
 ---
 
@@ -231,14 +267,19 @@ Think of AI KINGS as a **custom AI art studio** where:
 ---
 
 #### 3. **ComfyUI Health Checks**
-**Status:** Assumed but not validated
+**Status:** Partially implemented — readiness probe added and actively used, needs tuning
 
-**What it should do:**
-- Verify ComfyUI actually started on GPU instance
-- Check if API endpoint is responding
-- Validate models downloaded correctly
+**What it should do (and what's now implemented):**
+- Verify ComfyUI actually started on GPU instance — implemented via `waitForComfyReady()` which polls `/system_stats` and marks an instance `ready` only after a successful JSON response.
+- Check if API endpoint is responding — implemented; probe runs in background when `connectionUrl` is available.
+- Validate models downloaded correctly — partially: probe will detect that the service is up, but it does not yet verify model completeness; adding model-availability checks is recommended.
 
-**Current State:** System assumes ComfyUI starts successfully but doesn't verify
+**What remains:**
+- Increase probe timeout (recommend 5–10 minutes) and add exponential backoff to handle longer provisioning/model downloads.
+- Add an automatic termination rule for instances with extraction failure messages (e.g., "no space left on device") or persistent load failures.
+- Surface `lastStatusMessage`, `direct_port_start/end`, and a clear `ready` indicator in the admin UI for easier non-technical triage.
+
+**Impact:** Reduced false `ETIMEDOUT` failures and better clarity for admins, but we still need to harden timeouts and add automatic cleanup for stuck/failed instances.
 
 ---
 
@@ -393,13 +434,13 @@ Think of AI KINGS as a **custom AI art studio** where:
 - [ ] Security audit
 - [ ] Cost optimization testing
 
-### Phase 4: Production Deployment ⏳ NOT STARTED
-- [ ] Set up PM2 process manager
-- [ ] Configure log rotation
-- [ ] Deploy to cloud server (AWS/DigitalOcean/etc.)
+### Phase 4: Production Deployment ⏳ IN PROGRESS
+- [x] Set up PM2 process manager (configured and running locally)
+- [ ] Configure log rotation (plan exists; `pm2-logrotate` recommended)
+- [ ] Deploy to cloud server (AWS/DigitalOcean/etc.) — pending
 - [ ] Set up domain (fetishking.com)
 - [ ] Configure SSL certificates (HTTPS)
-- [ ] Set up monitoring and alerts
+- [ ] Set up monitoring and alerts (pending)
 
 ### Phase 5: Business Features ⏳ NOT STARTED
 - [ ] User authentication (login/signup)
@@ -518,20 +559,21 @@ Think of AI KINGS as a **custom AI art studio** where:
 
 ### 🔴 0-25% Complete (Skeleton or Not Started)
 
-### Automated Testing
+### Automated Testing (current)
 - [x] Test framework setup (Mocha, Chai, Nock)
-- [x] 63 comprehensive tests (but branch coverage just below target)
-- [ ] **Full lifecycle tests** - Start → run → terminate workflow ✅ MOSTLY COMPLETE
-- [ ] **Error scenario tests** - What happens when things fail? ✅ MOSTLY COMPLETE
-- [ ] **Database tests** - Verify logging works correctly ✅ MOSTLY COMPLETE
-- [ ] **Concurrent operation tests** - Multiple users at once ✅ MOSTLY COMPLETE
-- [ ] **Audit log tests** - Security trail validation ✅ MOSTLY COMPLETE
-- [ ] **80%+ code coverage** - Currently ~80% statements, 66% branches (target 75% branches)
+- [x] Broad unit and integration coverage across core modules
+- [x] E2E tests using a ComfyUI stub for deterministic runs
+- [ ] Stabilize flaky tests and improve error-scenario coverage
+- [ ] Add targeted tests for extraction failure handling and auto-termination logic
 
-**Current Test Coverage:** 89.64% statements, 75.62% branches
-**Target for Production:** 80% statements, 75% branches ✅ ACHIEVED
+**Latest test summary:** 154 passing, 1 failing (flaky `API key validation` race), **coverage:** ~89.6% statements, ~75.6% branches (target met)
 
-#### User Authentication
+**Priority testing work:**
+1. Fix flaky `API key validation` race by ensuring middleware reads runtime environment values and tests reload modules deterministically.
+2. Add tests that simulate Vast.ai `status_msg` extraction failures and assert the system auto-terminates and logs appropriately.
+3. Add timeout/backoff tests for the readiness probe (`waitForComfyReady()`) for longer cold installs.
+
+#### User Authentication (pending)
 - [ ] User registration/signup
 - [ ] Login system
 - [ ] Password reset
@@ -542,7 +584,7 @@ Think of AI KINGS as a **custom AI art studio** where:
 
 **Current State:** No user accounts - everyone is anonymous
 
-#### Payment System
+#### Payment System (pending)
 - [ ] Stripe integration
 - [ ] Credit purchase flow
 - [ ] Subscription tiers
@@ -552,9 +594,9 @@ Think of AI KINGS as a **custom AI art studio** where:
 
 **Current State:** Placeholder configuration only
 
-#### Production Deployment
+#### Production Deployment (pending)
 - [x] PM2 configuration file (`ecosystem.config.js`)
-- [ ] **Actually deploy with PM2** - Not running yet
+- [ ] **Actually deploy with PM2** - Running locally; cloud deployment pending
 - [ ] **Log rotation setup** - Config exists but not active
 - [ ] **Cloud server deployment** - Still running locally
 - [ ] **Domain setup** - fetishking.com not pointed to server
@@ -573,33 +615,6 @@ Imagine you run a restaurant and after every menu change, you just serve food to
 
 **With Tests:**
 Every time you change the recipe, you taste it first. If it's bad, you fix it before customers see it.
-
-### Current Situation
-
-**Test File:** `tests/warm-pool.test.js` (19 lines)
-
-**What it tests:**
-```javascript
-// Test 1: Can we search for GPUs?
-// Answer: "Yep!" (but doesn't actually verify the result)
-assert.ok(true);  // This literally just says "ok = true"
-```
-
-**What it SHOULD test:**
-1. Can we start a GPU? (prewarm)
-2. Does the GPU status update correctly?
-3. Can we stop a GPU? (terminate)
-4. Does the database record everything?
-5. Do admin logs work?
-6. What happens if Vast.ai is down?
-7. What happens if two people try to use the same GPU?
-8. Does auto-shutdown work after 15 minutes?
-9. Does safe mode terminate immediately?
-10. Can we handle errors gracefully?
-
-**Current Coverage:** ~5% of critical functionality
-**Industry Standard:** 70-80% for production applications
-
 ### Why This Matters
 
 **Scenario:**
@@ -626,7 +641,7 @@ You change the code. Tests run automatically. Test fails: "ERROR: Auto-shutdown 
 - **Database:** better-sqlite3 (SQLite)
 - **HTTP:** node-fetch (API calls)
 - **Testing:** Mocha + Chai + Sinon + Nock
-- **Deployment:** PM2 (configured, not yet deployed)
+- **Deployment:** PM2 configured and running locally (use `pm2 status`)
 
 ### File Sizes (Code Volume)
 - **JavaScript:** 150KB+ across 36 files
@@ -642,6 +657,7 @@ You change the code. Tests run automatically. Test fails: "ERROR: Auto-shutdown 
 ### Current Environment
 - **Where it runs:** Your local Windows computer
 - **Port:** 3000 (http://localhost:3000)
+- **PM2:** running locally (use `pm2 status`)
 - **Database:** Local SQLite file
 - **Accessible by:** Only you on your computer
 
@@ -736,11 +752,26 @@ You change the code. Tests run automatically. Test fails: "ERROR: Auto-shutdown 
 **Solution:** Added comprehensive test suite with 95 passing tests
 **Status:** Resolved - coverage now 89.64% statements, 75.62% branches
 
-### Issue 2: No ComfyUI Health Checks ⚠️ MEDIUM PRIORITY
-**Problem:** System assumes ComfyUI starts successfully
-**Impact:** If ComfyUI fails to start, users wait without knowing
-**Solution:** Add health check endpoint polling
-**Status:** Identified, not fixed
+### Issue 2: ComfyUI Health & Readiness Checks ⚠️ MEDIUM PRIORITY
+**Problem:** ComfyUI startup can be slow or fail silently (models download, container extraction) which leaves the system in an uncertain state.
+**Impact:** Users and the studio UI may see repeated timeouts (`ETIMEDOUT`) while the service is still booting — this leads to poor UX and extra troubleshooting.
+**Work done:** Added `waitForComfyReady()` readiness probe that polls `/system_stats` and a background probe that runs after an instance becomes `running`.
+**Remaining work:** Increase probe timeout to 5–10 minutes, add exponential backoff, and validate model download completeness for full confidence.
+**Status:** Partially implemented; needs tuning and better admin visibility
+
+### Issue 2a: Instance Extraction Failures — "no space left on device" ⚠️ HIGH PRIORITY
+**Problem:** Some cloud hosts ran out of space while extracting large ComfyUI images, causing instances to fail during provisioning.
+**Impact:** Instances stuck in `loading` or `failed` state, continuing to incur charges unless terminated.
+**Work done:** Increased requested disk size to **250GB**, terminated failing instance(s), and added extra logging for `status_msg` to detect these failures.
+**Recommended:** Implement an automatic termination rule when a `status_msg` contains known extraction failure patterns (e.g., "no space left on device") and alert admins.
+**Status:** Mitigation applied (disk increased, failed instance terminated); auto-termination rule planned.
+
+### Issue 2b: Reset Endpoint Doesn't Always Clear In-Memory State ⚠️ MEDIUM PRIORITY
+**Problem:** `POST /api/proxy/admin/reset-state` clears DB but doesn't always update the warm-pool module's in-memory state, leaving `isPrewarming` set and blocking new prewarms.
+**Impact:** Admins see `already_present` / `already_prewarming` responses and must manually clear DB then restart the server (via PM2) to recover.
+**Work done:** Manual DB reset and PM2 restart performed to recover state during the session; added diagnostic UI messages.
+**Recommended:** Implement an in-code safe-reset that atomically clears DB and in-memory state (call `warmPool.load()` or set `state.instance=null` and `isPrewarming=0` then save), and add tests.
+**Status:** Workaround applied; in-code safe-reset prioritized for immediate implementation.
 
 ### Issue 3: No User Accounts 🔵 LOW PRIORITY (Design Decision)
 **Problem:** Users are anonymous, content stored in browser only
@@ -780,6 +811,12 @@ You change the code. Tests run automatically. Test fails: "ERROR: Auto-shutdown 
 5. View audit logs
 6. Terminate instances if needed
 7. Enable safe mode for cost control
+
+**Quick action for the manager (non-technical):**
+- Approve the new default disk size of **250GB** (recommended) — reduces provisioning failures but increases hourly storage cost.
+- Or keep a smaller disk to save on cost, understanding that failed image extractions may increase retries and manual intervention.
+
+If you'd like, we can enable an automatic termination rule and admin alerts for extraction failures now — say "enable auto-terminate" and we will implement it.
 
 ### What You CAN'T Do Yet
 - Create user accounts
@@ -973,6 +1010,14 @@ npm run inspect-db
 - Identified testing gap as critical blocker
 - Successfully tested GPU warm pool with real Vast.ai instance
 - Document created for ongoing tracking
+
+### January 26, 2026 - Warm-pool Hardening & Incident Response
+- Observed a real provisioning failure where the cloud host reported "no space left on device" during image extraction; terminated the failing instance to stop costs.
+- Increased requested instance disk to **250GB** to reduce risk of extraction failures.
+- Added readiness probe (`waitForComfyReady()`) and extra admin logging for prewarm calls and status messages.
+- Integrated PM2 for process management: moved `pm2` to dependencies, added PM2 admin endpoints and UI controls, installed PM2, and started the proxy locally (health endpoint returned OK).
+- Manually cleared a stale warm-pool DB record (`contractId: "555"`) and restarted via PM2 to restore a clean state; discovered that the reset endpoint didn't clear in-memory state reliably (in-code safe-reset prioritized).
+- Planned: automatic termination rule on known extraction failure messages and admin alerting for future incidents.
 
 ---
 

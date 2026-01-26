@@ -570,7 +570,7 @@ describe('Generation Handler Tests', function() {
       assert.strictEqual(statusRes.status, 200);
       assert.strictEqual(statusRes.body.status, 'completed');
       assert.ok(statusRes.body.result);
-      assert.strictEqual(statusRes.body.result.generationTime, 10);
+      assert.strictEqual(statusRes.body.result.metadata.generationTime, 10);
     });
   });
 });

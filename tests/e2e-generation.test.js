@@ -8,13 +8,18 @@ const { resetDb } = require('./helpers/test-helper');
 const db = require('../server/db');
 
 describe('E2E Generation (ComfyUI stub) Tests', function() {
+  this.timeout(15000); // Increase timeout for E2E tests
+
   let app;
   let request;
   let stubServer;
   let stubListener;
+  let appListener;
   let fsStubs = {};
+  let warmPool;
 
-  before(function() {
+  before(function(done) {
+    this.timeout(10000); // Timeout for setup
     process.env.ADMIN_API_KEY = 'test_admin_key';
     process.env.VASTAI_API_KEY = 'dummy_vast_key';
     process.env.AUDIT_SALT = 'test_salt';
@@ -22,9 +27,20 @@ describe('E2E Generation (ComfyUI stub) Tests', function() {
     // Load app
     delete require.cache[require.resolve('../server/vastai-proxy')];
     delete require.cache[require.resolve('../server/generation-handler')];
+    delete require.cache[require.resolve('../server/warm-pool')];
 
     app = require('../server/vastai-proxy');
+    warmPool = require('../server/warm-pool');
     request = supertest(app);
+
+    // Start actual server on port 3000 for generation-handler to connect to
+    appListener = app.listen(3000, done);
+  });
+
+  after(function(done) {
+    this.timeout(5000);
+    if (appListener && appListener.close) appListener.close(done);
+    else done();
   });
 
   beforeEach(async function() {
@@ -33,9 +49,20 @@ describe('E2E Generation (ComfyUI stub) Tests', function() {
     // Enable background generation in test for E2E
     process.env.ENABLE_ASYNC_GENERATION = '1';
 
-    // Start comfy stub on 8188 (local fallback address)
+    // Start comfy stub on 8188
     const comfyApp = createComfyStub();
     stubListener = comfyApp.listen(8188);
+
+    // Configure warm pool to point to our stub (simulating a running remote instance)
+    warmPool._internal.state.instance = {
+      contractId: 'test_e2e_contract',
+      status: 'running',
+      connectionUrl: 'http://127.0.0.1:8188',
+      createdAt: new Date().toISOString(),
+      lastHeartbeat: new Date().toISOString(),
+      leasedUntil: null
+    };
+    warmPool._internal.state.isPrewarming = false;
 
     // Stub disk writes to capture savePath and buffer
     fsStubs.writeFileSync = sinon.stub(fs, 'writeFileSync').callsFake((p, buf) => {
@@ -56,7 +83,12 @@ describe('E2E Generation (ComfyUI stub) Tests', function() {
     // Disable background generation after test
     delete process.env.ENABLE_ASYNC_GENERATION;
 
+    // Clear warm pool state
+    warmPool._internal.state.instance = null;
+    warmPool._internal.state.isPrewarming = false;
+
     // Close comfy stub
+    this.timeout(5000);
     if (stubListener && stubListener.close) stubListener.close(done); else done();
   });
 

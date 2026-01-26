@@ -3,6 +3,8 @@ const nock = require('nock');
 const { resetDb } = require('./helpers/test-helper');
 
 describe('Warm-pool extra branches', function() {
+  this.timeout(15000); // Increase timeout for complex async operations
+
   beforeEach(function() {
     resetDb();
     process.env.VASTAI_API_KEY = 'dummy';
@@ -99,6 +101,11 @@ describe('Warm-pool extra branches', function() {
     process.env.VASTAI_API_KEY = 'dummy';
     Object.assign(warmPool._internal.state, { instance: null, isPrewarming: false });
 
+    // Mock SSH key registration
+    nock('https://console.vast.ai')
+      .post('/api/v0/ssh/')
+      .reply(200, { success: true });
+
     // First two attempts fail with network error
     nock('https://console.vast.ai')
       .post('/api/v0/bundles/')
@@ -114,6 +121,17 @@ describe('Warm-pool extra branches', function() {
     nock('https://console.vast.ai')
       .put('/api/v0/asks/888/')
       .reply(200, { new_contract: 777 });
+
+    // Mock instance check (multiple times for polling)
+    nock('https://console.vast.ai')
+      .get('/api/v0/instances/777/')
+      .times(10)
+      .reply(200, { status: 'running', public_ipaddr: '2.3.4.5' });
+
+    // Mock ComfyUI readiness
+    nock('http://2.3.4.5:8188')
+      .get('/system_stats')
+      .reply(200, { system: { ram_total: 32000 }, devices: [{ name: 'GPU' }] });
 
     // Speed up retries
     const origSetTimeout = global.setTimeout;
@@ -133,6 +151,11 @@ describe('Warm-pool extra branches', function() {
     const warmPool = require('../server/warm-pool');
     process.env.VASTAI_API_KEY = 'dummy';
     Object.assign(warmPool._internal.state, { instance: null, isPrewarming: false });
+
+    // Mock SSH key registration
+    nock('https://console.vast.ai')
+      .post('/api/v0/ssh/')
+      .reply(200, { success: true });
 
     // All initial searches return empty
     nock('https://console.vast.ai')
@@ -157,6 +180,17 @@ describe('Warm-pool extra branches', function() {
     nock('https://console.vast.ai')
       .put('/api/v0/asks/1/')
       .reply(200, { new_contract: 555 });
+
+    // Mock instance check
+    nock('https://console.vast.ai')
+      .get('/api/v0/instances/555/')
+      .times(10)
+      .reply(200, { status: 'running', public_ipaddr: '3.4.5.6' });
+
+    // Mock ComfyUI readiness
+    nock('http://3.4.5.6:8188')
+      .get('/system_stats')
+      .reply(200, { system: { ram_total: 32000 }, devices: [{ name: 'GPU' }] });
 
     const origSetTimeout = global.setTimeout;
     global.setTimeout = (fn, ms) => { return origSetTimeout(fn, 0); };

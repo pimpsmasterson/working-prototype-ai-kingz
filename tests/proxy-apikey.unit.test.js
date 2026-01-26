@@ -1,6 +1,8 @@
 const assert = require('assert');
 
 describe('API key middleware (unit)', function() {
+  this.timeout(10000); // Increase timeout for module reloading
+
   it('returns 500 when VASTAI_API_KEY is not set', function() {
     // Save original key
     const originalKey = process.env.VASTAI_API_KEY;

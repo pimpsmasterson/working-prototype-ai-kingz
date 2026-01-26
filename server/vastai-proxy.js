@@ -2,12 +2,88 @@
 // Lightweight Express proxy for Vast.ai and ComfyUI to avoid browser CORS issues
 // Usage: VASTAI_API_KEY=<key> node server/vastai-proxy.js
 
+// Global error handlers to prevent silent crashes
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Promise Rejection:', reason);
+    console.error('Promise:', promise);
+    console.error('Server will continue running...');
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+    console.error('Stack:', error.stack);
+    console.error('Server will continue running...');
+});
+
+process.on('beforeExit', (code) => {
+    console.log('⚠️ Process is about to exit with code:', code);
+});
+
+process.on('exit', (code) => {
+    console.log('⚠️ Process exiting with code:', code);
+});
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
+const path = require('path');
 // Load environment variables from .env in development
 try { require('dotenv').config(); } catch (e) { /* no dotenv available */ }
+const fs = require('fs');
+const pm2 = require('pm2');
+
+// Validate required environment variables
+const requiredEnvVars = [
+    'VASTAI_API_KEY',
+    'ADMIN_API_KEY'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+    console.error('FATAL: Missing required environment variables:');
+    missingVars.forEach(varName => console.error(`  - ${varName}`));
+    console.error('\nPlease set these variables before starting the server.');
+    console.error('Example: VASTAI_API_KEY=xxx ADMIN_API_KEY=yyy node server/vastai-proxy.js');
+    process.exit(1);
+}
+
+// Warn about optional but recommended environment variables
+const recommendedVars = ['HUGGINGFACE_HUB_TOKEN', 'COMFYUI_PROVISION_SCRIPT'];
+const missingRecommended = recommendedVars.filter(varName => !process.env[varName]);
+if (missingRecommended.length > 0) {
+    console.warn('⚠️ Warning: Missing recommended environment variables:');
+    missingRecommended.forEach(varName => console.warn(`  - ${varName}`));
+    console.warn('Some features may not work correctly without these.\n');
+}
+
+// Persistent token file stored in project root. This allows setting tokens via
+// the admin endpoint and having them survive process restarts without
+// manually editing environment variables.
+const TOKEN_STORE_PATH = path.join(__dirname, '..', '.proxy-tokens.json');
+const HOME_TOKEN_PATH = path.join(process.env.HOME || process.env.USERPROFILE || '', '.proxy-tokens.json');
+
+function loadPersistentTokens() {
+    try {
+        // Prefer home token file if present (one file to rule them all)
+        const candidates = [HOME_TOKEN_PATH, TOKEN_STORE_PATH];
+        for (const p of candidates) {
+            if (!p) continue;
+            if (fs.existsSync(p)) {
+                const raw = fs.readFileSync(p, 'utf8');
+                const obj = JSON.parse(raw || '{}');
+                if (obj.vastai) process.env.VASTAI_API_KEY = process.env.VASTAI_API_KEY || obj.vastai;
+                if (obj.huggingface) process.env.HUGGINGFACE_HUB_TOKEN = process.env.HUGGINGFACE_HUB_TOKEN || obj.huggingface;
+                if (obj.civitai) process.env.CIVITAI_TOKEN = process.env.CIVITAI_TOKEN || obj.civitai;
+                console.log('Loaded persistent tokens from', p);
+                break;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load persistent tokens:', e && e.message ? e.message : e);
+    }
+}
+loadPersistentTokens();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +120,9 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Serve static files from workspace root
+app.use(express.static(path.join(__dirname, '..')));
+
 function checkApiKeyOrDie(req, res, next) {
     // Read from environment at request time to make behavior deterministic during tests
     // TEST HOOK: when `FORCE_MISSING_VAST_KEY` is set to '1', treat the key as missing.
@@ -71,6 +150,59 @@ app.get('/api/proxy/health', (req, res) => {
 app.get('/api/proxy/warm-pool', (req, res) => {
     try {
         res.json(warmPool.getStatus());
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GPU status endpoint - check availability before generation
+app.get('/api/proxy/gpu-status', (req, res) => {
+    try {
+        const pool = warmPool.getStatus();
+        const instance = pool.instance;
+
+        let status = 'unavailable';
+        let message = 'No GPU instance available';
+        let canGenerate = false;
+        let canPrewarm = true;
+        let estimatedReadyTime = null;
+
+        if (pool.isPrewarming) {
+            status = 'prewarming';
+            message = 'GPU instance is being prepared';
+            canPrewarm = false;
+            estimatedReadyTime = '2-5 minutes';
+        } else if (instance) {
+            if (instance.status === 'running' && instance.connectionUrl) {
+                status = 'ready';
+                message = 'GPU instance is ready for generation';
+                canGenerate = true;
+                canPrewarm = false;
+            } else if (instance.status === 'starting') {
+                status = 'starting';
+                message = 'GPU instance is starting up';
+                canPrewarm = false;
+                estimatedReadyTime = '1-3 minutes';
+            } else if (instance.status === 'running') {
+                status = 'initializing';
+                message = 'GPU instance is initializing ComfyUI';
+                canPrewarm = false;
+                estimatedReadyTime = '1-2 minutes';
+            }
+        }
+
+        res.json({
+            status,
+            message,
+            canGenerate,
+            canPrewarm,
+            estimatedReadyTime,
+            instance: instance ? {
+                contractId: instance.contractId,
+                status: instance.status,
+                hasConnectionUrl: !!instance.connectionUrl
+            } : null
+        });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -139,6 +271,53 @@ app.post('/api/proxy/admin/warm-pool', express.json(), async (req, res) => {
     }
 });
 
+// Admin termination (protected)
+app.post('/api/proxy/admin/terminate', express.json(), async (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+    try {
+        const { contractId } = req.body || {};
+        const result = await warmPool.terminate(contractId);
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Admin state reset (protected)
+app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+    try {
+        const db = require('./db').db;
+        db.prepare('UPDATE warm_pool SET instance = NULL, isPrewarming = 0 WHERE id = 1').run();
+        // Force warm-pool module to reload state
+        if (typeof warmPool.load === 'function') {
+            warmPool.load();
+        }
+        
+        // Audit the reset
+        try {
+            audit.logAdminEvent({ 
+                adminKey: key, 
+                ip: req.ip || (req.connection && req.connection.remoteAddress), 
+                route: req.originalUrl, 
+                action: 'reset_state', 
+                details: { note: 'Manual state reset from admin UI' }, 
+                outcome: 'ok' 
+            });
+        } catch (e) {}
+        
+        res.json({ status: 'ok', message: 'WarmPool state reset successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Admin logs listing (protected)
 app.get('/api/proxy/admin/logs', (req, res) => {
     const key = req.headers['x-admin-key'] || req.query.adminKey;
@@ -187,6 +366,367 @@ app.get('/api/proxy/admin/logs', (req, res) => {
     }
 });
 
+// Instance health check endpoint (protected)
+// Returns comprehensive health report for the current warm instance
+app.get('/api/proxy/admin/warm-pool/health', async (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+
+    try {
+        const pool = warmPool.getStatus();
+        if (!pool.instance || !pool.instance.connectionUrl) {
+            return res.json({
+                healthy: false,
+                error: 'No active instance',
+                instance: null
+            });
+        }
+
+        // Run comprehensive health check
+        const healthReport = await warmPool.validateInstanceHealth(
+            pool.instance.connectionUrl,
+            pool.instance.contractId
+        );
+
+        const isHealthy = warmPool.isInstanceHealthy(healthReport);
+
+        // Audit the health check
+        try {
+            audit.logAdminEvent({
+                adminKey: key,
+                ip: req.ip || req.connection && req.connection.remoteAddress,
+                route: req.originalUrl,
+                action: 'health_check',
+                details: { contractId: pool.instance.contractId, healthy: isHealthy },
+                outcome: isHealthy ? 'ok' : 'unhealthy'
+            });
+        } catch (e) { console.error('audit log error:', e); }
+
+        res.json({
+            healthy: isHealthy,
+            instance: {
+                contractId: pool.instance.contractId,
+                status: pool.instance.status,
+                connectionUrl: pool.instance.connectionUrl
+            },
+            healthReport
+        });
+    } catch (e) {
+        console.error('Health check error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get current environment configuration (protected, sensitive values masked)
+app.get('/api/proxy/admin/config', (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+
+    // Return current config with sensitive values masked
+    res.json({
+        VASTAI_API_KEY: process.env.VASTAI_API_KEY ? '***configured***' : 'NOT SET',
+        ADMIN_API_KEY: process.env.ADMIN_API_KEY ? '***configured***' : 'NOT SET',
+        HUGGINGFACE_HUB_TOKEN: process.env.HUGGINGFACE_HUB_TOKEN ? '***configured***' : 'NOT SET',
+        CIVITAI_TOKEN: process.env.CIVITAI_TOKEN ? '***configured***' : 'NOT SET',
+        COMFYUI_PROVISION_SCRIPT: process.env.COMFYUI_PROVISION_SCRIPT || 'NOT SET (using default)',
+        WARM_POOL_DISK_GB: process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '400',
+        VASTAI_MIN_CUDA_CAPABILITY: warmPool.MIN_CUDA_CAPABILITY,
+        VASTAI_COMFY_IMAGE: process.env.VASTAI_COMFY_IMAGE || 'vastai/comfy:v0.10.0-cuda-12.9-py312',
+        WARM_POOL_SAFE_MODE: process.env.WARM_POOL_SAFE_MODE || '0',
+        WARM_POOL_IDLE_MINUTES: process.env.WARM_POOL_IDLE_MINUTES || '15',
+        PORT: process.env.PORT || '3000'
+    });
+});
+
+// Update environment configuration (protected)
+// This persists tokens to .proxy-tokens.json for restart survival
+app.post('/api/proxy/admin/config', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+
+    const {
+        huggingface_token,
+        civitai_token,
+        provision_script,
+        min_cuda_capability,
+        warm_pool_disk_gb
+    } = req.body || {};
+
+    const updates = {};
+
+    // Update tokens in memory and persist
+    if (huggingface_token !== undefined) {
+        process.env.HUGGINGFACE_HUB_TOKEN = huggingface_token;
+        updates.huggingface = huggingface_token;
+    }
+    if (civitai_token !== undefined) {
+        process.env.CIVITAI_TOKEN = civitai_token;
+        updates.civitai = civitai_token;
+    }
+    if (provision_script !== undefined) {
+        process.env.COMFYUI_PROVISION_SCRIPT = provision_script;
+    }
+    if (min_cuda_capability !== undefined) {
+        process.env.VASTAI_MIN_CUDA_CAPABILITY = String(min_cuda_capability);
+    }
+    if (typeof warm_pool_disk_gb !== 'undefined' && warm_pool_disk_gb !== null) {
+        // Accept numeric or string values; store as string in env for consistency
+        process.env.WARM_POOL_DISK_GB = String(warm_pool_disk_gb);
+        updates.warm_pool_disk_gb = String(warm_pool_disk_gb);
+    }
+
+    // Persist token updates
+    if (Object.keys(updates).length > 0) {
+        try {
+            let existing = {};
+            if (fs.existsSync(TOKEN_STORE_PATH)) {
+                existing = JSON.parse(fs.readFileSync(TOKEN_STORE_PATH, 'utf8') || '{}');
+            }
+            Object.assign(existing, updates);
+            fs.writeFileSync(TOKEN_STORE_PATH, JSON.stringify(existing, null, 2));
+        } catch (e) {
+            console.error('Failed to persist tokens:', e);
+        }
+    }
+
+    // Audit the config change
+    try {
+        audit.logAdminEvent({
+            adminKey: key,
+            ip: req.ip || req.connection && req.connection.remoteAddress,
+            route: req.originalUrl,
+            action: 'update_config',
+            details: {
+                huggingface_token: huggingface_token ? 'updated' : 'unchanged',
+                civitai_token: civitai_token ? 'updated' : 'unchanged',
+                provision_script: provision_script ? 'updated' : 'unchanged',
+                min_cuda_capability: min_cuda_capability || 'unchanged',
+                warm_pool_disk_gb: typeof warm_pool_disk_gb !== 'undefined' ? 'updated' : 'unchanged'
+            },
+            outcome: 'ok'
+        });
+    } catch (e) { console.error('audit log error:', e); }
+
+    res.json({
+        success: true,
+        message: 'Configuration updated',
+        note: 'Some changes may require restarting the warm pool instance to take effect'
+    });
+});
+
+// ============================================================================
+// PM2 SERVER MANAGEMENT ENDPOINTS (localhost only + admin key)
+// ============================================================================
+
+// Helper to check localhost
+function isLocalhost(req) {
+    const remote = req.ip || (req.connection && req.connection.remoteAddress);
+    return ['::1', '127.0.0.1', '::ffff:127.0.0.1'].includes(remote);
+}
+
+// PM2 Restart endpoint
+app.post('/api/proxy/admin/pm2/restart', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'forbidden - PM2 control only allowed from localhost' });
+    }
+    logAuthAttempt(req, true);
+
+    pm2.connect((err) => {
+        if (err) {
+            console.error('PM2 connect error:', err);
+            return res.status(500).json({ error: 'Failed to connect to PM2', details: err.message });
+        }
+
+        pm2.restart('vastai-proxy', (err) => {
+            pm2.disconnect();
+            if (err) {
+                console.error('PM2 restart error:', err);
+                // Audit the failed restart
+                try {
+                    audit.logAdminEvent({
+                        adminKey: key,
+                        ip: req.ip || (req.connection && req.connection.remoteAddress),
+                        route: req.originalUrl,
+                        action: 'pm2_restart',
+                        details: { error: err.message },
+                        outcome: 'error'
+                    });
+                } catch (e) { console.error('audit log error:', e); }
+                return res.status(500).json({ error: 'Failed to restart via PM2', details: err.message });
+            }
+
+            // Audit successful restart
+            try {
+                audit.logAdminEvent({
+                    adminKey: key,
+                    ip: req.ip || (req.connection && req.connection.remoteAddress),
+                    route: req.originalUrl,
+                    action: 'pm2_restart',
+                    details: { processName: 'vastai-proxy' },
+                    outcome: 'ok'
+                });
+            } catch (e) { console.error('audit log error:', e); }
+
+            res.json({ success: true, message: 'Server restart initiated via PM2' });
+        });
+    });
+});
+
+// PM2 Stop endpoint
+app.post('/api/proxy/admin/pm2/stop', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'forbidden - PM2 control only allowed from localhost' });
+    }
+    logAuthAttempt(req, true);
+
+    pm2.connect((err) => {
+        if (err) {
+            console.error('PM2 connect error:', err);
+            return res.status(500).json({ error: 'Failed to connect to PM2', details: err.message });
+        }
+
+        pm2.stop('vastai-proxy', (err) => {
+            pm2.disconnect();
+            if (err) {
+                console.error('PM2 stop error:', err);
+                try {
+                    audit.logAdminEvent({
+                        adminKey: key,
+                        ip: req.ip || (req.connection && req.connection.remoteAddress),
+                        route: req.originalUrl,
+                        action: 'pm2_stop',
+                        details: { error: err.message },
+                        outcome: 'error'
+                    });
+                } catch (e) { console.error('audit log error:', e); }
+                return res.status(500).json({ error: 'Failed to stop via PM2', details: err.message });
+            }
+
+            try {
+                audit.logAdminEvent({
+                    adminKey: key,
+                    ip: req.ip || (req.connection && req.connection.remoteAddress),
+                    route: req.originalUrl,
+                    action: 'pm2_stop',
+                    details: { processName: 'vastai-proxy' },
+                    outcome: 'ok'
+                });
+            } catch (e) { console.error('audit log error:', e); }
+
+            res.json({ success: true, message: 'Server stopped via PM2' });
+        });
+    });
+});
+
+// PM2 Start endpoint
+app.post('/api/proxy/admin/pm2/start', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    if (!isLocalhost(req)) {
+        return res.status(403).json({ error: 'forbidden - PM2 control only allowed from localhost' });
+    }
+    logAuthAttempt(req, true);
+
+    pm2.connect((err) => {
+        if (err) {
+            console.error('PM2 connect error:', err);
+            return res.status(500).json({ error: 'Failed to connect to PM2', details: err.message });
+        }
+
+        pm2.start('vastai-proxy', (err) => {
+            pm2.disconnect();
+            if (err) {
+                console.error('PM2 start error:', err);
+                try {
+                    audit.logAdminEvent({
+                        adminKey: key,
+                        ip: req.ip || (req.connection && req.connection.remoteAddress),
+                        route: req.originalUrl,
+                        action: 'pm2_start',
+                        details: { error: err.message },
+                        outcome: 'error'
+                    });
+                } catch (e) { console.error('audit log error:', e); }
+                return res.status(500).json({ error: 'Failed to start via PM2', details: err.message });
+            }
+
+            try {
+                audit.logAdminEvent({
+                    adminKey: key,
+                    ip: req.ip || (req.connection && req.connection.remoteAddress),
+                    route: req.originalUrl,
+                    action: 'pm2_start',
+                    details: { processName: 'vastai-proxy' },
+                    outcome: 'ok'
+                });
+            } catch (e) { console.error('audit log error:', e); }
+
+            res.json({ success: true, message: 'Server started via PM2' });
+        });
+    });
+});
+
+// PM2 Status endpoint - get current PM2 process status
+app.get('/api/proxy/admin/pm2/status', (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    logAuthAttempt(req, true);
+
+    pm2.connect((err) => {
+        if (err) {
+            return res.status(500).json({ error: 'Failed to connect to PM2', details: err.message });
+        }
+
+        pm2.describe('vastai-proxy', (err, processDescription) => {
+            pm2.disconnect();
+            if (err) {
+                return res.status(500).json({ error: 'Failed to get PM2 status', details: err.message });
+            }
+
+            if (!processDescription || processDescription.length === 0) {
+                return res.json({
+                    managed: false,
+                    message: 'Process not managed by PM2. Start with: npm run start:pm2'
+                });
+            }
+
+            const proc = processDescription[0];
+            res.json({
+                managed: true,
+                name: proc.name,
+                status: proc.pm2_env.status,
+                pid: proc.pid,
+                uptime: proc.pm2_env.pm_uptime ? Date.now() - proc.pm2_env.pm_uptime : null,
+                restarts: proc.pm2_env.restart_time,
+                memory: proc.monit ? proc.monit.memory : null,
+                cpu: proc.monit ? proc.monit.cpu : null
+            });
+        });
+    });
+});
+
 // Forward arbitrary ComfyUI requests to the active warm instance.
 // Example: POST /api/proxy/comfy/flow -> proxied to http://<instance>:8188/flow
 app.use('/api/proxy/comfy', async (req, res) => {
@@ -223,11 +763,35 @@ app.use('/api/proxy/comfy', async (req, res) => {
 
 app.post('/api/proxy/warm-pool/prewarm', async (req, res) => {
     try {
+        console.log('[DEBUG] Prewarm endpoint hit');
+        // Log all headers for diagnosis
+        console.log('[DEBUG] Headers:', JSON.stringify(req.headers));
+        const key = req.headers['x-admin-api-key'] || req.headers['x-admin-key'] || req.query.adminKey;
+        console.log('[DEBUG] Key received:', key ? `${key.substring(0, 4)}...` : 'NONE');
+        console.log('[DEBUG] Expected key:', process.env.ADMIN_API_KEY ? `${process.env.ADMIN_API_KEY.substring(0, 4)}...` : 'NOT SET');
+
+        if (!key || key !== process.env.ADMIN_API_KEY) {
+            console.log('[DEBUG] Auth failed');
+            try { logAuthAttempt(req, false); } catch (e) { console.error('audit error:', e); }
+            return res.status(403).json({ error: 'forbidden - invalid admin key' });
+        }
+        console.log('[DEBUG] Auth passed');
+        try { logAuthAttempt(req, true); } catch (e) { console.error('audit error:', e); }
+
+        console.log('[Prewarm] Starting warm-pool prewarm...');
+        console.log('[DEBUG] About to call warmPool.prewarm()');
         const result = await warmPool.prewarm();
+        console.log('[Prewarm] Success:', result);
+
+        // Audit admin prewarm
+        try {
+            audit.logAdminEvent({ adminKey: key, ip: req.ip || req.connection && req.connection.remoteAddress, route: req.originalUrl, action: 'prewarm', details: result, outcome: 'ok' });
+        } catch (e) { console.error('audit log error:', e); }
+
         res.status(200).json(result);
     } catch (e) {
-        console.error('warm-pool prewarm error:', e);
-        res.status(500).json({ error: e.message });
+        console.error('[Prewarm] Error:', e);
+        res.status(500).json({ error: e.message, stack: e.stack });
     }
 });
 
@@ -262,7 +826,7 @@ app.get('/assets/js/admin-warm-pool.js', (req, res) => {
     res.sendFile(require('path').join(__dirname, '..', 'assets', 'js', 'admin-warm-pool.js'));
 });
 
-app.post('/api/proxy/warm-pool/claim', async (req, res) => {
+app.post('/api/proxy/warm-pool/claim', express.json(), async (req, res) => {
     try {
         const body = req.body || {};
         const maxMinutes = typeof body.maxMinutes !== 'undefined' ? body.maxMinutes : (typeof body.maxSessionMinutes !== 'undefined' ? body.maxSessionMinutes : 30);
@@ -492,16 +1056,30 @@ app.get('/api/proxy/check-tokens', (req, res) => {
 // Admin helper: set tokens at runtime (LOCALHOST ONLY). This stores tokens in process.env for the running process only.
 app.post('/api/proxy/admin/set-tokens', (req, res) => {
     // Only allow local requests
-    const remote = req.ip || req.connection.remoteAddress;
+    const remote = req.ip || req.connection && req.connection.remoteAddress;
     if (!['::1','127.0.0.1','::ffff:127.0.0.1'].includes(remote)) {
         return res.status(403).json({ error: 'Forbidden - set tokens only allowed from localhost' });
     }
 
-    const { huggingface, civitai } = req.body || {};
+    const { huggingface, civitai, vastai } = req.body || {};
     if (huggingface) process.env.HUGGINGFACE_HUB_TOKEN = huggingface;
     if (civitai) process.env.CIVITAI_TOKEN = civitai;
+    if (vastai) process.env.VASTAI_API_KEY = vastai;
 
-    res.json({ huggingface: !!process.env.HUGGINGFACE_HUB_TOKEN, civitai: !!process.env.CIVITAI_TOKEN });
+    // Persist tokens to a local file so they survive restarts
+    try {
+        const toSave = {
+            huggingface: process.env.HUGGINGFACE_HUB_TOKEN || null,
+            civitai: process.env.CIVITAI_TOKEN || null,
+            vastai: process.env.VASTAI_API_KEY || null
+        };
+        fs.writeFileSync(TOKEN_STORE_PATH, JSON.stringify(toSave, null, 2), { mode: 0o600 });
+        console.log('Persisted tokens to .proxy-tokens.json (local only)');
+    } catch (e) {
+        console.error('Failed to persist tokens:', e && e.message ? e.message : e);
+    }
+
+    res.json({ huggingface: !!process.env.HUGGINGFACE_HUB_TOKEN, civitai: !!process.env.CIVITAI_TOKEN, vastai: !!process.env.VASTAI_API_KEY });
 });
 
 // ============================================================================
@@ -510,8 +1088,7 @@ app.post('/api/proxy/admin/set-tokens', (req, res) => {
 
 const generationHandler = require('./generation-handler');
 const db = require('./db');
-const fs = require('fs');
-const path = require('path');
+// Note: fs is already required at the top of the file
 
 // Generation endpoints
 app.post('/api/proxy/generate', generationHandler.handleGenerate);
@@ -674,7 +1251,25 @@ function startProxy(port = PORT) {
 
 // Only listen if run directly
 if (require.main === module) {
-    startProxy(PORT);
+    console.log('[DEBUG] Starting server... require.main === module is true');
+    console.log('[DEBUG] PORT:', PORT);
+    try {
+        const server = startProxy(PORT);
+        server.on('error', (err) => {
+            console.error('❌ Server error:', err);
+            if (err.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use`);
+                process.exit(1);
+            }
+        });
+        server.on('listening', () => {
+            console.log('[DEBUG] Server is now listening');
+        });
+        console.log('[DEBUG] startProxy() called, server object:', !!server);
+    } catch (err) {
+        console.error('❌ Failed to start server:', err);
+        process.exit(1);
+    }
 }
 
 // Export the middleware for deterministic unit testing

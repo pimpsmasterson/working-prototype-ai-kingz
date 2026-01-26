@@ -5,6 +5,8 @@ const { resetDb } = require('./helpers/test-helper');
 const db = require('../server/db');
 
 describe('Admin logs and ComfyUI proxy', function() {
+  this.timeout(10000); // Increase timeout for server startup
+
   let app;
   let request;
 
@@ -172,7 +174,8 @@ describe('Admin logs and ComfyUI proxy', function() {
     // Stub prewarm to throw
     const prewarmStub = sinon.stub(warmPool, 'prewarm').rejects(new Error('prewarm failed'));
 
-    const res = await request.post('/api/proxy/warm-pool/prewarm');
+    const res = await request.post('/api/proxy/warm-pool/prewarm')
+      .set('x-admin-api-key', 'admin_key_test');
 
     assert.strictEqual(res.status, 500);
     assert.ok(res.body.error);

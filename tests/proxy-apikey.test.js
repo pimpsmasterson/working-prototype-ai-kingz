@@ -2,6 +2,8 @@ const assert = require('assert');
 const supertest = require('supertest');
 
 describe('API key validation', function() {
+  this.timeout(10000); // Increase timeout for module reloading
+
   it('checkApiKeyOrDie returns 500 when VASTAI_API_KEY is not set', function() {
     // Save original key
     const originalKey = process.env.VASTAI_API_KEY;

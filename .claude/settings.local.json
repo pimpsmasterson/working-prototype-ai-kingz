@@ -7,7 +7,28 @@
       "Bash(npm test:*)",
       "Bash(npx nyc report:*)",
       "Bash(node -e:*)",
-      "Bash(timeout 3 node:*)"
+      "Bash(timeout 3 node:*)",
+      "Bash(npx mocha:*)",
+      "Bash(node server/vastai-proxy.js:*)",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(curl:*)",
+      "Bash(sqlite3:*)",
+      "Bash(for i in 1 2 3 4 5 6)",
+      "Bash(do echo \"Attempt $i...\")",
+      "Bash(break)",
+      "Bash(done)",
+      "Bash(ConvertFrom-Json)",
+      "Bash(ConvertTo-Json -Depth 3)",
+      "Bash(powershell -Command \"taskkill /IM node.exe /F\")",
+      "Bash(powershell -Command \"Invoke-RestMethod -Uri ''http://localhost:3000/api/proxy/warm-pool/prewarm'' -Method POST -Headers @{''x-admin-key''=''secure_admin_key_change_me''}\")",
+      "Bash(Get-Process node -ErrorAction SilentlyContinue)",
+      "Bash(Stop-Process -Force -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Stopped node processes\")",
+      "Bash(timeout 5 npm start:*)",
+      "Bash(powershell -Command \"$env:VASTAI_API_KEY=''4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360''; node -e \"\"\nconst fetch = require\\(''node-fetch''\\);\nconst VASTAI_API_KEY = process.env.VASTAI_API_KEY;\nconsole.log\\(''API Key:'', VASTAI_API_KEY ? VASTAI_API_KEY.slice\\(0, 10\\) + ''...'' : ''NOT SET''\\);\n\n// Try minimal search to see what fields are valid\nconst searchParams = {\n    q: {\n        rentable: { eq: true },\n        rented: { eq: false },\n        dph_total: { lte: 0.80 },\n        gpu_ram: { gte: 8192 },\n        disk_space: { gte: 250 }\n    },\n    order: [[''dph_total'', ''asc'']],\n    type: ''ask''\n};\n\nfetch\\(''https://console.vast.ai/api/v0/bundles/'', {\n    method: ''POST'',\n    headers: {\n        ''Content-Type'': ''application/json'',\n        ''Authorization'': ''Bearer '' + VASTAI_API_KEY\n    },\n    body: JSON.stringify\\(searchParams\\)\n}\\).then\\(r => r.json\\(\\)\\).then\\(data => {\n    console.log\\(''Offers found:'', \\(data.offers || []\\).length\\);\n    if \\(data.offers && data.offers.length > 0\\) {\n        console.log\\(''Top 3 offers:''\\);\n        data.offers.slice\\(0, 3\\).forEach\\(\\(o, i\\) => {\n            console.log\\(\\(i+1\\) + ''. ID:'', o.id, ''GPU:'', o.gpu_name, ''VRAM:'', o.gpu_ram, ''Price:'', o.dph_total, ''Disk:'', o.disk_space\\);\n        }\\);\n    } else {\n        console.log\\(''Response:'', JSON.stringify\\(data, null, 2\\).slice\\(0, 500\\)\\);\n    }\n}\\).catch\\(e => console.error\\(''Error:'', e\\)\\);\n\"\"\")",
+      "Bash(set VASTAI_API_KEY=4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360)",
+      "Bash(npm install)",
+      "Bash(npm run start:pm2:*)"
     ]
   }
 }

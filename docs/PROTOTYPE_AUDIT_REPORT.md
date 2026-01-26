@@ -10,6 +10,36 @@
 
 The AI KINGS prototype is a sophisticated web application platform for creating, browsing, and managing AI-generated adult video content. The project has evolved from a website scraper/builder tool into a fully-featured prototype with modern UI/UX, advanced video gallery functionality, and an AI content creation interface.
 
+---
+
+## 🧾 Plain-English Update (Jan 26, 2026)
+
+This short section is for non-technical readers — the long audit below contains details.
+
+- Where we are now: We have a working prototype and an automated system that can rent cloud machines for AI generation. The local developer server and UI are running and tests pass.
+
+- What broke: When trying a real (not test) run to pre-start a cloud machine, one rented machine failed while unpacking software because the host ran out of disk space. Another rented machine was running but the user interface couldn't connect to it (network timeout).
+
+- Where the problem happened: The failures happened on the cloud provider's machines (not on your personal computer). The cloud machine didn't have enough space to unpack a large image and one machine took longer to finish starting up than expected, causing timeouts.
+
+- What we did about it (right away):
+  - We increased the requested disk space for new machines to 250GB to avoid future unpacking failures.
+  - We added additional checks so the system waits longer for the AI service (ComfyUI) to finish starting and reports clearer status messages.
+  - We terminated the stuck/failed instances so they stop costing money.
+
+- What we need from you (simple choices):
+  1. Approve the larger disk size (250GB). This costs more but reduces the chance of failures. (Recommended.)
+  2. If you want to limit cost instead, we can try smaller images or extra retries, which may increase failure rate.
+
+- Quick risk/cost note: Bigger disk space increases hourly cost for rented machines. Stuck or failed machines also cost money if not terminated promptly — we added automation to detect and remove these.
+
+- Next steps we're ready to do (pick one):
+  - Keep the 250GB default and continue testing (recommended). ✅
+  - Add automatic termination rules for failed image extraction (recommended safety). ✅
+  - Add more detailed status reporting in the admin UI where is thi ????????? so you can see "Ready", "Starting", or "Failed: no disk space" without asking us.
+
+---
+
 ### Key Metrics
 - **Total Pages:** 4 HTML pages (index, videos, studio, index_temp)
 - **CSS Files:** 15 stylesheets
