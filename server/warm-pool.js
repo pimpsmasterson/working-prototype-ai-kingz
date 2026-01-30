@@ -500,21 +500,21 @@ async function prewarm() {
             const reasons = [];
             if (!o.rentable) { reasons.push('not rentable'); return false; }
             if (o.rented) { reasons.push('already rented'); return false; }
-            
+
             // Exclude Ukraine region
             if (o.geolocation && (o.geolocation.includes('Ukraine') || o.geolocation.includes('UA'))) {
                 reasons.push('region excluded: Ukraine');
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
-            
+
             const maxPrice = parseFloat(process.env.WARM_POOL_MAX_DPH || '3.00');
             if (typeof o.dph_total === 'number' && o.dph_total > maxPrice) {
                 reasons.push(`price too high: $${o.dph_total}/hr > $${maxPrice}/hr`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
-            
+
             // CRITICAL: Minimum 16GB VRAM for SDXL workflows.
             // Support multi-GPU configurations (e.g. 2x8GB) by checking total VRAM.
             const minVRAM = parseInt(process.env.VASTAI_MIN_GPU_RAM_MB || '16000'); // 16GB default
@@ -535,30 +535,30 @@ async function prewarm() {
             // CRITICAL: Require verified hosts only - reject unverified/deverified providers
             // Vast.ai uses TWO fields: o.verified (boolean) AND o.verification (string)
             console.log(`WarmPool: Checking offer ${o.id} [${o.gpu_name}] - verified=${JSON.stringify(o.verified)}, verification=${JSON.stringify(o.verification)}`);
-            
+
             // Accept if EITHER field indicates verification
             const isVerifiedBoolean = o.verified === true;
             const isVerifiedString = o.verification === 'verified';
-            
+
             if (!isVerifiedBoolean && !isVerifiedString) {
                 reasons.push(`host not verified (verified=${JSON.stringify(o.verified)}, verification=${JSON.stringify(o.verification)})`);
                 console.log(`WarmPool: ❌ REJECTED offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
-            
+
             console.log(`WarmPool: ✓ Offer ${o.id} [${o.gpu_name}] PASSED verification check`);
 
             // Bandwidth cost filters - reject expensive bandwidth that kills profitability
             // Target: <$3/TB download, <$5/TB upload (reasonable datacenter rates)
             const maxDownloadCostPerTB = parseFloat(process.env.VASTAI_MAX_INET_DOWN_COST_TB || '3.0');
             const maxUploadCostPerTB = parseFloat(process.env.VASTAI_MAX_INET_UP_COST_TB || '5.0');
-            
+
             if (typeof o.internet_down_cost_per_tb === 'number' && o.internet_down_cost_per_tb > maxDownloadCostPerTB) {
                 reasons.push(`download bandwidth too expensive: $${o.internet_down_cost_per_tb.toFixed(2)}/TB > $${maxDownloadCostPerTB}/TB`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
-            
+
             if (typeof o.internet_up_cost_per_tb === 'number' && o.internet_up_cost_per_tb > maxUploadCostPerTB) {
                 reasons.push(`upload bandwidth too expensive: $${o.internet_up_cost_per_tb.toFixed(2)}/TB > $${maxUploadCostPerTB}/TB`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
@@ -600,11 +600,11 @@ async function prewarm() {
             for (let i = 1; i <= attempts; i++) {
                 try {
                     console.log(`WarmPool: bundle search attempt ${i} with params:`, JSON.stringify(params));
-                    
+
                     const queryParams = {
                         ...params,
                         // Request 1000 results to ensure we find high-quality candidates
-                        limit: 1000 
+                        limit: 1000
                     };
 
                     const r = await fetch(`${VAST_BASE}/bundles/`, {
@@ -642,7 +642,7 @@ async function prewarm() {
 
                     // Apply client-side filtering
                     let offers = allOffers.filter(filterOffer);
-                    
+
                     // Sort results: Primary by price ($/hr), secondarily by bandwidth (Mbps DESC)
                     // This satisfies the "prefer higher" requirement for internet speed.
                     offers.sort((a, b) => {
@@ -662,7 +662,7 @@ async function prewarm() {
         }
 
         const offers = await searchBundles(searchParams);
-        
+
         // CRITICAL: NO RELAXED FALLBACK - strict requirements are non-negotiable
         // Previous relaxed fallback was bypassing verification, bandwidth speed, and VRAM checks
         // This caused unverified 8GB GPUs with 600 Mbps to be rented despite 16GB + 1Gbps requirement
@@ -743,7 +743,7 @@ async function prewarm() {
         if (process.env.CIVITAI_TOKEN) {
             envVars.CIVITAI_TOKEN = process.env.CIVITAI_TOKEN;
         }
-        
+
         // Pass through SCRIPTS_BASE_URL for modular provisioning system
         if (process.env.SCRIPTS_BASE_URL) {
             envVars.SCRIPTS_BASE_URL = process.env.SCRIPTS_BASE_URL;
@@ -754,7 +754,7 @@ async function prewarm() {
             ...(configuredImage && configuredImage !== 'auto' ? { image: configuredImage } : {}),
             runtype: 'ssh',
             target_state: 'running',
-            onstart: `bash -c "if [ -f /venv/main/bin/activate ]; then source /venv/main/bin/activate; fi; curl -fsSL ${provisionScript} | bash; cd /workspace/ComfyUI && (source /venv/main/bin/activate 2>/dev/null || true) && nohup python main.py --listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header > /workspace/comfyui.log 2>&1 &"`,
+            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'`,
             ssh_key: vastaiSsh.getKey(),
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
