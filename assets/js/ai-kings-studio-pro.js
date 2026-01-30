@@ -27,6 +27,20 @@ class StudioAppPro {
         this.init();
     }
 
+    /**
+     * Get the API base URL.
+     * If running on Live Server (port 5500-5510), point to localhost:3000.
+     * Otherwise, rely on relative path (production).
+     */
+    getApiUrl(path) {
+        const port = window.location.port;
+        // Check if running on typical Live Server ports
+        if (port && parseInt(port) >= 5500 && parseInt(port) <= 5510) {
+            return `http://localhost:3000${path}`;
+        }
+        return path;
+    }
+
     async init() {
         try {
             // Initialize Professional Muse Manager
@@ -207,7 +221,7 @@ class StudioAppPro {
 
     async checkServerTokens() {
         try {
-            const r = await fetch('/api/proxy/check-tokens');
+            const r = await fetch(this.getApiUrl('/api/proxy/check-tokens'));
             if (!r.ok) return;
             const info = await r.json();
             if (!info.huggingface || !info.civitai) {
@@ -260,8 +274,21 @@ class StudioAppPro {
         this.updateGenerateButton('generating');
 
         try {
-            // Generate with ComfyUI
-            const result = await this.generateWithComfyUI(activeMuse, prompt, activeVariation);
+            // Generate with ComfyUI - with auto-recovery for cold boot
+            let result;
+            try {
+                result = await this.generateWithComfyUI(activeMuse, prompt, activeVariation);
+            } catch (firstError) {
+                // If we get a NO_GPU error even after ensureGPUReady (race condition), try one more time
+                if (firstError.code === 'NO_GPU_AVAILABLE' || firstError.message.includes('No GPU available')) {
+                    console.log('GPU Disconnected during generation - Retrying with full boot sequence...');
+                    this.showInfo('Re-aligning Quantum Core. Please wait...');
+                    await this.ensureGPUReady();
+                    result = await this.generateWithComfyUI(activeMuse, prompt, activeVariation);
+                } else {
+                    throw firstError;
+                }
+            }
 
             // Show result
             await this.displayResult(result);
@@ -276,7 +303,7 @@ class StudioAppPro {
                 this.museManager.save();
             }
 
-            this.showSuccess('Generation complete!');
+            this.showSuccess('Manifestation complete!');
 
         } catch (error) {
             console.error('Generation failed:', error);
@@ -322,7 +349,7 @@ class StudioAppPro {
             };
 
             // Submit to generation handler
-            const response = await fetch('/api/proxy/generate', {
+            const response = await fetch(this.getApiUrl('/api/proxy/generate'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -368,7 +395,7 @@ class StudioAppPro {
             await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second intervals
 
             try {
-                const response = await fetch(`/api/proxy/generate/${jobId}`);
+                const response = await fetch(this.getApiUrl(`/api/proxy/generate/${jobId}`));
 
                 if (!response.ok) {
                     throw new Error(`Status check failed: ${response.status}`);
@@ -404,8 +431,10 @@ class StudioAppPro {
                     if (progressContainer) progressContainer.style.display = 'none';
 
                     // Handle GPU-specific errors with actionable message
-                    if (status.errorCode === 'NO_GPU_AVAILABLE' && status.errorDetails?.canPrewarm) {
-                        throw new Error('No GPU available. The system will auto-start one on your next attempt.');
+                    if (status.errorCode === 'NO_GPU_AVAILABLE') {
+                        const err = new Error('No GPU available. Auto-starting...');
+                        err.code = 'NO_GPU_AVAILABLE';
+                        throw err;
                     }
 
                     throw new Error(status.error || 'Generation failed');
@@ -436,7 +465,7 @@ class StudioAppPro {
 
     async tryClaimWarmPool() {
         try {
-            const r = await fetch('/api/proxy/warm-pool/claim', {
+            const r = await fetch(this.getApiUrl('/api/proxy/warm-pool/claim'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ maxSessionMinutes: 30 })
@@ -460,7 +489,7 @@ class StudioAppPro {
      */
     async checkGPUStatus() {
         try {
-            const response = await fetch('/api/proxy/gpu-status');
+            const response = await fetch(this.getApiUrl('/api/proxy/gpu-status'));
             if (!response.ok) {
                 return { canGenerate: false, canPrewarm: true, status: 'unavailable', message: 'Unable to check GPU status' };
             }
@@ -483,13 +512,18 @@ class StudioAppPro {
         }
 
         // GPU not ready - need to prewarm or wait
+        this.updateGenerateButton('generating', 'Connecting to Grid...');
+
         if (status.canPrewarm) {
             // No instance available - start prewarming
-            this.showInfo('Starting GPU instance... This may take 2-5 minutes.');
-            this.updateGenerateButton('generating', 'Starting GPU...');
+            this.showInfo('Initializing Quantum Core (Est. 3 mins)... You can continue editing.');
+
+            // Add a visual indicator for "Warming Up" if not already present
+            const btn = document.getElementById('btn-generate');
+            if (btn) btn.classList.add('pulsing-gold');
 
             try {
-                const prewarmRes = await fetch('/api/proxy/warm-pool/prewarm', { method: 'POST' });
+                const prewarmRes = await fetch(this.getApiUrl('/api/proxy/warm-pool/prewarm'), { method: 'POST' });
                 if (!prewarmRes.ok) {
                     const error = await prewarmRes.json();
                     throw new Error(error.error || 'Failed to start GPU instance');
@@ -497,12 +531,16 @@ class StudioAppPro {
                 console.log('[GPU] Prewarm initiated');
             } catch (error) {
                 console.error('[GPU] Prewarm failed:', error);
+                if (btn) btn.classList.remove('pulsing-gold');
                 throw new Error('Failed to start GPU instance: ' + error.message);
             }
         } else {
             // Instance is starting/initializing - just need to wait
             this.showInfo(status.message + (status.estimatedReadyTime ? ` (${status.estimatedReadyTime})` : ''));
-            this.updateGenerateButton('generating', status.message);
+            this.updateGenerateButton('generating', status.message || 'Warming up...');
+
+            const btn = document.getElementById('btn-generate');
+            if (btn) btn.classList.add('pulsing-gold');
         }
 
         // Poll until ready (max 5 minutes)
@@ -516,21 +554,25 @@ class StudioAppPro {
             const newStatus = await this.checkGPUStatus();
 
             if (newStatus.canGenerate) {
-                this.showSuccess('GPU instance is ready!');
+                this.showSuccess('Quantum Core Online. Manifesting...');
+                const btn = document.getElementById('btn-generate');
+                if (btn) btn.classList.remove('pulsing-gold');
                 console.log('[GPU] Instance ready after waiting');
                 return;
             }
 
             // Update progress message
             if (newStatus.status === 'starting') {
-                this.updateGenerateButton('generating', 'GPU starting...');
+                this.updateGenerateButton('generating', 'Booting Neural Net...');
             } else if (newStatus.status === 'initializing') {
-                this.updateGenerateButton('generating', 'Initializing ComfyUI...');
+                this.updateGenerateButton('generating', 'Loading Models...');
             } else if (newStatus.status === 'prewarming') {
-                this.updateGenerateButton('generating', 'Preparing GPU...');
+                this.updateGenerateButton('generating', 'Allocating Resources...');
             }
         }
 
+        const btn = document.getElementById('btn-generate');
+        if (btn) btn.classList.remove('pulsing-gold');
         throw new Error('GPU instance startup timed out after 5 minutes. Please try again.');
     }
 
@@ -635,7 +677,7 @@ class StudioAppPro {
                 video.src = result.imageUrl;
                 video.style.display = 'block';
                 video.play().catch(e => console.warn('Autoplay failed:', e));
-                
+
                 if (typeof gsap !== 'undefined') {
                     gsap.from(video, { scale: 0.95, opacity: 0, duration: 0.5 });
                 }
@@ -841,7 +883,7 @@ class StudioAppPro {
         }
 
         // Start polling warm pool status every 15s
-        try { this.updateWarmPoolStatus(); } catch(e){}
+        try { this.updateWarmPoolStatus(); } catch (e) { }
         if (!this.warmPoolPollHandle) this.warmPoolPollHandle = setInterval(() => this.updateWarmPoolStatus(), 15000);
     }
 
