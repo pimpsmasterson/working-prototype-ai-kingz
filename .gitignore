@@ -1,19 +1,2 @@
 node_modules
-.DS_Store
 .env
-logs/*.log
-
-# Coverage reports
-.nyc_output/
-coverage/
-*.lcov
-
-# Database files
-data/*.db
-data/*.db-journal
-
-# OS specific
-Thumbs.db
-*.swp
-*.swo
-nul
