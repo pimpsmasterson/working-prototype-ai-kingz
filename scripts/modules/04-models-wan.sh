@@ -22,7 +22,7 @@ echo "📦 Downloading Wan 2.1 models..."
 "$DOWNLOADER" "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors" \
               "$COMFYUI_DIR/models/diffusion_models" "wan2.1_t2v_1.3B_fp16.safetensors"
 
-"$DOWNLOADER" "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn.safetensors" \
+"$DOWNLOADER" "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" \
               "$COMFYUI_DIR/models/text_encoders" "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
 
 "$DOWNLOADER" "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan2.1_vae.safetensors" \
