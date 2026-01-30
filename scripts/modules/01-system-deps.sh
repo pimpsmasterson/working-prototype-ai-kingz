@@ -18,6 +18,12 @@ PACKAGE_INSTALL_TIMEOUT=600  # 10 minutes
 MAX_NETWORK_RETRIES=3
 NETWORK_TIMEOUT=30
 
+# Global OS Detection
+UBUNTU_VERSION="unknown"
+if [[ -f /etc/os-release ]]; then
+    UBUNTU_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
+fi
+
 # Logging
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [SYSTEM-DEPS] $*" >&2
