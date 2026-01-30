@@ -24,12 +24,13 @@ const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY
 // ============================================================================
 
 // Minimum CUDA capability - excludes Pascal and older (GTX 10 series, TITAN Xp)
-const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY || '7.0');
+// Lowered to 6.0 to allow datacenter GPUs like P100/P40 which have high VRAM
+const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY || '6.0');
 
-// Configurable minimum disk (GB) for warm instances. Default to 400GB to
-// reduce extraction / overlayfs failures when provisioning large checkpoints.
-const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '400', 10);
-const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 400;
+// Configurable minimum disk (GB) for warm instances. Default to 150GB to ensure
+// room for large models (Flux/SDXL) and custom nodes while meeting user requirements.
+const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '150', 10);
+const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 150;
 // Clamp to sane bounds: min 100GB, max 2000GB
 const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 100), 2000);
 /**
@@ -83,7 +84,9 @@ let state = {
     instance: null, // { contractId, status, connectionUrl, createdAt, lastHeartbeat, leasedUntil }
     lastAction: null,
     isPrewarming: false,
-    safeMode: false
+    safeMode: false,
+    provisionAttempt: 0,       // Track provisioning attempts for diagnostics
+    useDefaultScript: false    // Fallback flag: use default Vast.ai script instead of custom
 };
 
 const vastaiSsh = require('../lib/vastai-ssh');
@@ -104,9 +107,18 @@ function load() {
 
 // Wait for ComfyUI to respond on the instance (polls /system_stats)
 // Now includes comprehensive GPU and model health validation
-async function waitForComfyReady(contractId, timeoutMs = 180000, intervalMs = 5000) {
+// ADAPTIVE POLLING: Wait for provisioning buffer, then poll slowly during provisioning
+async function waitForComfyReady(contractId, timeoutMs = 1500000, intervalMs = 90000) {
     const start = Date.now();
     let lastHealthReport = null;
+    let consecutiveFailures = 0;
+    let currentInterval = intervalMs;
+
+    // Provisioning buffer: skip health checks for the first 5 minutes
+    // Parallel provisioning can take ~8-12 minutes; this reduces false failures
+    const provisioningBufferMs = 5 * 60 * 1000; // 5 minutes
+    console.log(`WarmPool: Provisioning buffer active - waiting ${provisioningBufferMs / 1000}s before health checks`);
+    await new Promise(r => setTimeout(r, provisioningBufferMs));
 
     while (Date.now() - start < timeoutMs) {
         // Refresh instance info from Vast.ai
@@ -123,6 +135,19 @@ async function waitForComfyReady(contractId, timeoutMs = 180000, intervalMs = 50
                 state.instance.status = 'ready';
                 state.instance.lastHeartbeat = new Date().toISOString();
                 state.instance.lastHealthReport = healthReport;
+
+                // Fetch complete model inventory for pre-flight validation
+                try {
+                    state.instance.modelInventory = await fetchModelInventory(state.instance.connectionUrl);
+                    console.log('WarmPool: Model inventory cached', {
+                        checkpoints: state.instance.modelInventory.checkpoints.length,
+                        loras: state.instance.modelInventory.loras.length
+                    });
+                } catch (invErr) {
+                    console.warn('WarmPool: Failed to fetch model inventory:', invErr.message);
+                    state.instance.modelInventory = { checkpoints: [], loras: [], vaes: [], customNodes: [], errors: [invErr.message] };
+                }
+
                 save();
 
                 try {
@@ -133,34 +158,55 @@ async function waitForComfyReady(contractId, timeoutMs = 180000, intervalMs = 50
                         details: {
                             vram_total: healthReport.vram_total,
                             vram_free: healthReport.vram_free,
-                            checkpoint_count: healthReport.checkpoint_count
+                            checkpoint_count: healthReport.checkpoint_count,
+                            lora_count: state.instance.modelInventory?.loras?.length || 0
                         },
                         source: 'warm-pool'
                     });
-                } catch (e) {}
+                } catch (e) { }
 
                 return true;
             }
 
-            // Log progress for debugging
+            // Adaptive polling based on elapsed provisioning time
             const elapsed = Math.round((Date.now() - start) / 1000);
-            console.log(`WarmPool: Waiting for healthy instance (${elapsed}s elapsed)...`, {
+            consecutiveFailures++;
+
+            // Slow polling during provisioning (first 10 minutes), faster after
+            if (elapsed < 600) {
+                currentInterval = 90000; // 90s during provisioning phase
+            } else {
+                currentInterval = 30000; // 30s after 10 minutes
+            }
+
+            console.log(`WarmPool: Waiting for healthy instance (${elapsed}s elapsed, poll every ${currentInterval / 1000}s)...`, {
                 api: healthReport.comfyui_api,
                 gpu: healthReport.gpu_available,
                 functional: healthReport.gpu_functional,
                 errors: healthReport.errors
             });
+        } else {
+            consecutiveFailures = 0; // Reset on any progress
         }
 
-        await new Promise(r => setTimeout(r, intervalMs));
+        await new Promise(r => setTimeout(r, currentInterval));
     }
 
     // Timed out - log the last health report for debugging
     console.error('WarmPool: Instance readiness timeout', {
         contractId,
         timeoutMs,
-        lastHealthReport
+        lastHealthReport,
+        provisionAttempt: state.provisionAttempt,
+        useDefaultScript: state.useDefaultScript
     });
+
+    // FALLBACK TRIGGER: If using custom script and it failed, set fallback flag for next attempt
+    if (!state.useDefaultScript && process.env.COMFYUI_PROVISION_SCRIPT) {
+        console.warn('WarmPool: ⚠️ FALLBACK TRIGGERED - Custom provisioning script failed. Next prewarm will use default Vast.ai script.');
+        state.useDefaultScript = true;
+        save();
+    }
 
     return false;
 }
@@ -230,6 +276,7 @@ async function validateInstanceHealth(connectionUrl, contractId) {
         }
 
         // 3. Check if models/checkpoints are loaded via object_info endpoint
+        // CRITICAL: Verify models actually downloaded (not just ComfyUI running)
         try {
             const objectInfoUrl = base + '/object_info/CheckpointLoaderSimple';
             const objectInfoResponse = await fetch(objectInfoUrl, {
@@ -244,14 +291,17 @@ async function validateInstanceHealth(connectionUrl, contractId) {
                 healthReport.models_loaded = healthReport.checkpoint_count > 0;
 
                 if (!healthReport.models_loaded) {
-                    healthReport.errors.push('No checkpoints found');
+                    healthReport.errors.push('CRITICAL: No checkpoints found - provisioning likely failed');
                 }
+            } else {
+                healthReport.errors.push(`object_info endpoint failed: ${objectInfoResponse.status}`);
             }
         } catch (objErr) {
             // object_info might not be available on all ComfyUI versions
             console.log('WarmPool: Could not fetch object_info:', objErr.message);
-            // Don't fail health check for this - just mark as unknown
-            healthReport.models_loaded = true; // Assume OK if we can't check
+            healthReport.errors.push('Cannot verify model inventory');
+            // CHANGED: Don't assume OK if we can't verify - mark as unknown and log warning
+            healthReport.models_loaded = false;
         }
 
     } catch (error) {
@@ -276,13 +326,115 @@ async function validateInstanceHealth(connectionUrl, contractId) {
 
 /**
  * Check if health report indicates a fully functional instance
+ * ENHANCED: Now also requires models to be loaded (prevents returning broken instances)
  * @param {Object} healthReport - Result from validateInstanceHealth
- * @returns {boolean} - True if instance is healthy
+ * @returns {boolean} - True if instance is healthy AND has models
  */
 function isInstanceHealthy(healthReport) {
-    return healthReport.comfyui_api &&
-           healthReport.gpu_available &&
-           healthReport.gpu_functional;
+    const basicHealth = healthReport.comfyui_api &&
+        healthReport.gpu_available &&
+        healthReport.gpu_functional;
+
+    // REQUIRE at least 1 checkpoint to be loaded (catches provision failures)
+    const modelsReady = healthReport.models_loaded && healthReport.checkpoint_count > 0;
+
+    if (basicHealth && !modelsReady) {
+        console.warn('WarmPool: Instance API/GPU healthy but NO MODELS LOADED - provisioning failed');
+    }
+
+    return basicHealth && modelsReady;
+}
+
+/**
+ * Fetch complete model inventory from ComfyUI instance
+ * Queries multiple /object_info endpoints to discover available models
+ * @param {string} connectionUrl - Base URL of the ComfyUI instance
+ * @returns {Object} - Model inventory { checkpoints: [], loras: [], vaes: [], customNodes: [] }
+ */
+async function fetchModelInventory(connectionUrl) {
+    const inventory = {
+        checkpoints: [],
+        loras: [],
+        vaes: [],
+        customNodes: [],
+        timestamp: new Date().toISOString(),
+        errors: []
+    };
+
+    if (!connectionUrl) {
+        inventory.errors.push('No connection URL');
+        return inventory;
+    }
+
+    const base = connectionUrl.replace(/\/$/, '');
+
+    // Fetch available checkpoints
+    try {
+        const checkpointResp = await fetch(`${base}/object_info/CheckpointLoaderSimple`, { timeout: 10000 });
+        if (checkpointResp.ok) {
+            const data = await checkpointResp.json();
+            inventory.checkpoints = data?.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+        }
+    } catch (e) {
+        inventory.errors.push(`Checkpoint fetch failed: ${e.message}`);
+    }
+
+    // Fetch available LoRAs
+    try {
+        const loraResp = await fetch(`${base}/object_info/LoraLoader`, { timeout: 10000 });
+        if (loraResp.ok) {
+            const data = await loraResp.json();
+            inventory.loras = data?.LoraLoader?.input?.required?.lora_name?.[0] || [];
+        }
+    } catch (e) {
+        inventory.errors.push(`LoRA fetch failed: ${e.message}`);
+    }
+
+    // Fetch available VAEs
+    try {
+        const vaeResp = await fetch(`${base}/object_info/VAELoader`, { timeout: 10000 });
+        if (vaeResp.ok) {
+            const data = await vaeResp.json();
+            inventory.vaes = data?.VAELoader?.input?.required?.vae_name?.[0] || [];
+        }
+    } catch (e) {
+        inventory.errors.push(`VAE fetch failed: ${e.message}`);
+    }
+
+    // Check for AnimateDiff custom node (critical for video workflows)
+    try {
+        const animateDiffResp = await fetch(`${base}/object_info/AnimateDiffLoader`, { timeout: 10000 });
+        if (animateDiffResp.ok) {
+            inventory.customNodes.push('AnimateDiffLoader');
+        }
+    } catch (e) { /* Node not available */ }
+
+    // Check for ADE_AnimateDiffLoaderWithContext (alternate AnimateDiff node)
+    try {
+        const adeResp = await fetch(`${base}/object_info/ADE_AnimateDiffLoaderWithContext`, { timeout: 10000 });
+        if (adeResp.ok) {
+            if (!inventory.customNodes.includes('AnimateDiffLoader')) {
+                inventory.customNodes.push('AnimateDiffLoader');
+            }
+        }
+    } catch (e) { /* Node not available */ }
+
+    // Check for VHS_VideoCombine (critical for video output)
+    try {
+        const vhsResp = await fetch(`${base}/object_info/VHS_VideoCombine`, { timeout: 10000 });
+        if (vhsResp.ok) {
+            inventory.customNodes.push('VHS_VideoCombine');
+        }
+    } catch (e) { /* Node not available */ }
+
+    console.log('WarmPool: Model inventory fetched', {
+        checkpoints: inventory.checkpoints.length,
+        loras: inventory.loras.length,
+        vaes: inventory.vaes.length,
+        customNodes: inventory.customNodes
+    });
+
+    return inventory;
 }
 
 function save() {
@@ -297,7 +449,7 @@ function save() {
 async function prewarm() {
     console.log('[PREWARM DEBUG] Function called');
     console.log('[PREWARM DEBUG] VASTAI_API_KEY:', VASTAI_API_KEY ? `${VASTAI_API_KEY.slice(0, 10)}...` : 'NOT SET');
-    
+
     if (prewarmLock) {
         if (prewarmInFlight) {
             console.log('[PREWARM DEBUG] Waiting on in-flight prewarm');
@@ -343,22 +495,103 @@ async function prewarm() {
             type: 'ask'
         };
 
-        // Client-side filtering criteria
+        // Client-side filtering criteria (optimized for presentation/showcase)
         const filterOffer = (o) => {
-            if (!o.rentable) return false;
-            if (o.rented) return false;
-            if (o.dph_total > 0.80) return false;        // Max $0.80/hr
-            if (o.gpu_ram < 8192) return false;          // Min 8GB VRAM for SDXL
-            if (typeof o.disk_space === 'number' && o.disk_space < requiredDiskGb) return false; // Min disk from env
+            const reasons = [];
+            if (!o.rentable) { reasons.push('not rentable'); return false; }
+            if (o.rented) { reasons.push('already rented'); return false; }
+            
+            // Exclude Ukraine region
+            if (o.geolocation && (o.geolocation.includes('Ukraine') || o.geolocation.includes('UA'))) {
+                reasons.push('region excluded: Ukraine');
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+            
+            const maxPrice = parseFloat(process.env.WARM_POOL_MAX_DPH || '3.00');
+            if (typeof o.dph_total === 'number' && o.dph_total > maxPrice) {
+                reasons.push(`price too high: $${o.dph_total}/hr > $${maxPrice}/hr`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+            
+            // CRITICAL: Minimum 16GB VRAM for SDXL workflows.
+            // Support multi-GPU configurations (e.g. 2x8GB) by checking total VRAM.
+            const minVRAM = parseInt(process.env.VASTAI_MIN_GPU_RAM_MB || '16000'); // 16GB default
+            const numGpus = o.num_gpus || 1;
+            const totalVram = (o.gpu_ram || 0) * numGpus;
 
-            // CRITICAL: Filter out legacy GPUs that are incompatible with modern PyTorch
-            // cuda_max_good indicates the CUDA compute capability of the GPU
-            if (o.cuda_max_good && !isGpuCompatible(o.cuda_max_good)) {
-                console.log(`WarmPool: Filtered out legacy GPU ${o.gpu_name || 'unknown'} (CUDA ${o.cuda_max_good} < ${MIN_CUDA_CAPABILITY})`);
+            if (totalVram < minVRAM) {
+                reasons.push(`Total GPU RAM too low: ${totalVram}MB < ${minVRAM}MB (${numGpus}x ${o.gpu_ram}MB)`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+            if (typeof o.disk_space === 'number' && o.disk_space < requiredDiskGb) {
+                reasons.push(`disk too small: ${o.disk_space}GB < ${requiredDiskGb}GB`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
 
-            // Optional: prefer verified but don't require
+            // CRITICAL: Require verified hosts only - reject unverified/deverified providers
+            // Vast.ai uses TWO fields: o.verified (boolean) AND o.verification (string)
+            console.log(`WarmPool: Checking offer ${o.id} [${o.gpu_name}] - verified=${JSON.stringify(o.verified)}, verification=${JSON.stringify(o.verification)}`);
+            
+            // Accept if EITHER field indicates verification
+            const isVerifiedBoolean = o.verified === true;
+            const isVerifiedString = o.verification === 'verified';
+            
+            if (!isVerifiedBoolean && !isVerifiedString) {
+                reasons.push(`host not verified (verified=${JSON.stringify(o.verified)}, verification=${JSON.stringify(o.verification)})`);
+                console.log(`WarmPool: ❌ REJECTED offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+            
+            console.log(`WarmPool: ✓ Offer ${o.id} [${o.gpu_name}] PASSED verification check`);
+
+            // Bandwidth cost filters - reject expensive bandwidth that kills profitability
+            // Target: <$3/TB download, <$5/TB upload (reasonable datacenter rates)
+            const maxDownloadCostPerTB = parseFloat(process.env.VASTAI_MAX_INET_DOWN_COST_TB || '3.0');
+            const maxUploadCostPerTB = parseFloat(process.env.VASTAI_MAX_INET_UP_COST_TB || '5.0');
+            
+            if (typeof o.internet_down_cost_per_tb === 'number' && o.internet_down_cost_per_tb > maxDownloadCostPerTB) {
+                reasons.push(`download bandwidth too expensive: $${o.internet_down_cost_per_tb.toFixed(2)}/TB > $${maxDownloadCostPerTB}/TB`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+            
+            if (typeof o.internet_up_cost_per_tb === 'number' && o.internet_up_cost_per_tb > maxUploadCostPerTB) {
+                reasons.push(`upload bandwidth too expensive: $${o.internet_up_cost_per_tb.toFixed(2)}/TB > $${maxUploadCostPerTB}/TB`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+
+            // High-speed download requirement
+            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '900'); // 900 Mbps minimum
+            if (typeof o.inet_down === 'number' && o.inet_down < minInetDown) {
+                reasons.push(`internet speed too low: ${o.inet_down.toFixed(1)} Mbps < ${minInetDown} Mbps`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+
+            const minReliability = parseFloat(process.env.VASTAI_MIN_RELIABILITY || '0.95'); // 95% reliability
+            if (typeof o.reliability === 'number' && o.reliability < minReliability) {
+                reasons.push(`reliability too low: ${(o.reliability * 100).toFixed(1)}% < ${(minReliability * 100).toFixed(1)}%`);
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+
+            // CRITICAL: Filter out consumer-grade legacy GPUs incompatible with modern workloads
+            // Allow datacenter GPUs like P100/P40 (they have 16-24GB VRAM for SDXL)
+            const isLegacyName = (o.gpu_name || '').toLowerCase().match(/^gtx\s*(1080|1070)|titan\s*x/);
+            if (isLegacyName || (o.cuda_max_good && !isGpuCompatible(o.cuda_max_good))) {
+                console.log(`WarmPool: Filtered out legacy GPU ${o.gpu_name || 'unknown'} (CUDA ${o.cuda_max_good || 'N/A'} < ${MIN_CUDA_CAPABILITY})`);
+                return false;
+            }
+
+            // Log successful offer with bandwidth costs for transparency
+            const downCost = typeof o.internet_down_cost_per_tb === 'number' ? `$${o.internet_down_cost_per_tb.toFixed(2)}/TB` : 'N/A';
+            const upCost = typeof o.internet_up_cost_per_tb === 'number' ? `$${o.internet_up_cost_per_tb.toFixed(2)}/TB` : 'N/A';
+            console.log(`WarmPool: ✓ Offer ${o.id} PASSED filters: ${numGpus}x ${o.gpu_name}, $${o.dph_total}/hr, ${totalVram}MB Total VRAM, ${o.disk_space}GB disk, verified=${o.verified}, bandwidth: ↓${downCost} ↑${upCost}`);
             return true;
         };
 
@@ -366,19 +599,57 @@ async function prewarm() {
         async function searchBundles(params, attempts = 3) {
             for (let i = 1; i <= attempts; i++) {
                 try {
-                    console.log(`WarmPool: bundle search attempt ${i}`);
+                    console.log(`WarmPool: bundle search attempt ${i} with params:`, JSON.stringify(params));
+                    
+                    const queryParams = {
+                        ...params,
+                        // Request 1000 results to ensure we find high-quality candidates
+                        limit: 1000 
+                    };
+
                     const r = await fetch(`${VAST_BASE}/bundles/`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${VASTAI_API_KEY}`
                         },
-                        body: JSON.stringify(params)
+                        body: JSON.stringify(queryParams)
                     });
+
+                    if (!r.ok) {
+                        console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
+                        const errorText = await r.text();
+                        console.error(`WarmPool: Error response:`, errorText);
+                        continue;
+                    }
+
                     const data = await r.json();
                     const allOffers = data.offers || [];
+                    console.log(`WarmPool: Vast.ai returned ${allOffers.length} total offers`);
+
+                    // Log sample of first few offers for debugging
+                    if (allOffers.length > 0 && allOffers.length <= 5) {
+                        console.log(`WarmPool: Sample offers:`, allOffers.map(o => ({
+                            id: o.id,
+                            gpu: o.gpu_name,
+                            price: o.dph_total,
+                            vram: o.gpu_ram,
+                            disk: o.disk_space,
+                            rentable: o.rentable,
+                            rented: o.rented
+                        })));
+                    }
+
                     // Apply client-side filtering
-                    const offers = allOffers.filter(filterOffer);
+                    let offers = allOffers.filter(filterOffer);
+                    
+                    // Sort results: Primary by price ($/hr), secondarily by bandwidth (Mbps DESC)
+                    // This satisfies the "prefer higher" requirement for internet speed.
+                    offers.sort((a, b) => {
+                        if (a.dph_total !== b.dph_total) return a.dph_total - b.dph_total;
+                        return (b.inet_down || 0) - (a.inet_down || 0);
+                    });
+
                     console.log(`WarmPool: bundle search attempt ${i} found ${allOffers.length} total, ${offers.length} matching criteria`);
                     if (offers.length) return offers;
                 } catch (err) {
@@ -391,38 +662,72 @@ async function prewarm() {
         }
 
         const offers = await searchBundles(searchParams);
+        
+        // CRITICAL: NO RELAXED FALLBACK - strict requirements are non-negotiable
+        // Previous relaxed fallback was bypassing verification, bandwidth speed, and VRAM checks
+        // This caused unverified 8GB GPUs with 600 Mbps to be rented despite 16GB + 1Gbps requirement
+
         if (!offers.length) {
             throw new Error('No offers found after retries and fallback');
         }
 
-        const offer = offers[0];
-
+        // Try renting offers in order until one succeeds. This handles cases where an
+        // offer becomes unavailable between search and rent (Vast.ai returns no_such_ask).
+        let rentData = null;
+        let selectedOffer = null;
         // Concurrency guard: if another prewarm set a VALID instance while we searched, skip renting
         // We only skip if the instance is NOT in a failed state.
-        if (state.instance && state.instance.contractId && 
-            state.instance.status !== 'failed' && 
+        if (state.instance && state.instance.contractId &&
+            state.instance.status !== 'failed' &&
             !String(state.instance.lastStatusMessage || '').toLowerCase().includes('no space left on device')) {
             console.warn('WarmPool: instance already present after search; skipping rent');
             return { status: 'already_present', instance: state.instance };
         }
 
-        // Rent the selected offer via asks PUT
         // Allow the prebuilt image to be configurable via VASTAI_COMFY_IMAGE.
         // If VASTAI_COMFY_IMAGE is set to 'auto', do not set `image` so the offer default is used.
         // By default (when the env var is not set) prefer the known Comfy template image to improve reliability.
         const configuredImage = (process.env.VASTAI_COMFY_IMAGE === undefined)
             ? 'vastai/comfy:v0.10.0-cuda-12.9-py312'
             : process.env.VASTAI_COMFY_IMAGE;
-        
-        // Allow custom provisioning script for auto-downloading NSFW models
-        // Set COMFYUI_PROVISION_SCRIPT to your script URL, or leave unset for default
-        const provisionScript = process.env.COMFYUI_PROVISION_SCRIPT ||
-            "https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/pytorch/derivatives/comfyui/provisioning_scripts/default.sh";
-        
+
+        // PARALLEL PROVISIONING: Use optimized parallel download script for fast setup
+        // Priority: 1) Check fallback flag, 2) COMFYUI_PROVISION_SCRIPT env var, 3) Vast.ai default
+        const customProvisionScript = process.env.COMFYUI_PROVISION_SCRIPT;
+        const defaultProvisionScript = "https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/pytorch/derivatives/comfyui/provisioning_scripts/default.sh";
+
+        // Increment provision attempt counter
+        state.provisionAttempt = (state.provisionAttempt || 0) + 1;
+        console.log(`WarmPool: 📦 Provisioning attempt #${state.provisionAttempt} (fallback mode: ${state.useDefaultScript})`);
+
+        // FALLBACK LOGIC: If useDefaultScript flag is set (from previous failure), use default script
+        let provisionScript = defaultProvisionScript;
+        if (state.useDefaultScript) {
+            console.warn('WarmPool: ⚠️ Using DEFAULT Vast.ai script (fallback from failed custom script)');
+            provisionScript = defaultProvisionScript;
+        } else if (customProvisionScript) {
+            // Validate custom script URL before using it (check for 404 gist issues)
+            try {
+                const testResp = await fetch(customProvisionScript, { method: 'HEAD', timeout: 10000 });
+                if (testResp.ok) {
+                    provisionScript = customProvisionScript;
+                    console.log('WarmPool: ✅ Using custom provision script:', customProvisionScript);
+                } else {
+                    console.warn(`WarmPool: ⚠️ Custom provision script returned ${testResp.status}, falling back to default`);
+                    provisionScript = defaultProvisionScript;
+                }
+            } catch (err) {
+                console.warn(`WarmPool: ⚠️ Custom provision script unreachable, falling back to default:`, err.message);
+                provisionScript = defaultProvisionScript;
+            }
+        }
+
+        console.log('WarmPool: 🔧 Selected provision script:', provisionScript);
+
         // Build environment variables - include HF and Civitai tokens if set
         const envVars = {
-            COMFYUI_ARGS: "--listen 0.0.0.0 --disable-auto-launch --port 18188 --enable-cors-header",
-            COMFYUI_API_BASE: "http://localhost:18188",
+            COMFYUI_ARGS: "--listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header",
+            COMFYUI_API_BASE: "http://localhost:8188",
             PROVISIONING_SCRIPT: provisionScript,
             PORTAL_CONFIG: "localhost:1111:11111:/:Instance Portal|localhost:8188:18188:/:ComfyUI|localhost:8288:18288:/docs:API Wrapper|localhost:8188:18188:/:ComfyUI|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing",
             OPEN_BUTTON_PORT: "1111",
@@ -430,7 +735,7 @@ async function prewarm() {
             DATA_DIRECTORY: "/workspace/",
             OPEN_BUTTON_TOKEN: "1"
         };
-        
+
         // Pass through Hugging Face and Civitai tokens for model downloads
         if (process.env.HUGGINGFACE_HUB_TOKEN) {
             envVars.HUGGINGFACE_HUB_TOKEN = process.env.HUGGINGFACE_HUB_TOKEN;
@@ -439,11 +744,17 @@ async function prewarm() {
             envVars.CIVITAI_TOKEN = process.env.CIVITAI_TOKEN;
         }
         
+        // Pass through SCRIPTS_BASE_URL for modular provisioning system
+        if (process.env.SCRIPTS_BASE_URL) {
+            envVars.SCRIPTS_BASE_URL = process.env.SCRIPTS_BASE_URL;
+            console.log('WarmPool: 📦 Using modular scripts from:', process.env.SCRIPTS_BASE_URL);
+        }
+
         const rentBody = {
             ...(configuredImage && configuredImage !== 'auto' ? { image: configuredImage } : {}),
             runtype: 'ssh',
             target_state: 'running',
-            onstart: 'entrypoint.sh',
+            onstart: `bash -c "if [ -f /venv/main/bin/activate ]; then source /venv/main/bin/activate; fi; curl -fsSL ${provisionScript} | bash; cd /workspace/ComfyUI && (source /venv/main/bin/activate 2>/dev/null || true) && nohup python main.py --listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header > /workspace/comfyui.log 2>&1 &"`,
             ssh_key: vastaiSsh.getKey(),
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
@@ -455,40 +766,80 @@ async function prewarm() {
         // Ensure account-level SSH key exists so per-instance access works
         try { await vastaiSsh.registerKey(VASTAI_API_KEY); } catch (e) { /* continue even if key registration fails */ }
 
-        const rentResp = await fetch(`${VAST_BASE}/asks/${offer.id}/`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${VASTAI_API_KEY}`
-            },
-            body: JSON.stringify(rentBody)
-        });
+        // Iterate offers and attempt to rent each. If Vast.ai reports the ask is gone
+        // (no_such_ask / 404/3603) try the next candidate instead of failing hard.
+        for (let i = 0; i < offers.length; i++) {
+            const offer = offers[i];
+            console.log(`WarmPool: Attempting to rent offer ${offer.id} (${i + 1}/${offers.length}) $${offer.dph_total}/hr ${offer.gpu_name}`);
+            try {
+                // Rent the selected offer via asks PUT
+                const rentResp = await fetch(`${VAST_BASE}/asks/${offer.id}/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${VASTAI_API_KEY}`
+                    },
+                    body: JSON.stringify(rentBody)
+                });
 
-        let rentData = await rentResp.json();
-        if (!rentResp.ok) {
-            // If image manifest not found, attempt a fallback rent without specifying image
-            const txt = JSON.stringify(rentData || {});
-            if (txt.includes('manifest') || txt.includes('not found') || txt.includes('manifest unknown')) {
-                console.warn('WarmPool: prebuilt image not available, retrying rent without image');
-                try {
-                    const fallbackBody = Object.assign({}, rentBody);
-                    delete fallbackBody.image;
-                    const rentResp2 = await fetch(`${VAST_BASE}/asks/${offer.id}/`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${VASTAI_API_KEY}`
-                        },
-                        body: JSON.stringify(fallbackBody)
-                    });
-                    rentData = await rentResp2.json();
-                    if (!rentResp2.ok) throw new Error(JSON.stringify(rentData));
-                } catch (e) {
-                    throw new Error(`Rent failed and fallback failed: ${e.message || e}`);
+                // parse response safely
+                const parsed = await rentResp.json().catch(() => ({}));
+                if (!rentResp.ok) {
+                    const txt = JSON.stringify(parsed || {});
+                    // Handle known transient case where ask is no longer available
+                    if (txt && (txt.includes('no_such_ask') || txt.includes('no such ask') || txt.includes('ask not found') || (parsed && parsed.msg && String(parsed.msg).toLowerCase().includes('no_such_ask')))) {
+                        console.warn(`WarmPool: Offer ${offer.id} no longer available (no_such_ask); trying next candidate`);
+                        // continue to next offer
+                        continue;
+                    }
+                    // If image manifest problem, we may retry without image below
+                    if (txt.includes('manifest') || txt.includes('not found') || txt.includes('manifest unknown')) {
+                        console.warn('WarmPool: prebuilt image not available for this offer, retrying rent without image');
+                        try {
+                            const fallbackBody = Object.assign({}, rentBody);
+                            delete fallbackBody.image;
+                            const rentResp2 = await fetch(`${VAST_BASE}/asks/${offer.id}/`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${VASTAI_API_KEY}`
+                                },
+                                body: JSON.stringify(fallbackBody)
+                            });
+                            const parsed2 = await rentResp2.json().catch(() => ({}));
+                            if (!rentResp2.ok) {
+                                const txt2 = JSON.stringify(parsed2 || {});
+                                if (txt2 && (txt2.includes('no_such_ask') || txt2.includes('no such ask'))) {
+                                    console.warn(`WarmPool: Offer ${offer.id} became unavailable while retrying without image; trying next candidate`);
+                                    continue;
+                                }
+                                throw new Error(JSON.stringify(parsed2 || {}));
+                            }
+                            rentData = parsed2;
+                            selectedOffer = offer;
+                            break; // success
+                        } catch (e) {
+                            console.warn('WarmPool: Rent fallback without image failed:', e && e.message ? e.message : e);
+                            continue; // try next offer
+                        }
+                    }
+                    // For other errors, throw to outer catch and eventually abort
+                    throw new Error(JSON.stringify(parsed || {}));
                 }
-            } else {
-                throw new Error(JSON.stringify(rentData));
+
+                // Success
+                rentData = parsed;
+                selectedOffer = offer;
+                break;
+            } catch (e) {
+                console.error(`WarmPool: Rent attempt for offer ${offer.id} failed:`, e && e.message ? e.message : e);
+                // try next offer
+                continue;
             }
+        }
+
+        if (!rentData || !selectedOffer) {
+            throw new Error('All rent attempts failed or offers no longer available');
         }
 
         const contractId = rentData.new_contract || rentData.contract || rentData.id;
@@ -503,7 +854,7 @@ async function prewarm() {
 
         // Log usage event: instance started
         try {
-            audit.logUsageEvent({ event_type: 'instance_started', contract_id: contractId, instance_status: 'starting', details: { offerId: offer.id }, source: 'warm-pool' });
+            audit.logUsageEvent({ event_type: 'instance_started', contract_id: contractId, instance_status: 'starting', details: { offerId: selectedOffer.id, gpuName: selectedOffer.gpu_name, pricePerHour: selectedOffer.dph_total }, source: 'warm-pool' });
         } catch (e) { console.error('audit log usage error:', e); }
 
         save();
@@ -520,21 +871,25 @@ async function prewarm() {
         } else {
             await checkInstance();
             try {
-                // attempt to detect ComfyUI readiness (3 minutes max)
-                await waitForComfyReady(contractId, 180000, 5000);
+                // attempt to detect ComfyUI readiness (15 minutes max to allow large model downloads like Flux)
+                await waitForComfyReady(contractId, 900000, 10000);
             } catch (e) { /* continue even if readiness check fails */ }
         }
         const result = { status: 'started', instance: state.instance };
         // resolve inflight for waiters
-        try { resolveInflight && resolveInflight(result); } catch (e) {}
+        try { resolveInflight && resolveInflight(result); } catch (e) { }
         prewarmInFlight = null;
         return result;
     } catch (error) {
         console.error('WarmPool prewarm error:', error);
         state.lastAction = new Date().toISOString();
+        // CRITICAL: Don't clear instance on prewarm errors - might just be rate limiting
+        if (state.instance) {
+            state.instance.lastError = error.message;
+        }
         save();
         // reject inflight waiters
-        try { rejectInflight && rejectInflight(error); } catch (e) {}
+        try { rejectInflight && rejectInflight(error); } catch (e) { }
         prewarmInFlight = null;
         throw error;
     } finally {
@@ -560,6 +915,12 @@ async function checkInstance() {
                 save();
                 return null;
             }
+            // CRITICAL: If rate limited (429), DON'T kill the instance - just log and skip this check
+            if (r.status === 429) {
+                console.warn(`WarmPool: Vast.ai API rate limited (429). Skipping this health check cycle.`);
+                state.instance.lastError = `Rate limited (429) at ${new Date().toISOString()}`;
+                return; // Don't throw - instance is still running
+            }
             throw new Error(`instances status error ${r.status} ${txt}`);
         }
         const instance = await r.json();
@@ -573,7 +934,7 @@ async function checkInstance() {
         if ((inst.actual_status === 'running' || inst.status === 'running') && inst.public_ipaddr) {
             // Default to direct port 8188
             let port = 8188;
-            
+
             // Check for explicitly mapped ports if direct ports aren't used or as a fallback
             if (inst.ports && inst.ports['8188/tcp'] && inst.ports['8188/tcp'].length > 0) {
                 port = inst.ports['8188/tcp'][0].HostPort;
@@ -581,23 +942,43 @@ async function checkInstance() {
                 // Some templates might use 18188 internally and map it
                 port = inst.ports['18188/tcp'][0].HostPort;
             }
-            
+
             state.instance.connectionUrl = `http://${inst.public_ipaddr}:${port}`;
-            
+
             // If this is the first time we've detected the connectionUrl, mark as loading and validate health
             if (!previousConnectionUrl && state.instance.connectionUrl && process.env.NODE_ENV !== 'test') {
                 state.instance.status = 'loading'; // Override to loading until ComfyUI responds
-                console.log(`WarmPool: Instance ${contractId} network ready, validating ComfyUI health...`);
+                console.log(`WarmPool: Instance ${contractId} network ready, validating ComfyUI health (up to 15m)...`);
                 // Trigger health validation in background (don't block checkInstance)
-                waitForComfyReady(contractId, 180000, 5000).catch(err => {
+                const healthTimeoutMs = parseInt(process.env.COMFYUI_READY_TIMEOUT_MS || (process.env.DISABLE_AUTO_RECOVERY === '1' ? '3600000' : '900000'), 10);
+                waitForComfyReady(contractId, healthTimeoutMs, 10000).catch(async err => {
                     console.error(`WarmPool: Health validation failed for ${contractId}:`, err.message);
+
+                    // AUTO-RECOVERY: If instance is running but models never loaded, terminate and recreate
+                    // Skip auto-recovery if explicitly disabled (for long provisioning/download phases)
+                    if (process.env.DISABLE_AUTO_RECOVERY === '1') {
+                        console.log('WarmPool: Auto-recovery disabled via DISABLE_AUTO_RECOVERY env var. Skipping termination.');
+                        return;
+                    }
+                    if (state.instance && state.instance.contractId === contractId) {
+                        const healthReport = await validateInstanceHealth(state.instance.connectionUrl, contractId).catch(() => null);
+                        if (healthReport && healthReport.comfyui_api && !healthReport.models_loaded) {
+                            console.warn(`WarmPool: AUTO-RECOVERY - Instance ${contractId} running but NO MODELS. Destroying and recreating...`);
+                            try {
+                                await terminate(contractId);
+                                console.log('WarmPool: Broken instance terminated. Will recreate on next prewarm request.');
+                            } catch (termErr) {
+                                console.error('WarmPool: Failed to auto-terminate broken instance:', termErr);
+                            }
+                        }
+                    }
                 });
             }
         }
         // Record status message for audit/debugging
         if (inst.status_msg) {
             state.instance.lastStatusMessage = inst.status_msg;
-            
+
             // AUTO-TERMINATE if instance is failing due to 'no space left on device'
             if (inst.status_msg.toLowerCase().includes('no space left on device')) {
                 console.warn(`WarmPool: Auto-terminating broken instance ${contractId} due to disk space exhaustion`);
@@ -664,7 +1045,7 @@ async function terminate(contractId = null) {
 // Polling loop to update instance state and enforce idle shutdown
 let pollHandle = null;
 function startPolling(opts = {}) {
-    const intervalMs = opts.intervalMs || 30000; // 30s
+    const intervalMs = opts.intervalMs || 120000; // 120s - adaptive polling to avoid rate limits
     if (pollHandle) return;
     // Respect a safe-mode environment variable for aggressive shutdowns
     const safeMode = (process.env.WARM_POOL_SAFE_MODE === '1' || process.env.WARM_POOL_SAFE_MODE === 'true');
@@ -677,8 +1058,9 @@ function startPolling(opts = {}) {
                 try {
                     if (!state._waitingForReady && state.instance.connectionUrl) {
                         state._waitingForReady = true;
-                        waitForComfyReady(state.instance.contractId, 120000, 5000)
-                            .catch(() => {})
+                        const pollingHealthTimeout = parseInt(process.env.COMFYUI_READY_TIMEOUT_MS || (process.env.DISABLE_AUTO_RECOVERY === '1' ? '3600000' : '900000'), 10);
+                        waitForComfyReady(state.instance.contractId, pollingHealthTimeout, 10000)
+                            .catch(() => { })
                             .finally(() => { state._waitingForReady = false; });
                     }
                 } catch (e) { /* ignore readiness probe errors */ }
@@ -700,16 +1082,8 @@ function startPolling(opts = {}) {
                     }
                 }
 
-                // If idle for more than configured minutes, terminate
-                const maxIdleMinutes = (opts.maxIdleMinutes || 15);
-                if (!state.instance.leasedUntil) {
-                    // Determine idle time from lastAction or createdAt
-                    const last = state.lastAction ? new Date(state.lastAction).getTime() : new Date(state.instance.createdAt).getTime();
-                    if (Date.now() - last > maxIdleMinutes * 60000) {
-                        console.log('WarmPool: idle timeout reached, terminating instance', state.instance.contractId);
-                        await module.exports.terminate(state.instance.contractId);
-                    }
-                }
+                // IDLE TIMEOUT DISABLED - Instance will not auto-terminate
+                // To manually terminate: POST /api/proxy/admin/terminate with admin key
             }
         } catch (e) {
             console.error('WarmPool polling error:', e);
@@ -751,6 +1125,33 @@ async function setSafeMode(enabled) {
     return getStatus();
 }
 
+/**
+ * Set whether to use default Vast.ai script instead of custom provisioning script.
+ * Used for fallback after custom provisioning fails.
+ * @param {boolean} useDefault - If true, use default script on next prewarm
+ * @returns {Object} - Current status
+ */
+function setUseDefaultScript(useDefault) {
+    state.useDefaultScript = !!useDefault;
+    state.lastAction = new Date().toISOString();
+    console.log(`WarmPool: 🔄 useDefaultScript set to ${state.useDefaultScript}`);
+    save();
+    return getStatus();
+}
+
+/**
+ * Reset provisioning state (fallback flag and attempt counter).
+ * Call this after successful provisioning or when admin wants to retry custom script.
+ */
+function resetProvisioningState() {
+    state.useDefaultScript = false;
+    state.provisionAttempt = 0;
+    state.lastAction = new Date().toISOString();
+    console.log('WarmPool: 🔄 Provisioning state reset (fallback disabled, attempt counter cleared)');
+    save();
+    return getStatus();
+}
+
 // Initialize
 try {
     load();
@@ -781,14 +1182,18 @@ module.exports = {
     claim,
     setDesiredSize,
     setSafeMode,
+    setUseDefaultScript,       // Fallback script control
+    resetProvisioningState,    // Reset fallback state
     startPolling,
     stopPolling,
     checkInstance,
+    load,  // Expose load for admin state reload
     // GPU compatibility exports (for testing and external use)
     isGpuCompatible,
     getPyTorchVersionForGPU,
     validateInstanceHealth,
     isInstanceHealthy,
+    fetchModelInventory,
     MIN_CUDA_CAPABILITY,
     _internal: { state }
 };
