@@ -12,7 +12,7 @@ const vastaiSsh = require('../lib/vastai-ssh');
 
 class VastAIAutomator {
     constructor() {
-        this.apiKey = process.env.VASTAI_API_KEY || '4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360';
+        this.apiKey = process.env.VASTAI_API_KEY || 'c0c517ae844d08ee03354fcf8cc9909eaaec857ed6e0a54128b3490a54808a4f';
         this.baseUrl = 'https://console.vast.ai/api/v0';
         this.sshKey = vastaiSsh.getKey();
 

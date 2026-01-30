@@ -1547,6 +1547,10 @@ if (require.main === module) {
         });
         server.on('listening', () => {
             console.log('[DEBUG] Server is now listening');
+            const addr = server.address();
+            console.log('[DEBUG] Server bound to:', addr);
+            // Keep process alive
+            setInterval(() => {}, 1 << 30);
         });
         console.log('[DEBUG] startProxy() called, server object:', !!server);
     } catch (err) {
