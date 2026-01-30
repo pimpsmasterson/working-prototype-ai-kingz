@@ -53,12 +53,16 @@ validate_tokens() {
 
     # Check HuggingFace token
     if [[ -n "${HUGGINGFACE_HUB_TOKEN:-}" ]]; then
-        if curl -f -H "Authorization: Bearer $HUGGINGFACE_HUB_TOKEN" \
-               --max-time 10 --silent \
-               "https://huggingface.co/api/whoami" >/dev/null 2>&1; then
+        # Use a public endpoint that requires auth for full validation, or just whoami
+        # Suppress output to avoid leaking info, but capture status
+        local hf_status
+        hf_status=$(curl -o /dev/null -s -w "%{http_code}" -H "Authorization: Bearer $HUGGINGFACE_HUB_TOKEN" "https://huggingface.co/api/whoami")
+        
+        if [[ "$hf_status" == "200" ]]; then
             log "✅ HuggingFace token is valid"
         else
-            warn_log "HuggingFace token appears invalid"
+            warn_log "HuggingFace token validation returned $hf_status (might be invalid or rate limited)"
+            # Don't mark as invalid for the entire script, just warn, as public model downloads might still work
         fi
     fi
 
