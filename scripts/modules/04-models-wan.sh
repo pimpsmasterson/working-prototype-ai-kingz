@@ -126,12 +126,13 @@ download_wan_models_sequential() {
         sleep 10
     done
 
-    # Wan 2.2 Models (much larger - only download if resources allow)
+    # Wan 2.2 Models (HUGE - Disabled by default for speed)
     local avail_disk
     avail_disk=$(df /workspace | tail -1 | awk '{print $4}')
     avail_disk=$((avail_disk / 1024 / 1024))  # Convert to GB
 
-    if (( avail_disk >= 150 )); then  # Need 150GB+ for Wan 2.2
+    # Only download if SAFE_MODE is 0 AND we have tons of space AND explicitly requested
+    if (( avail_disk >= 150 )) && [[ "${DOWNLOAD_ALL_WAN_MODELS:-false}" == "true" ]]; then
         log "📦 Downloading Wan 2.2 models (large files)..."
 
         declare -A wan22_models=(
@@ -154,7 +155,7 @@ download_wan_models_sequential() {
             sleep 30
         done
     else
-        warn_log "Skipping Wan 2.2 models - insufficient disk space (${avail_disk}GB available, need 150GB+)"
+        log "⏩ SKIPPING Wan 2.2 models (Default Speed Mode). Set DOWNLOAD_ALL_WAN_MODELS=true to enable."
     fi
 
     # Report results

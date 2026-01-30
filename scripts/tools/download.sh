@@ -134,10 +134,10 @@ download_with_retry() {
         local success=0
 
         if command -v aria2c >/dev/null 2>&1; then
-            # Use aria2c with memory-conscious settings
-            if aria2c -x4 -s4 --max-connection-per-server=2 \
-                     --timeout="$timeout" --retry-wait=30 --max-tries=1 \
-                     --lowest-speed-limit=1K --max-overall-download-limit=50M \
+            # Use aria2c with MAX SPEED settings (aggressive)
+            if aria2c -x16 -s16 -j16 --max-connection-per-server=16 \
+                     --timeout="$timeout" --retry-wait=5 --max-tries=3 \
+                     --disk-cache=64M \
                      --file-allocation=none \
                      "${HEADERS[@]}" -d "$DIR" -o "$FILENAME" "$URL" 2>/dev/null; then
                 success=1
