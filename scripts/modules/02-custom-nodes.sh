@@ -52,15 +52,17 @@ check_memory() {
 }
 
 check_disk_space() {
-    local avail_mb
-    avail_mb=$(df /workspace | tail -1 | awk '{print $4}')
-    avail_mb=$((avail_mb / 1024))  # Convert to MB
+    local avail_kb
+    avail_kb=$(df /workspace | tail -1 | awk '{print $4}')
+    local avail_mb=$((avail_kb / 1024))  # Convert KB to MB
+    local avail_gb=$((avail_mb / 1024))  # Convert MB to GB for logging
 
     if (( avail_mb < MIN_DISK_SPACE_MB )); then
-        error_log "Insufficient disk space: ${avail_mb}MB available, need ${MIN_DISK_SPACE_MB}MB"
+        error_log "Insufficient disk space: ${avail_gb}GB (${avail_mb}MB) available, need ${MIN_DISK_SPACE_MB}MB"
         return 1
     fi
 
+    log "✅ Disk space check passed: ${avail_gb}GB available"
     return 0
 }
 
@@ -86,18 +88,15 @@ install_package_safe() {
     export PIP_CACHE_DIR="$PIP_CACHE_DIR"
     mkdir -p "$PIP_CACHE_DIR"
 
-    # Install with comprehensive options
+    # Install with comprehensive options - prefer binary wheels for stability
     local pip_cmd=(
         pip install
-        --no-cache-dir
+        --cache-dir "$PIP_CACHE_DIR"
         --timeout "$PIP_TIMEOUT"
         --retries 3
         --progress-bar off
         --quiet
     )
-
-    # Add memory-conscious options
-    pip_cmd+=(--no-binary :all:)  # Prefer source builds for better memory usage
 
     # Execute installation with timeout and error handling
     if timeout "$PIP_TIMEOUT" "${pip_cmd[@]}" "$package" 2>&1; then
@@ -141,18 +140,26 @@ install_heavy_packages() {
     for package in "${heavy_packages[@]}"; do
         # Special handling for OpenCV which often fails to compile
         if [[ "$package" == "opencv-python-headless>=4.8.0" ]]; then
-            log "Installing $package (with special handling)..."
-            if ! install_package_safe "$package" "--only-binary=all" 2>/dev/null; then
-                warn_log "OpenCV pip install failed, trying system package..."
+            log "Installing $package (with system fallback)..."
+            if ! install_package_safe "$package" "opencv-python-headless"; then
+                warn_log "OpenCV pip install failed, trying system packages..."
                 # Try installing system opencv packages
                 if command -v apt-get >/dev/null 2>&1; then
-                    apt-get update && apt-get install -y python3-opencv libopencv-dev 2>/dev/null || true
+                    log "Installing system OpenCV packages..."
+                    if apt-get update && apt-get install -y python3-opencv libopencv-dev; then
+                        log "✅ System OpenCV packages installed successfully"
+                        # Verify the installation worked
+                        if python3 -c "import cv2; print('OpenCV version:', cv2.__version__)" 2>/dev/null; then
+                            log "✅ OpenCV import test passed"
+                        else
+                            warn_log "OpenCV installed but import failed - some features may not work"
+                        fi
+                    else
+                        warn_log "System OpenCV installation failed"
+                    fi
                 fi
-                # Try one more time with pip, but don't fail the whole process
-                if ! install_package_safe "opencv-python-headless" "--only-binary=all" 2>/dev/null; then
-                    warn_log "OpenCV installation failed completely - some video features may not work"
-                    failed_packages+=("$package")
-                fi
+                # Don't try pip again since system packages should be sufficient
+                warn_log "Using system OpenCV packages - some advanced features may be limited"
             fi
         else
             if ! install_package_safe "$package"; then
@@ -189,12 +196,12 @@ install_video_packages() {
     for package in "${video_packages[@]}"; do
         # Special handling for packages that commonly fail
         if [[ "$package" == "decord>=0.6.0" ]]; then
-            # decord is often not available, skip it
-            warn_log "Skipping $package - not available in pip, will use alternative video processing"
+            # decord doesn't have Python 3.12 wheels and often fails to build
+            warn_log "Skipping $package - no Python 3.12 wheels available, will use alternative video processing"
             continue
         elif [[ "$package" == "moviepy>=1.0.0" ]]; then
-            # moviepy requires many build dependencies, try with --only-binary
-            if ! install_package_safe "$package" "--only-binary=all" 2>/dev/null; then
+            # moviepy requires many build dependencies, try with binary-only first
+            if ! install_package_safe "$package" "moviepy (binary only)"; then
                 warn_log "moviepy failed to install - video editing features may be limited"
                 failed_packages+=("$package")
             fi

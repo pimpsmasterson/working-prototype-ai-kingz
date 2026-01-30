@@ -263,6 +263,14 @@ if [[ "$UBUNTU_VERSION" == "24.04" ]]; then
         "libwebp-dev"
         "zlib1g-dev"
         "libbz2-dev"
+        # Autotools for building packages like patchelf
+        "autotools-dev"
+        "autoconf"
+        "automake"
+        "libtool"
+        # Additional system libraries
+        "libopencv-dev"
+        "python3-opencv"
     )
 else
     APT_PACKAGES=(
@@ -281,6 +289,11 @@ else
         "build-essential"
         "libssl-dev"
         "libffi-dev"
+        # Autotools for building packages
+        "autotools-dev"
+        "autoconf"
+        "automake"
+        "libtool"
     )
 fi
 

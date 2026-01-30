@@ -16,7 +16,7 @@ MAX_RETRIES=5
 BASE_TIMEOUT=1800  # 30 minutes for large files
 RETRY_DELAY=60    # 1 minute between retries
 MAX_MEMORY_USAGE=80  # Max % memory usage before throttling
-MIN_DISK_SPACE=1073741824  # 1GB minimum free space
+MIN_DISK_SPACE=1048576  # 1GB minimum free space in KB (df reports in 1K blocks)
 
 # Logging function
 log() {
@@ -119,7 +119,7 @@ download_with_retry() {
     local disk_space
     disk_space=$(check_disk_space)
     if [ "$disk_space" -lt "$MIN_DISK_SPACE" ]; then
-        log "❌ Insufficient disk space: $(($disk_space/1024/1024))MB free, need 1GB+"
+        log "❌ Insufficient disk space: $((disk_space/1024))MB free, need 1GB+"
         return 1
     fi
 

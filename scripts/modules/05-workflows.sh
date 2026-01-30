@@ -41,11 +41,11 @@ check_resources_for_workflows() {
     fi
 
     # Check disk space (workflows are tiny - need 1GB+ free)
-    local avail_disk
-    avail_disk=$(df /workspace | tail -1 | awk '{print $4}')
-    avail_disk=$((avail_disk / 1024 / 1024))  # Convert to GB
-    if (( avail_disk < 1 )); then
-        error_log "Insufficient disk space for workflows: ${avail_disk}GB available, need 1GB+"
+    local avail_kb
+    avail_kb=$(df /workspace | tail -1 | awk '{print $4}')  # KB
+    local avail_gb=$((avail_kb / 1024 / 1024))  # Convert to GB
+    if (( avail_gb < 1 )); then
+        error_log "Insufficient disk space for workflows: ${avail_gb}GB available, need 1GB+"
         return 1
     fi
 

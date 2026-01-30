@@ -218,15 +218,15 @@ check_resources() {
     fi
 
     # Check disk space (need at least 20GB free)
-    local avail_disk
-    avail_disk=$(df /workspace | tail -1 | awk '{print $4}')
-    avail_disk=$((avail_disk / 1024 / 1024))  # Convert to GB
-    if (( avail_disk < 20 )); then
-        error_log "Insufficient disk space: ${avail_disk}GB available, need 20GB+"
+    local avail_kb
+    avail_kb=$(df /workspace | tail -1 | awk '{print $4}')  # df shows 1K blocks, so this is KB
+    local avail_gb=$((avail_kb / 1024 / 1024))  # Convert KB to GB
+    if (( avail_gb < 20 )); then
+        error_log "Insufficient disk space: ${avail_gb}GB available, need 20GB+"
         return 1
     fi
 
-    log "✅ Resources check passed (${avail_mem}MB RAM, ${avail_disk}GB disk)"
+    log "✅ Resources check passed (${avail_mem}MB RAM, ${avail_gb}GB disk)"
     return 0
 }
 
