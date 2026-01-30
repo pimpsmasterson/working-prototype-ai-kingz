@@ -1,2 +1,10 @@
+
+# Auto-generated
 node_modules
 .env
+.proxy-tokens.json
+coverage/
+data/backup_*
+*.log
+.DS_Store
+
