@@ -236,24 +236,53 @@ if ! check_network; then
     exit 1
 fi
 
-# APT package installation
-APT_PACKAGES=(
-    "unrar"
-    "p7zip-full"
-    "unzip"
-    "ffmpeg"
-    "libgl1-mesa-glx"
-    "libglib2.0-0"
-    "git-lfs"
-    "file"
-    "aria2"
-    "curl"
-    "python3-pip"
-    "python3-dev"
-    "build-essential"
-    "libssl-dev"
-    "libffi-dev"
-)
+# APT package installation - Ubuntu 24.04 compatible
+if [[ "$UBUNTU_VERSION" == "24.04" ]]; then
+    APT_PACKAGES=(
+        "unrar"
+        "p7zip-full"
+        "unzip"
+        "ffmpeg"
+        "libgl1-mesa-glx"
+        "libglib2.0-0"
+        "git-lfs"
+        "file"
+        "aria2"
+        "curl"
+        "python3-pip"
+        "python3-dev"
+        "build-essential"
+        "libssl-dev"
+        "libffi-dev"
+        # Additional build dependencies for Python packages on Ubuntu 24.04
+        "libjpeg-dev"
+        "libpng-dev"
+        "libtiff-dev"
+        "libfreetype6-dev"
+        "liblcms2-dev"
+        "libwebp-dev"
+        "zlib1g-dev"
+        "libbz2-dev"
+    )
+else
+    APT_PACKAGES=(
+        "unrar"
+        "p7zip-full"
+        "unzip"
+        "ffmpeg"
+        "libgl1-mesa-glx"
+        "libglib2.0-0"
+        "git-lfs"
+        "file"
+        "aria2"
+        "curl"
+        "python3-pip"
+        "python3-dev"
+        "build-essential"
+        "libssl-dev"
+        "libffi-dev"
+    )
+fi
 
 # Update APT first
 if ! apt_update_safe; then

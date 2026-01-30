@@ -139,8 +139,25 @@ install_heavy_packages() {
     local failed_packages=()
 
     for package in "${heavy_packages[@]}"; do
-        if ! install_package_safe "$package"; then
-            failed_packages+=("$package")
+        # Special handling for OpenCV which often fails to compile
+        if [[ "$package" == "opencv-python-headless>=4.8.0" ]]; then
+            log "Installing $package (with special handling)..."
+            if ! install_package_safe "$package" "--only-binary=all" 2>/dev/null; then
+                warn_log "OpenCV pip install failed, trying system package..."
+                # Try installing system opencv packages
+                if command -v apt-get >/dev/null 2>&1; then
+                    apt-get update && apt-get install -y python3-opencv libopencv-dev 2>/dev/null || true
+                fi
+                # Try one more time with pip, but don't fail the whole process
+                if ! install_package_safe "opencv-python-headless" "--only-binary=all" 2>/dev/null; then
+                    warn_log "OpenCV installation failed completely - some video features may not work"
+                    failed_packages+=("$package")
+                fi
+            fi
+        else
+            if ! install_package_safe "$package"; then
+                failed_packages+=("$package")
+            fi
         fi
 
         # Brief pause between heavy installs
@@ -170,8 +187,21 @@ install_video_packages() {
     local failed_packages=()
 
     for package in "${video_packages[@]}"; do
-        if ! install_package_safe "$package"; then
-            failed_packages+=("$package")
+        # Special handling for packages that commonly fail
+        if [[ "$package" == "decord>=0.6.0" ]]; then
+            # decord is often not available, skip it
+            warn_log "Skipping $package - not available in pip, will use alternative video processing"
+            continue
+        elif [[ "$package" == "moviepy>=1.0.0" ]]; then
+            # moviepy requires many build dependencies, try with --only-binary
+            if ! install_package_safe "$package" "--only-binary=all" 2>/dev/null; then
+                warn_log "moviepy failed to install - video editing features may be limited"
+                failed_packages+=("$package")
+            fi
+        else
+            if ! install_package_safe "$package"; then
+                failed_packages+=("$package")
+            fi
         fi
     done
 
