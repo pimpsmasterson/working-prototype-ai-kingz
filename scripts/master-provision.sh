@@ -316,15 +316,70 @@ main() {
         "${SCRIPTS_ROOT}/modules/05-workflows.sh"
     )
 
-    for module in "${modules[@]}"; do
-        if run_module_with_protection "$module"; then
-            log "Module pipeline continuing..."
-        else
-            if ! handle_module_failure "$(basename "$module" .sh)"; then
-                break
+    # 1. System Dependencies (BLOCKING - Must run first)
+    log "🏁 STAGE 1: System Dependencies"
+    if ! run_module_with_protection "${SCRIPTS_ROOT}/modules/01-system-deps.sh"; then
+        error_log "Critical failure in System Dependencies. Aborting."
+        exit 1
+    fi
+
+    # 2. Parallel Execution Block (Custom Nodes + Models)
+    log "🏁 STAGE 2: Parallel Provisioning (Nodes + Models)"
+    declare -a PIDS=()
+    declare -A PID_MAP=()
+    
+    # helper for background launching
+    launch_module() {
+        local script=$1
+        local name=$(basename "$script" .sh)
+        # Run in subshell to trap exit code, redirect output to separate log to avoid interleaving
+        (
+            exec > "${WORKSPACE}/${name}.log" 2>&1
+            if run_module_with_protection "$script"; then
+                exit 0
+            else
+                exit 1
             fi
+        ) &
+        local pid=$!
+        PIDS+=($pid)
+        PID_MAP[$pid]=$name
+        log "🚀 Released $name to background (PID: $pid)"
+    }
+
+    launch_module "${SCRIPTS_ROOT}/modules/02-custom-nodes.sh"
+    launch_module "${SCRIPTS_ROOT}/modules/03-models-core.sh"
+    launch_module "${SCRIPTS_ROOT}/modules/04-models-wan.sh"
+
+    # Wait for all background jobs
+    log "⏳ Waiting for parallel tasks to complete..."
+    local parallel_failures=0
+    
+    for pid in "${PIDS[@]}"; do
+        if wait "$pid"; then
+            log "✅ Task ${PID_MAP[$pid]} completed successfully"
+        else
+            error_log "❌ Task ${PID_MAP[$pid]} failed"
+            parallel_failures=$((parallel_failures + 1))
+            FAILED_MODULES+=("${PID_MAP[$pid]}")
         fi
+        # Cat the log to main log for audit
+        log "--- Output from ${PID_MAP[$pid]} ---"
+        cat "${WORKSPACE}/${PID_MAP[$pid]}.log" >> "$LOG_FILE"
+        cat "${WORKSPACE}/${PID_MAP[$pid]}.log" # Also show in current stream
+        rm -f "${WORKSPACE}/${PID_MAP[$pid]}.log"
+        log "-----------------------------------"
     done
+
+    if (( parallel_failures > 0 )); then
+        warn_log "$parallel_failures parallel modules failed. Proceeding with caution."
+    fi
+
+    # 3. Workflows (Run last to ensure nodes/models exist)
+    log "🏁 STAGE 3: Workflows & Finalization"
+    if ! run_module_with_protection "${SCRIPTS_ROOT}/modules/05-workflows.sh"; then
+         FAILED_MODULES+=("05-workflows")
+    fi
 
     # Final ComfyUI startup
     if (( ${#FAILED_MODULES[@]} == 0 )); then
