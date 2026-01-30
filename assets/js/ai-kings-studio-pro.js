@@ -113,6 +113,23 @@ class StudioAppPro {
             this.generateBtn.addEventListener('click', () => this.generateContent());
         }
 
+        // Quick prompt buttons
+        document.querySelectorAll('.quick-prompt-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const prompt = btn.getAttribute('data-prompt');
+                if (this.promptInput && prompt) {
+                    this.promptInput.value = prompt;
+                    // Add hover effect
+                    btn.style.background = 'rgba(255,0,204,0.2)';
+                    btn.style.borderColor = '#ff00cc';
+                    setTimeout(() => {
+                        btn.style.background = 'rgba(255,255,255,0.05)';
+                        btn.style.borderColor = 'rgba(255,255,255,0.1)';
+                    }, 200);
+                }
+            });
+        });
+
         // Workflow selector buttons
         document.querySelectorAll('.workflow-btn').forEach(btn => {
             btn.addEventListener('click', () => {

@@ -20,18 +20,18 @@ No SSH. No manual uploads. **Zero intervention after setup.**
 
 ### Step 2: Set Environment Variables
 
-Edit `start-proxy.ps1` and uncomment these lines:
+Edit `scripts/powershell/start-proxy.ps1` and uncomment these lines:
 
 ```powershell
 $env:HUGGINGFACE_HUB_TOKEN = "hf_YOUR_TOKEN_HERE"  # Get from: https://huggingface.co/settings/tokens
 $env:CIVITAI_TOKEN = "YOUR_CIVITAI_TOKEN"          # Get from: https://civitai.com/user/account
-$env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/youruser/abc123/raw/comfyui-nsfw-provision.sh"
+$env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/"
 ```
 
 ### Step 3: Start the Proxy
 
 ```powershell
-.\start-proxy.ps1
+.\scripts\powershell\start-proxy.ps1
 ```
 
 ---

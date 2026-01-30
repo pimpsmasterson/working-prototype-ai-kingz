@@ -8,12 +8,12 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const vastaiSsh = require('../lib/vastai-ssh');
 
 class VastAIAutomator {
     constructor() {
         this.apiKey = process.env.VASTAI_API_KEY || '4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360';
         this.baseUrl = 'https://console.vast.ai/api/v0';
-        const vastaiSsh = require('./lib/vastai-ssh');
         this.sshKey = vastaiSsh.getKey();
 
         // Token checks for model downloads

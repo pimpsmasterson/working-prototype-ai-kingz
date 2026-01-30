@@ -1,4 +1,4 @@
-(function(){
+(function () {
   const statusBox = document.getElementById('statusBox');
   const adminKeyInput = document.getElementById('adminKey');
   const btnRefresh = document.getElementById('btnRefresh');
@@ -76,10 +76,10 @@
 
   async function fetchStatus() {
     const key = adminKeyInput.value;
-    if (!key) { showStatus('Provide admin key above', true); poolSection.style.display='none'; return; }
+    if (!key) { showStatus('Provide admin key above', true); poolSection.style.display = 'none'; return; }
     try {
       const r = await fetch(API_BASE + '/api/proxy/admin/warm-pool', { headers: { 'x-admin-key': key } });
-      if (r.status === 403) { showStatus('Forbidden - invalid admin key', true); poolSection.style.display='none'; return; }
+      if (r.status === 403) { showStatus('Forbidden - invalid admin key', true); poolSection.style.display = 'none'; return; }
       const j = await parseJsonOrThrow(r);
       showStatus(JSON.stringify(j, null, 2));
       desiredSizeInput.value = j.desiredSize || 0;
@@ -88,9 +88,9 @@
 
       // Update GPU status cards
       updateGpuStatus(j);
-    } catch (e) { 
-      showStatus('Fetch failed: ' + e, true); 
-      poolSection.style.display='none'; 
+    } catch (e) {
+      showStatus('Fetch failed: ' + e, true);
+      poolSection.style.display = 'none';
       updateProxyStatus(false);
     }
   }
@@ -119,18 +119,18 @@
   async function resetProxyState() {
     const key = adminKeyInput.value;
     if (!key) { alert('Enter admin key first'); return; }
-    
+
     if (!confirm('This will clear the cached instance state in the proxy database. It will NOT terminate real GPUs, but the proxy will "forget" about them until they are found during next prewarm or health check. Proceed?')) return;
 
     try {
       btnResetState.disabled = true;
       btnResetState.textContent = 'Resetting...';
-      
+
       const r = await fetch(API_BASE + '/api/proxy/admin/reset-state', {
         method: 'POST',
         headers: { 'x-admin-key': key, 'Content-Type': 'application/json' }
       });
-      
+
       const j = await r.json();
       if (r.ok) {
         alert('✅ ' + (j.message || 'State reset successfully.'));
@@ -231,7 +231,7 @@
       } catch (e) {
         console.error('Polling error:', e);
       }
-    }, 5000); // Poll every 5 seconds
+    }, 10000); // Poll every 10 seconds
   }
 
   async function saveSettings() {
@@ -522,111 +522,99 @@
 
   // Initial status check and periodic ping
   checkProxyStatus();
-  setInterval(checkProxyStatus, 5000);
+  setInterval(checkProxyStatus, 10000);
 
   // Auto-refresh status every 30 seconds if authenticated
   setInterval(() => {
-      if (adminKeyInput.value && poolSection.style.display !== 'none') {
+    if (adminKeyInput.value && poolSection.style.display !== 'none') {
       fetchStatus();
     }
   }, 30000);
 
   // Check proxy health every 5 seconds to update the status dot
-  setInterval(checkProxyStatus, 5000);
+  setInterval(checkProxyStatus, 10000);
   checkProxyStatus(); // Also run immediately
 
-  btnRefresh.addEventListener('click', fetchStatus);
-  btnSave.addEventListener('click', saveSettings);
-  btnTerminate.addEventListener('click', terminateInstance);
-  btnPrewarm.addEventListener('click', prewarmGpu);
-  btnShowPool.addEventListener('click', () => showSection('pool'));
-  btnShowConfig.addEventListener('click', () => showSection('config'));
-  btnShowLogs.addEventListener('click', () => showSection('logs'));
-  btnHealthCheck.addEventListener('click', runHealthCheck);
-  btnLoadConfig.addEventListener('click', loadConfig);
-  btnUpdateConfig.addEventListener('click', () => { configForm.style.display='block'; btnUpdateConfig.style.display='none'; configDisplay.style.display='none'; });
-  btnSaveConfig.addEventListener('click', saveConfig);
-  btnCancelConfig.addEventListener('click', hideConfigForm);
-  btnResetState.addEventListener('click', resetProxyState);
 
-    // --- Admin Logs UI & fetch ---
-    const btnLoadLogs = document.getElementById('btnLoadLogs');
-    const logsSince = document.getElementById('logsSince');
-    const logsAction = document.getElementById('logsAction');
-    const logsLimit = document.getElementById('logsLimit');
-    const logsSection = document.getElementById('logsSection');
-    const logsTableBody = document.querySelector('#logsTable tbody');
-    const logsStatus = document.getElementById('logsStatus');
-    const logsPrev = document.getElementById('logsPrev');
-    const logsNext = document.getElementById('logsNext');
-    const logsPageInfo = document.getElementById('logsPageInfo');
 
-    let logsPage = 1;
-    let logsTotal = 0;
+  // --- Admin Logs UI & fetch ---
+  const btnLoadLogs = document.getElementById('btnLoadLogs');
+  const logsSince = document.getElementById('logsSince');
+  const logsAction = document.getElementById('logsAction');
+  const logsLimit = document.getElementById('logsLimit');
+  const logsSection = document.getElementById('logsSection');
+  const logsTableBody = document.querySelector('#logsTable tbody');
+  const logsStatus = document.getElementById('logsStatus');
+  const logsPrev = document.getElementById('logsPrev');
+  const logsNext = document.getElementById('logsNext');
+  const logsPageInfo = document.getElementById('logsPageInfo');
 
-    function isoFromDatetimeLocal(val) {
-      if (!val) return null;
-      const d = new Date(val);
-      return d.toISOString();
+  let logsPage = 1;
+  let logsTotal = 0;
+
+  function isoFromDatetimeLocal(val) {
+    if (!val) return null;
+    const d = new Date(val);
+    return d.toISOString();
+  }
+
+  async function fetchLogs(page = 1) {
+    const key = adminKeyInput.value;
+    if (!key) { showStatus('Provide admin key above to load logs', true); return; }
+    const limit = Number(logsLimit.value || 50);
+    const offset = (page - 1) * limit;
+    const sinceVal = isoFromDatetimeLocal(logsSince.value);
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    if (sinceVal) params.set('since', sinceVal);
+    if (logsAction.value) params.set('action', logsAction.value);
+
+    try {
+      const r = await fetch(API_BASE + '/api/proxy/admin/logs?' + params.toString(), { headers: { 'x-admin-key': key } });
+      if (r.status === 403) { showStatus('Forbidden - invalid admin key', true); logsSection.style.display = 'none'; return; }
+      const j = await parseJsonOrThrow(r);
+      logsTotal = j.total || 0;
+      logsPage = page;
+      renderLogs(j.rows || []);
+      logsSection.style.display = 'block';
+      logsPageInfo.textContent = `Page ${logsPage} (showing ${j.rows.length} of ${logsTotal})`;
+      logsStatus.textContent = '';
+    } catch (e) {
+      logsStatus.textContent = 'Fetch logs failed: ' + e;
+      logsSection.style.display = 'none';
     }
+  }
 
-    async function fetchLogs(page = 1) {
-      const key = adminKeyInput.value;
-      if (!key) { showStatus('Provide admin key above to load logs', true); return; }
-      const limit = Number(logsLimit.value || 50);
-      const offset = (page - 1) * limit;
-      const sinceVal = isoFromDatetimeLocal(logsSince.value);
-      const params = new URLSearchParams();
-      params.set('limit', String(limit));
-      params.set('offset', String(offset));
-      if (sinceVal) params.set('since', sinceVal);
-      if (logsAction.value) params.set('action', logsAction.value);
-
-      try {
-        const r = await fetch(API_BASE + '/api/proxy/admin/logs?' + params.toString(), { headers: { 'x-admin-key': key } });
-        if (r.status === 403) { showStatus('Forbidden - invalid admin key', true); logsSection.style.display='none'; return; }
-        const j = await parseJsonOrThrow(r);
-        logsTotal = j.total || 0;
-        logsPage = page;
-        renderLogs(j.rows || []);
-        logsSection.style.display = 'block';
-        logsPageInfo.textContent = `Page ${logsPage} (showing ${j.rows.length} of ${logsTotal})`;
-        logsStatus.textContent = '';
-      } catch (e) {
-        logsStatus.textContent = 'Fetch logs failed: ' + e;
-        logsSection.style.display = 'none';
-      }
+  function renderLogs(rows) {
+    logsTableBody.innerHTML = '';
+    if (!rows || rows.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="6">No logs</td>';
+      logsTableBody.appendChild(tr);
+      return;
     }
-
-    function renderLogs(rows) {
-      logsTableBody.innerHTML = '';
-      if (!rows || rows.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="6">No logs</td>';
-        logsTableBody.appendChild(tr);
-        return;
-      }
-      for (const r of rows) {
-        const tr = document.createElement('tr');
-        const details = (r.details && typeof r.details === 'object') ? JSON.stringify(r.details) : (r.details || '');
-        tr.innerHTML = `<td>${r.ts || ''}</td>
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      const details = (r.details && typeof r.details === 'object') ? JSON.stringify(r.details) : (r.details || '');
+      tr.innerHTML = `<td>${r.ts || ''}</td>
                         <td>${r.action || ''}</td>
                         <td>${r.route || ''}</td>
                         <td>${r.ip || ''}</td>
                         <td>${r.outcome || ''}</td>
                         <td style="max-width:320px;overflow:auto">${escapeHtml(details)}</td>`;
-        logsTableBody.appendChild(tr);
-      }
+      logsTableBody.appendChild(tr);
     }
+  }
 
-    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function(m) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; }); }
+  function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]; }); }
 
-    btnLoadLogs && btnLoadLogs.addEventListener('click', () => fetchLogs(1));
-    logsPrev && logsPrev.addEventListener('click', () => { if (logsPage > 1) fetchLogs(logsPage - 1); });
-    logsNext && logsNext.addEventListener('click', () => {
-      const limit = Number(logsLimit.value || 50);
-      const maxPage = Math.ceil((logsTotal || 0) / limit) || 1;
-      if (logsPage < maxPage) fetchLogs(logsPage + 1);
-    });
+  btnLoadLogs && btnLoadLogs.addEventListener('click', () => fetchLogs(1));
+  logsPrev && logsPrev.addEventListener('click', () => { if (logsPage > 1) fetchLogs(logsPage - 1); });
+  logsNext && logsNext.addEventListener('click', () => {
+    const limit = Number(logsLimit.value || 50);
+    const maxPage = Math.ceil((logsTotal || 0) / limit) || 1;
+    if (logsPage < maxPage) fetchLogs(logsPage + 1);
+  });
 
-  })();
+})();

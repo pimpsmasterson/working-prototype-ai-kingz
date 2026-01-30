@@ -347,12 +347,21 @@ class MuseStorageManager {
         }
     }
 
-    exportProfile(profile, includeImages = false) {
+    async exportProfile(profile, includeImages = false) {
+        let images = [];
+        if (includeImages) {
+            try {
+                images = await this.getReferenceImages(profile.id);
+            } catch (e) {
+                console.warn('Failed to fetch reference images for export:', e);
+            }
+        }
+
         const exportData = {
             version: '1.0',
             exportedAt: new Date().toISOString(),
             profile: profile.toJSON(),
-            images: includeImages ? [] : null // TODO: Include base64 images if requested
+            images: includeImages ? images : null
         };
 
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });

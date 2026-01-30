@@ -11,22 +11,21 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-// ============================================================================
-// CUSTOM ERRORS
-// ============================================================================
+// Import centralized error classes
+const {
+  ErrorCodes,
+  GenerationError,
+  NoGPUAvailableError,
+  CheckpointNotFoundError,
+  LoraNotFoundError,
+  WorkflowValidationError,
+  ComfyUIExecutionError,
+  isGenerationError,
+  errorToResponse
+} = require('./errors');
 
-/**
- * Error thrown when no GPU instance is available for generation
- */
-class NoGPUAvailableError extends Error {
-  constructor(message, details = {}) {
-    super(message);
-    this.name = 'NoGPUAvailableError';
-    this.code = 'NO_GPU_AVAILABLE';
-    this.canPrewarm = details.canPrewarm || false;
-    this.poolStatus = details.poolStatus || null;
-  }
-}
+// Import workflow validation
+const { validateWorkflow, throwValidationError } = require('./workflow-validator');
 
 // ============================================================================
 // MAIN API ENDPOINTS
@@ -65,7 +64,10 @@ async function handleGenerate(req, res) {
       sampler: settings?.sampler || 'euler_ancestral',
       checkpoint: settings?.checkpoint || 'dreamshaper_8.safetensors',
       frameCount: workflowType === 'video' ? (settings?.frames || 16) : null,
-      fps: workflowType === 'video' ? (settings?.fps || 8) : null
+      fps: workflowType === 'video' ? (settings?.fps || 8) : null,
+      // LoRA support
+      loraName: settings?.loraName || null,
+      loraStrength: settings?.loraStrength || 0.8
     };
 
     require('./db').createJob(jobData);
@@ -160,7 +162,7 @@ function getJobStatus(req, res) {
 
 /**
  * Background generation process
- * Orchestrates the full pipeline: claim GPU → build workflow → submit → poll → save
+ * Orchestrates the full pipeline: claim GPU → validate → build workflow → submit → poll → save
  */
 async function generateAsync(jobId, jobData, muse) {
   let instance = null;
@@ -178,9 +180,16 @@ async function generateAsync(jobId, jobData, muse) {
 
     console.log(`[Job ${jobId}] Using ${instance.type} GPU: ${instance.contractId || 'local'}`);
 
-    // 2. Build workflow
+    // 2. Build workflow with pre-flight validation
     console.log(`[Job ${jobId}] Building ${jobData.workflowType} workflow...`);
-    const workflow = buildWorkflowForJob(jobData, muse);
+
+    // Pass model inventory for validation (if available)
+    if (instance.modelInventory) {
+      console.log(`[Job ${jobId}] Validating workflow against ${instance.modelInventory.checkpoints?.length || 0} checkpoints, ${instance.modelInventory.loras?.length || 0} LoRAs`);
+    }
+
+    // buildWorkflowForJob will throw validation errors if models are missing
+    const workflow = buildWorkflowForJob(jobData, muse, instance.modelInventory);
 
     require('./db').updateJobStatus(jobId, 'processing', {
       workflow_json: JSON.stringify(workflow)
@@ -230,17 +239,25 @@ async function generateAsync(jobId, jobData, muse) {
   } catch (error) {
     console.error(`[Job ${jobId}] Generation failed:`, error);
 
-    // Build error data with structured details for GPU availability issues
+    // Build error data with structured details based on error type
     const errorData = {
       error_message: error.message,
       completed_at: new Date().toISOString()
     };
 
-    // Add structured error data for NoGPUAvailableError
-    if (error.code === 'NO_GPU_AVAILABLE') {
+    // Add structured error data for known error types
+    if (isGenerationError(error) || error.code) {
       errorData.error_code = error.code;
-      errorData.can_prewarm = error.canPrewarm ? 1 : 0;
-      errorData.pool_status = JSON.stringify(error.poolStatus);
+
+      // Store error details based on type
+      if (error.code === ErrorCodes.NO_GPU_AVAILABLE) {
+        errorData.can_prewarm = error.canPrewarm ? 1 : 0;
+        errorData.pool_status = JSON.stringify(error.poolStatus);
+      } else if (error.code === ErrorCodes.CHECKPOINT_NOT_FOUND ||
+        error.code === ErrorCodes.LORA_NOT_FOUND ||
+        error.code === ErrorCodes.WORKFLOW_VALIDATION_ERROR) {
+        errorData.pool_status = JSON.stringify(error.details || {});
+      }
     }
 
     require('./db').updateJobStatus(jobId, 'failed', errorData);
@@ -255,6 +272,7 @@ async function generateAsync(jobId, jobData, muse) {
 
 /**
  * Claim GPU instance from warm pool (remote GPU only - no local fallback)
+ * Returns instance info including model inventory for pre-flight validation
  */
 async function claimGPUInstance(workflowType) {
   // Get pool status for detailed error reporting
@@ -266,11 +284,16 @@ async function claimGPUInstance(workflowType) {
 
     if (claim && claim.connectionUrl) {
       console.log(`[GPU] Claimed warm instance: ${claim.contractId} for ${workflowType}`);
+
+      // Get model inventory from warm pool state for pre-flight validation
+      const modelInventory = poolStatus.instance?.modelInventory || null;
+
       return {
         type: 'vastai',
         connectionUrl: claim.connectionUrl,
         contractId: claim.contractId,
-        isWarm: true
+        isWarm: true,
+        modelInventory // Include for workflow validation
       };
     }
   } catch (err) {
@@ -325,8 +348,13 @@ const comfyWorkflows = require('./comfy-workflows');
 
 /**
  * Build ComfyUI workflow based on job type
+ * Now includes LoRA support and pre-flight validation
+ * @param {Object} jobData - Job parameters
+ * @param {Object} muse - Muse character data (optional)
+ * @param {Object} modelInventory - Available models for validation (optional)
+ * @returns {Object} - ComfyUI workflow JSON
  */
-function buildWorkflowForJob(jobData, muse) {
+function buildWorkflowForJob(jobData, muse, modelInventory = null) {
   const baseParams = {
     prompt: jobData.prompt,
     negativePrompt: jobData.negativePrompt,
@@ -336,15 +364,23 @@ function buildWorkflowForJob(jobData, muse) {
     cfgScale: jobData.cfgScale,
     seed: jobData.seed,
     sampler: jobData.sampler,
-    checkpoint: jobData.checkpoint
+    checkpoint: jobData.checkpoint,
+    nsfw: !!jobData.nsfw,
+    // LoRA support
+    loraName: jobData.loraName || null,
+    loraStrength: jobData.loraStrength || 0.8
   };
 
-  const params = jobData.workflowType === 'video' ? { ...baseParams, frames: jobData.frameCount, fps: jobData.fps } : baseParams;
+  // Add video-specific params if needed
+  const params = jobData.workflowType === 'video'
+    ? { ...baseParams, frames: jobData.frameCount, fps: jobData.fps }
+    : baseParams;
 
-  // If a workflowTemplate is specified (or job marked nsfw), pass it through
-  const template = jobData.workflowTemplate || (jobData.nsfw ? 'nsfw_video' : null);
+  // Determine template - use explicit template, or auto-select based on content type
+  const template = jobData.workflowTemplate || null;
 
-  return comfyWorkflows.buildWorkflow(params, jobData.workflowType, template);
+  // Build workflow with validation (if inventory available)
+  return comfyWorkflows.buildWorkflow(params, jobData.workflowType, template, modelInventory);
 }
 
 
@@ -381,8 +417,8 @@ async function submitToComfyUI(instance, workflow) {
  * Poll ComfyUI until generation completes
  */
 async function pollComfyUIUntilComplete(instance, promptId, workflowType) {
-  const maxAttempts = workflowType === 'video' ? 120 : 60; // 10min for video, 5min for image
-  const pollInterval = 5000; // 5 seconds
+  const maxAttempts = workflowType === 'video' ? 180 : 60; // 15min for video, 5min for image
+  const pollInterval = 10000; // 10 seconds
 
   for (let i = 0; i < maxAttempts; i++) {
     await sleep(pollInterval);

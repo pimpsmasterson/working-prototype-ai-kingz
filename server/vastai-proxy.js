@@ -2,6 +2,9 @@
 // Lightweight Express proxy for Vast.ai and ComfyUI to avoid browser CORS issues
 // Usage: VASTAI_API_KEY=<key> node server/vastai-proxy.js
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 // Global error handlers to prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ Unhandled Promise Rejection:', reason);
@@ -87,6 +90,19 @@ loadPersistentTokens();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Normalize admin header/query variants so scripts using different header names work
+app.use((req, res, next) => {
+    try {
+        if (req.headers && req.headers['x-admin-api-key'] && !req.headers['x-admin-key']) {
+            req.headers['x-admin-key'] = req.headers['x-admin-api-key'];
+        }
+        if (req.query && req.query['adminApiKey'] && !req.query.adminKey) {
+            req.query.adminKey = req.query['adminApiKey'];
+        }
+    } catch (e) { /* ignore */ }
+    next();
+});
 
 // Load critical tokens from environment — do not commit secrets to code
 const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY || null;
@@ -228,6 +244,16 @@ function logAuthAttempt(req, success) {
 }
 
 // Admin endpoints for warm-pool control
+function warmPoolCompat(status) {
+    return {
+        desiredSize: status.desiredSize,
+        instances: status.instance ? [status.instance] : [],
+        lastAction: status.lastAction,
+        isPrewarming: !!status.isPrewarming,
+        safeMode: !!status.safeMode
+    };
+}
+
 app.get('/api/proxy/admin/warm-pool', (req, res) => {
     // perform auth check with logging
     const key = req.headers['x-admin-key'] || req.query.adminKey;
@@ -237,7 +263,24 @@ app.get('/api/proxy/admin/warm-pool', (req, res) => {
     }
     logAuthAttempt(req, true);
     try {
-        res.json(warmPool.getStatus());
+        const status = warmPool.getStatus();
+        res.json(warmPoolCompat(status));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Backwards-compatible alias used by some tests/scripts
+app.get('/api/proxy/admin/warm-pool/status', (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    logAuthAttempt(req, true);
+    try {
+        const status = warmPool.getStatus();
+        res.json(warmPoolCompat(status));
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -286,6 +329,26 @@ app.post('/api/proxy/admin/terminate', express.json(), async (req, res) => {
     }
 });
 
+// Admin state reload from database (protected) - reloads without resetting
+app.post('/api/proxy/admin/reload-state', express.json(), (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+    try {
+        // Force warm-pool module to reload state from database
+        if (typeof warmPool.load === 'function') {
+            warmPool.load();
+            const status = warmPool.getStatus();
+            res.json({ status: 'ok', message: 'WarmPool state reloaded from database', warmPool: status });
+        } else {
+            res.status(500).json({ error: 'warmPool.load not available' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Admin state reset (protected)
 app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
     const key = req.headers['x-admin-key'] || req.query.adminKey;
@@ -299,22 +362,101 @@ app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
         if (typeof warmPool.load === 'function') {
             warmPool.load();
         }
-        
+
         // Audit the reset
         try {
-            audit.logAdminEvent({ 
-                adminKey: key, 
-                ip: req.ip || (req.connection && req.connection.remoteAddress), 
-                route: req.originalUrl, 
-                action: 'reset_state', 
-                details: { note: 'Manual state reset from admin UI' }, 
-                outcome: 'ok' 
+            audit.logAdminEvent({
+                adminKey: key,
+                ip: req.ip || (req.connection && req.connection.remoteAddress),
+                route: req.originalUrl,
+                action: 'reset_state',
+                details: { note: 'Manual state reset from admin UI' },
+                outcome: 'ok'
             });
-        } catch (e) {}
-        
+        } catch (e) { }
+
         res.json({ status: 'ok', message: 'WarmPool state reset successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+// Admin reprovision endpoint - terminate and recreate with fallback script option
+// Use this when provisioning fails repeatedly to force fallback to default Vast.ai script
+app.post('/api/proxy/admin/warm-pool/reprovision', express.json(), async (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        logAuthAttempt(req, false);
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    logAuthAttempt(req, true);
+
+    try {
+        const { useDefaultScript = true, resetFallback = false } = req.body || {};
+        const pool = warmPool.getStatus();
+        const previousContract = pool.instance?.contractId || null;
+
+        console.log(`WarmPool: 🔄 Admin triggered reprovision (useDefaultScript: ${useDefaultScript}, resetFallback: ${resetFallback})`);
+
+        // Audit the reprovision request
+        try {
+            audit.logAdminEvent({
+                adminKey: key,
+                ip: req.ip || (req.connection && req.connection.remoteAddress),
+                route: req.originalUrl,
+                action: 'reprovision',
+                details: {
+                    useDefaultScript,
+                    resetFallback,
+                    previousContract,
+                    previousStatus: pool.instance?.status
+                },
+                outcome: 'started'
+            });
+        } catch (e) { console.error('audit log error:', e); }
+
+        // Terminate existing instance if present
+        if (previousContract) {
+            console.log(`WarmPool: 🗑️ Terminating existing instance ${previousContract} before reprovision`);
+            await warmPool.terminate(previousContract);
+        }
+
+        // Handle fallback flag
+        if (resetFallback && typeof warmPool.resetProvisioningState === 'function') {
+            // Reset fallback mode to try custom script again
+            warmPool.resetProvisioningState();
+        } else if (useDefaultScript && typeof warmPool.setUseDefaultScript === 'function') {
+            // Force use of default script
+            warmPool.setUseDefaultScript(true);
+        }
+
+        // Trigger new prewarm
+        const result = await warmPool.prewarm();
+
+        res.json({
+            status: 'reprovisioning',
+            message: useDefaultScript
+                ? 'Terminated old instance, starting new one with default Vast.ai script'
+                : 'Terminated old instance, starting new one with custom script',
+            previousContract,
+            result
+        });
+    } catch (e) {
+        console.error('WarmPool: reprovision error:', e);
+
+        // Audit the failure
+        try {
+            audit.logAdminEvent({
+                adminKey: key,
+                ip: req.ip || (req.connection && req.connection.remoteAddress),
+                route: req.originalUrl,
+                action: 'reprovision',
+                details: { error: e.message },
+                outcome: 'error'
+            });
+        } catch (auditErr) { console.error('audit log error:', auditErr); }
+
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -433,13 +575,118 @@ app.get('/api/proxy/admin/config', (req, res) => {
         HUGGINGFACE_HUB_TOKEN: process.env.HUGGINGFACE_HUB_TOKEN ? '***configured***' : 'NOT SET',
         CIVITAI_TOKEN: process.env.CIVITAI_TOKEN ? '***configured***' : 'NOT SET',
         COMFYUI_PROVISION_SCRIPT: process.env.COMFYUI_PROVISION_SCRIPT || 'NOT SET (using default)',
-        WARM_POOL_DISK_GB: process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '400',
+        WARM_POOL_DISK_GB: process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '150',
         VASTAI_MIN_CUDA_CAPABILITY: warmPool.MIN_CUDA_CAPABILITY,
         VASTAI_COMFY_IMAGE: process.env.VASTAI_COMFY_IMAGE || 'vastai/comfy:v0.10.0-cuda-12.9-py312',
         WARM_POOL_SAFE_MODE: process.env.WARM_POOL_SAFE_MODE || '0',
         WARM_POOL_IDLE_MINUTES: process.env.WARM_POOL_IDLE_MINUTES || '15',
         PORT: process.env.PORT || '3000'
     });
+});
+
+// ============================================================================
+// WORKFLOW TEMPLATE API
+// ============================================================================
+
+const comfyWorkflows = require('./comfy-workflows');
+
+// List available workflow templates (public endpoint)
+app.get('/api/proxy/workflow-templates', (req, res) => {
+    try {
+        const templates = comfyWorkflows.listTemplates();
+        res.json({ templates });
+    } catch (error) {
+        console.error('Failed to list workflow templates:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get required models for a specific template (public endpoint)
+app.get('/api/proxy/workflow-templates/:name/requirements', (req, res) => {
+    try {
+        const { name } = req.params;
+
+        if (!comfyWorkflows.hasTemplate(name)) {
+            return res.status(404).json({
+                error: `Template '${name}' not found`,
+                available: comfyWorkflows.listTemplates().map(t => t.name)
+            });
+        }
+
+        const requirements = comfyWorkflows.getRequiredModels(name);
+        res.json({ template: name, requirements });
+    } catch (error) {
+        console.error('Failed to get template requirements:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get model inventory from current warm instance (admin endpoint)
+app.get('/api/proxy/admin/model-inventory', (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+
+    try {
+        const pool = warmPool.getStatus();
+
+        if (!pool.instance) {
+            return res.status(404).json({
+                error: 'No instance available',
+                hint: 'Prewarm an instance first'
+            });
+        }
+
+        if (!pool.instance.modelInventory) {
+            return res.status(404).json({
+                error: 'Model inventory not yet available',
+                hint: 'Instance must be fully ready (status: ready)',
+                instanceStatus: pool.instance.status
+            });
+        }
+
+        res.json({
+            contractId: pool.instance.contractId,
+            status: pool.instance.status,
+            inventory: pool.instance.modelInventory
+        });
+    } catch (error) {
+        console.error('Failed to get model inventory:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Refresh model inventory from instance (admin endpoint)
+app.post('/api/proxy/admin/model-inventory/refresh', async (req, res) => {
+    const key = req.headers['x-admin-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden' });
+    }
+
+    try {
+        const pool = warmPool.getStatus();
+
+        if (!pool.instance || !pool.instance.connectionUrl) {
+            return res.status(404).json({
+                error: 'No running instance with connection URL',
+                hint: 'Instance must be running and have a connection URL'
+            });
+        }
+
+        // Fetch fresh inventory
+        const inventory = await warmPool.fetchModelInventory(pool.instance.connectionUrl);
+
+        // Update state (note: we can't directly modify state here, but the inventory is returned)
+        res.json({
+            message: 'Model inventory refreshed',
+            contractId: pool.instance.contractId,
+            inventory
+        });
+    } catch (error) {
+        console.error('Failed to refresh model inventory:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Update environment configuration (protected)
@@ -729,11 +976,15 @@ app.get('/api/proxy/admin/pm2/status', (req, res) => {
 
 // Forward arbitrary ComfyUI requests to the active warm instance.
 // Example: POST /api/proxy/comfy/flow -> proxied to http://<instance>:8188/flow
+// Set COMFYUI_TUNNEL_URL=http://localhost:8188 to use SSH tunnel instead of public IP
 app.use('/api/proxy/comfy', async (req, res) => {
     try {
         const pool = warmPool.getStatus();
-        if (!pool.instance || !pool.instance.connectionUrl) return res.status(404).json({ error: 'no warm instance available' });
-        const targetBase = pool.instance.connectionUrl.replace(/\/$/, '');
+        if (!pool.instance) return res.status(404).json({ error: 'no warm instance available' });
+        // Use SSH tunnel override if set, otherwise use instance connectionUrl
+        const tunnelUrl = process.env.COMFYUI_TUNNEL_URL;
+        const targetBase = (tunnelUrl || pool.instance.connectionUrl || '').replace(/\/$/, '');
+        if (!targetBase) return res.status(404).json({ error: 'no connection URL available' });
         const forwardPath = req.originalUrl.replace(/^\/api\/proxy\/comfy/, '');
         const targetUrl = targetBase + (forwardPath || '/');
 
@@ -746,14 +997,25 @@ app.use('/api/proxy/comfy', async (req, res) => {
         // Remove headers that might cause issues
         delete opts.headers.host;
 
-        if (['POST','PUT','PATCH'].includes(req.method.toUpperCase())) {
+        if (['POST', 'PUT', 'PATCH'].includes(req.method.toUpperCase())) {
             opts.body = JSON.stringify(req.body || {});
             opts.headers['content-type'] = 'application/json';
         }
 
         const r = await fetch(targetUrl, opts);
+
+        // Check content type to handle binary data (images) correctly
+        const contentType = r.headers.get('content-type') || '';
+        if (contentType.startsWith('image/') || contentType === 'application/octet-stream') {
+            // Binary data - forward as buffer
+            const buffer = await r.buffer();
+            res.set('Content-Type', contentType);
+            return res.status(r.status).send(buffer);
+        }
+
+        // Text/JSON data
         const text = await r.text();
-        try { return res.status(r.status).json(JSON.parse(text)); } catch(e) { return res.status(r.status).send(text); }
+        try { return res.status(r.status).json(JSON.parse(text)); } catch (e) { return res.status(r.status).send(text); }
 
     } catch (e) {
         console.error('comfy proxy error:', e);
@@ -792,6 +1054,24 @@ app.post('/api/proxy/warm-pool/prewarm', async (req, res) => {
     } catch (e) {
         console.error('[Prewarm] Error:', e);
         res.status(500).json({ error: e.message, stack: e.stack });
+    }
+});
+
+// Backwards-compatible admin alias for prewarm
+app.post('/api/proxy/admin/warm-pool/prewarm', express.json(), async (req, res) => {
+    try {
+        const key = req.headers['x-admin-api-key'] || req.headers['x-admin-key'] || req.query.adminKey;
+        if (!key || key !== process.env.ADMIN_API_KEY) {
+            logAuthAttempt(req, false);
+            return res.status(403).json({ error: 'forbidden - invalid admin key' });
+        }
+        logAuthAttempt(req, true);
+        const result = await warmPool.prewarm();
+        try { audit.logAdminEvent({ adminKey: key, ip: req.ip || req.connection && req.connection.remoteAddress, route: req.originalUrl, action: 'prewarm', details: result, outcome: 'ok' }); } catch (e) { console.error('audit log error:', e); }
+        res.status(200).json(result);
+    } catch (e) {
+        console.error('[Admin Prewarm] Error:', e);
+        res.status(500).json({ error: e.message });
     }
 });
 
@@ -1057,7 +1337,7 @@ app.get('/api/proxy/check-tokens', (req, res) => {
 app.post('/api/proxy/admin/set-tokens', (req, res) => {
     // Only allow local requests
     const remote = req.ip || req.connection && req.connection.remoteAddress;
-    if (!['::1','127.0.0.1','::ffff:127.0.0.1'].includes(remote)) {
+    if (!['::1', '127.0.0.1', '::ffff:127.0.0.1'].includes(remote)) {
         return res.status(403).json({ error: 'Forbidden - set tokens only allowed from localhost' });
     }
 
@@ -1244,9 +1524,12 @@ try {
 
 // Wrapper for starting the server
 function startProxy(port = PORT) {
-    return app.listen(port, '0.0.0.0', () => {
-        console.log(`Vast.ai proxy running on http://localhost:${port}/ (ready)`);
+    const server = app.listen(port, '0.0.0.0', () => {
+        const addr = server.address();
+        const boundPort = addr ? addr.port : port;
+        console.log(`Vast.ai proxy running on http://localhost:${boundPort}/ (ready)`);
     });
+    return server;
 }
 
 // Only listen if run directly

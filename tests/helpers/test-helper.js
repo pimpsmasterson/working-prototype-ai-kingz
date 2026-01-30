@@ -22,7 +22,15 @@ function resetDb() {
       const warmPool = require('../../server/warm-pool');
       // Mutate existing state object to preserve the original module reference
       if (warmPool._internal && warmPool._internal.state) {
-        Object.assign(warmPool._internal.state, { desiredSize: 1, instance: null, lastAction: null, isPrewarming: false, safeMode: false });
+        Object.assign(warmPool._internal.state, {
+          desiredSize: 1,
+          instance: null,
+          lastAction: null,
+          isPrewarming: false,
+          safeMode: false,
+          provisionAttempt: 0,      // Reset fallback attempt counter
+          useDefaultScript: false   // Reset fallback flag
+        });
         // Persist the reset state in DB
         require('../../server/db').saveState(warmPool._internal.state);
       }

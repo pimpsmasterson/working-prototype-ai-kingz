@@ -140,7 +140,7 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
-COMFYUI_PROVISION_SCRIPT=https://raw.githubusercontent.com/YOUR_USERNAME/ai-kings/main/scripts/fetish-king-nsfw-provision.sh
+COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/
 ```
 
 ## 📊 API Endpoints
@@ -222,11 +222,72 @@ If the automated setup doesn't work, you can manually configure the GPU:
 - **Provisioning failed**: Check Vast.ai logs or SSH in to debug
 - **Models not downloading**: Verify HuggingFace/Civitai tokens are set
 
+### Instance Health Recovery
+
+If a warm-pool instance fails to provision correctly (ECONNREFUSED, checkpoint_count: 0):
+
+#### 1. Check Health Status
+```bash
+# PowerShell
+Invoke-RestMethod -Uri "http://localhost:3000/api/proxy/admin/warm-pool/health" `
+  -Headers @{ "x-admin-key" = "YOUR_ADMIN_KEY" }
+
+# curl
+curl "http://localhost:3000/api/proxy/admin/warm-pool/health" \
+  -H "x-admin-key: YOUR_ADMIN_KEY"
+```
+
+#### 2. Check Warm-Pool Status
+```bash
+curl "http://localhost:3000/api/proxy/admin/warm-pool/status" \
+  -H "x-admin-key: YOUR_ADMIN_KEY"
+```
+
+#### 3. Force Reprovision with Default Script
+If custom provisioning fails, use the reprovision endpoint to terminate and recreate:
+```bash
+# Use default Vast.ai script (fallback mode)
+curl -X POST "http://localhost:3000/api/proxy/admin/warm-pool/reprovision" \
+  -H "x-admin-key: YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"useDefaultScript": true}'
+
+# Reset fallback and retry custom script
+curl -X POST "http://localhost:3000/api/proxy/admin/warm-pool/reprovision" \
+  -H "x-admin-key: YOUR_ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"resetFallback": true}'
+```
+
+#### 4. Manual Instance Inspection (via Vast.ai SSH)
+```bash
+# Check ComfyUI process
+docker ps -a | grep comfy
+
+# Check container logs
+docker logs <container_id> --tail 200
+
+# Check disk usage
+df -h && du -sh /workspace/ComfyUI/models/*
+
+# Test ComfyUI locally
+curl http://localhost:8188/system_stats
+```
+
+#### Common Failure Patterns
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `ECONNREFUSED 8188` | ComfyUI not running | Check container logs, restart container |
+| `checkpoint_count: 0` | Model downloads failed | Check disk space, rate limits, tokens |
+| Health stuck "loading" | Large model downloads | Wait 15+ min, check download progress |
+| `no space left on device` | Disk full | Use larger instance (WARM_POOL_DISK_GB) |
+
 ### Admin Dashboard Features
 - **One-Click GPU Rental**: No manual commands or IDE required
 - **Real-Time Status**: Monitor provisioning progress
 - **Cost Control**: Automatic shutdown after idle periods
 - **Audit Trail**: All actions logged with timestamps
+- **Reprovision Button**: Force fallback to default script when custom fails
 
 ## 🤝 Contributing
 

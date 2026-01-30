@@ -36,7 +36,7 @@ However, HTTP requests to port 8188 **timeout** (curl exit code 28).
 ### Configuration
 ```
 COMFYUI_ARGS: --listen 0.0.0.0 --disable-auto-launch --port 18188 --enable-cors-header
-PROVISIONING_SCRIPT: https://gist.githubusercontent.com/.../comfyui-nsfw-provision.sh
+PROVISIONING_SCRIPT: https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/
 ```
 
 ### Port Mapping (PORTAL_CONFIG)

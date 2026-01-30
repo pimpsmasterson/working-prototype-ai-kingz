@@ -3,17 +3,17 @@ const path = require('path');
 const { resetDb, nock, nockCleanAll } = require('./helpers/test-helper');
 const db = require('../server/db');
 
-describe('Warm-pool lifecycle (mocked)', function() {
+describe('Warm-pool lifecycle (mocked)', function () {
   this.timeout(10000); // Increase timeout for async operations
 
-  beforeEach(function() {
+  beforeEach(function () {
     resetDb();
     nock.cleanAll();
   });
 
-  afterEach(function() { nockCleanAll(); });
+  afterEach(function () { nockCleanAll(); });
 
-  it('prewarm happy-path — rents an offer and becomes running', async function() {
+  it('prewarm happy-path — rents an offer and becomes running', async function () {
     process.env.VASTAI_API_KEY = 'dummy_key';
 
     // Mock SSH key registration
@@ -24,7 +24,7 @@ describe('Warm-pool lifecycle (mocked)', function() {
     // Mock bundles -> one offer
     nock('https://console.vast.ai')
       .post('/api/v0/bundles/')
-      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 8192, disk_space: 250 }] });
+      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 12288, disk_space: 320, reliability: 0.99, inet_down: 600 }] });
 
     // Mock asks PUT -> rent
     nock('https://console.vast.ai')
@@ -60,7 +60,7 @@ describe('Warm-pool lifecycle (mocked)', function() {
     assert.ok(rows.length >= 1, 'instance_started event should be recorded');
   });
 
-  it('claim sets lease and logs usage', async function() {
+  it('claim sets lease and logs usage', async function () {
     process.env.VASTAI_API_KEY = 'dummy_key';
 
     // Pre-seed the state with a running instance
@@ -78,7 +78,7 @@ describe('Warm-pool lifecycle (mocked)', function() {
     assert.ok(rows.length >= 1, 'lease_claimed event should be recorded');
   });
 
-  it('terminate clears tracked instance and logs termination', async function() {
+  it('terminate clears tracked instance and logs termination', async function () {
     process.env.VASTAI_API_KEY = 'dummy_key';
 
     // Setup mock delete

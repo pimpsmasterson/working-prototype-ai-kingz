@@ -116,9 +116,7 @@ class ComfyUIIntegration {
      * @returns {Promise<Object>} Response with prompt_id
      */
     async submitWorkflow(workflow) {
-        const url = (this.serviceType === 'vastai') 
-            ? `${this.baseUrl}/prompt` 
-            : `${this.baseUrl}/prompt`;
+        const url = `${this.baseUrl}/prompt`;
 
         try {
             const response = await fetch(url, {
@@ -154,9 +152,7 @@ class ComfyUIIntegration {
      * @returns {Promise<Object>} History data
      */
     async getHistory(promptId) {
-        const url = (this.serviceType === 'vastai')
-            ? `${this.baseUrl}/history/${promptId}`
-            : `${this.baseUrl}/history/${promptId}`;
+        const url = `${this.baseUrl}/history/${promptId}`;
 
         try {
             const response = await fetch(url, {
@@ -190,9 +186,7 @@ class ComfyUIIntegration {
             type
         });
 
-        const url = (this.serviceType === 'vastai')
-            ? `${this.baseUrl}/view?${params}`
-            : `${this.baseUrl}/view?${params}`;
+        const url = `${this.baseUrl}/view?${params}`;
 
         try {
             const response = await fetch(url, {
@@ -221,9 +215,7 @@ class ComfyUIIntegration {
      */
     async isAvailable() {
         try {
-            const url = (this.serviceType === 'vastai')
-                ? `${this.baseUrl}/system_stats`
-                : `${this.baseUrl}/system_stats`;
+            const url = `${this.baseUrl}/system_stats`;
 
             const response = await fetch(url, {
                 method: 'GET',
@@ -245,9 +237,7 @@ class ComfyUIIntegration {
      */
     async getModels() {
         try {
-            const url = (this.serviceType === 'vastai')
-                ? `${this.baseUrl}/object_info`
-                : `${this.baseUrl}/object_info`;
+            const url = `${this.baseUrl}/object_info`;
 
             const response = await fetch(url, {
                 headers: {

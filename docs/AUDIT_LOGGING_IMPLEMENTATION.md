@@ -71,7 +71,7 @@ Successfully implemented admin audit logging and usage event tracking for the Va
 ### Start the Server
 **Option 1: PowerShell Script (Recommended)**
 ```powershell
-.\start-proxy.ps1
+.\scripts\powershell\start-proxy.ps1
 ```
 
 **Option 2: npm**

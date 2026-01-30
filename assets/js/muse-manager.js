@@ -230,9 +230,9 @@ class MuseManager {
                 <div class="muse-card-header">
                     <div class="muse-avatar">
                         ${muse.aiSettings.primaryReference ?
-                            `<img src="${muse.aiSettings.primaryReference}" alt="${muse.name}">` :
-                            `<div class="avatar-placeholder">${muse.name.substring(0, 2).toUpperCase()}</div>`
-                        }
+                `<img src="${muse.aiSettings.primaryReference}" alt="${muse.name}">` :
+                `<div class="avatar-placeholder">${muse.name.substring(0, 2).toUpperCase()}</div>`
+            }
                     </div>
                     <div class="muse-card-info">
                         <div class="muse-card-name">
@@ -810,9 +810,17 @@ class MuseManager {
         this.renderMuseList();
     }
 
-    exportActiveMuse() {
+    async exportActiveMuse() {
         if (!this.activeMuse) return;
-        this.storage.exportProfile(this.activeMuse, false);
+
+        const includeImages = confirm('Include reference images in export file?\n(This will increase file size)');
+
+        try {
+            await this.storage.exportProfile(this.activeMuse, includeImages);
+        } catch (e) {
+            console.error('Export failed:', e);
+            alert('Failed to export character: ' + e.message);
+        }
     }
 
     async importMuse() {

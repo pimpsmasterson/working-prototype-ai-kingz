@@ -164,6 +164,20 @@ try {
     try { db.exec('ALTER TABLE generated_content ADD COLUMN workflow_template TEXT'); } catch (e) { /* ignore */ }
   }
 
+  // Migration: Add error tracking columns for structured error handling
+  const hasErrorCode = genTableInfo.some(r => r.name === 'error_code');
+  const hasCanPrewarm = genTableInfo.some(r => r.name === 'can_prewarm');
+  const hasPoolStatus = genTableInfo.some(r => r.name === 'pool_status');
+  if (!hasErrorCode) {
+    try { db.exec('ALTER TABLE generated_content ADD COLUMN error_code TEXT'); } catch (e) { /* ignore */ }
+  }
+  if (!hasCanPrewarm) {
+    try { db.exec('ALTER TABLE generated_content ADD COLUMN can_prewarm INTEGER DEFAULT 0'); } catch (e) { /* ignore */ }
+  }
+  if (!hasPoolStatus) {
+    try { db.exec('ALTER TABLE generated_content ADD COLUMN pool_status TEXT'); } catch (e) { /* ignore */ }
+  }
+
   // Create indexes for performance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_muse ON generated_content(muse_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_generated_content_status ON generated_content(status)`);

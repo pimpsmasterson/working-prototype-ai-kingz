@@ -67,7 +67,7 @@
     font-size: 1.5rem;
     cursor: pointer;
     padding: 0.5rem;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .muse-modal-close:hover {
@@ -119,7 +119,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .btn-new-muse:hover {
@@ -143,7 +143,7 @@
     color: #fff;
     font-size: 0.9rem;
     width: 100%;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .ai-input:focus,
@@ -181,7 +181,7 @@
     border-radius: 12px;
     padding: 1rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .muse-card:hover {
@@ -324,7 +324,7 @@
     padding: 0.75rem 1.25rem;
     cursor: pointer;
     border-bottom: 2px solid transparent;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
     font-size: 0.9rem;
     font-weight: 500;
     white-space: nowrap;
@@ -413,7 +413,7 @@
     color: #d4af37;
     padding: 0.75rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
     font-size: 0.9rem;
     width: 100%;
 }
@@ -432,7 +432,7 @@
     color: #c41e3a;
     padding: 0.5rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
     font-size: 0.9rem;
     line-height: 1;
 }
@@ -456,7 +456,7 @@
     border-radius: 8px;
     overflow: hidden;
     border: 2px solid rgba(212, 175, 55, 0.3);
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .reference-image-item.primary {
@@ -492,7 +492,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .reference-image-upload:hover {
@@ -559,7 +559,7 @@
     color: #d4af37;
     padding: 0.5rem 1rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
     font-size: 0.85rem;
 }
 
@@ -642,7 +642,7 @@
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .btn-primary:hover {
@@ -658,7 +658,7 @@
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .btn-secondary:hover {
@@ -674,7 +674,7 @@
     border-radius: 8px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--ai-kings-transition);
 }
 
 .btn-danger:hover {

@@ -41,11 +41,11 @@ pm2 set pm2-logrotate:retain 14
 ```
 
 ## Log rotation (PowerShell)
-- `scripts/rotate-logs.ps1` rotates and prunes `logs/*.log` older than 14 days.
+- `scripts/powershell/rotate-logs.ps1` rotates and prunes `logs/*.log` older than 14 days.
 - To schedule daily rotate at 03:00:
 
 ```powershell
-schtasks /Create /SC DAILY /TN "RotateVastProxyLogs" /TR "powershell -ExecutionPolicy Bypass -File \"C:\path\to\repo\scripts\rotate-logs.ps1\"" /ST 03:00 /F
+schtasks /Create /SC DAILY /TN "RotateVastProxyLogs" /TR "powershell -ExecutionPolicy Bypass -File \"C:\path\to\repo\scripts\powershell\rotate-logs.ps1\" /ST 03:00 /F
 ```
 
 ## Running tests
