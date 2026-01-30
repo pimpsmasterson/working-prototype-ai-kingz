@@ -16,6 +16,7 @@ $env:COMFYUI_PROVISION_SCRIPT = "https://raw.githubusercontent.com/pimpsmasterso
 
 $env:WARM_POOL_SAFE_MODE = "0"
 $env:WARM_POOL_IDLE_MINUTES = "15"
+$env:WARM_POOL_DISK_GB = "300"  # Minimum 300GB disk space for instances
 $env:PORT = "3000"
 $env:COMFYUI_TUNNEL_URL = "http://localhost:8188"
 
