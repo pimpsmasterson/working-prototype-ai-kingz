@@ -35,7 +35,7 @@ check_resources_for_workflows() {
     log "🔍 Checking resources for workflow downloads..."
 
     # Workflows are small, but check basic connectivity
-    if ! ping -c 1 -W 5 google.com >/dev/null 2>&1; then
+    if ! curl -fsSL --max-time 10 "https://www.google.com" > /dev/null 2>&1; then
         error_log "No internet connectivity detected"
         return 1
     fi

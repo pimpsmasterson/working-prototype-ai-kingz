@@ -328,46 +328,43 @@ main() {
     declare -a PIDS=()
     declare -A PID_MAP=()
     
-    # helper for background launching
-    launch_module() {
-        local script=$1
+    # Launch modules in background - direct execution without wrapper to avoid subshell scope issues
+    for script in "${SCRIPTS_ROOT}/modules/02-custom-nodes.sh" \
+                  "${SCRIPTS_ROOT}/modules/03-models-core.sh" \
+                  "${SCRIPTS_ROOT}/modules/04-models-wan.sh"; do
         local name=$(basename "$script" .sh)
-        # Run in subshell to trap exit code, redirect output to separate log to avoid interleaving
-        (
-            exec > "${WORKSPACE}/${name}.log" 2>&1
-            if run_module_with_protection "$script"; then
-                exit 0
-            else
-                exit 1
-            fi
-        ) &
+        log "🚀 Launching $name in background..."
+        # Run directly with timeout, redirect to per-module log
+        timeout "${TIMEOUT_MINUTES}m" bash "$script" > "${WORKSPACE}/${name}.log" 2>&1 &
         local pid=$!
         PIDS+=($pid)
         PID_MAP[$pid]=$name
-        log "🚀 Released $name to background (PID: $pid)"
-    }
-
-    launch_module "${SCRIPTS_ROOT}/modules/02-custom-nodes.sh"
-    launch_module "${SCRIPTS_ROOT}/modules/03-models-core.sh"
-    launch_module "${SCRIPTS_ROOT}/modules/04-models-wan.sh"
+        log "  → $name running as PID $pid"
+    done
 
     # Wait for all background jobs
     log "⏳ Waiting for parallel tasks to complete..."
     local parallel_failures=0
     
     for pid in "${PIDS[@]}"; do
+        local name="${PID_MAP[$pid]}"
         if wait "$pid"; then
-            log "✅ Task ${PID_MAP[$pid]} completed successfully"
+            log "✅ Task $name completed successfully"
         else
-            error_log "❌ Task ${PID_MAP[$pid]} failed"
+            local exit_code=$?
+            if (( exit_code == 124 )); then
+                error_log "❌ Task $name TIMED OUT after ${TIMEOUT_MINUTES} minutes"
+            else
+                error_log "❌ Task $name failed (exit code: $exit_code)"
+            fi
             parallel_failures=$((parallel_failures + 1))
-            FAILED_MODULES+=("${PID_MAP[$pid]}")
+            FAILED_MODULES+=("$name")
         fi
         # Cat the log to main log for audit
-        log "--- Output from ${PID_MAP[$pid]} ---"
-        cat "${WORKSPACE}/${PID_MAP[$pid]}.log" >> "$LOG_FILE"
-        cat "${WORKSPACE}/${PID_MAP[$pid]}.log" # Also show in current stream
-        rm -f "${WORKSPACE}/${PID_MAP[$pid]}.log"
+        log "--- Output from $name ---"
+        cat "${WORKSPACE}/${name}.log" >> "$LOG_FILE" 2>/dev/null || true
+        cat "${WORKSPACE}/${name}.log" 2>/dev/null || true
+        rm -f "${WORKSPACE}/${name}.log"
         log "-----------------------------------"
     done
 
