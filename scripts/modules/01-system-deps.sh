@@ -250,7 +250,7 @@ if [[ "$UBUNTU_VERSION" == "24.04" ]]; then
         "unzip"
         "ffmpeg"
         "libgl1"
-        "libglib2.0-0"
+
         "git-lfs"
         "file"
         "aria2"
@@ -264,7 +264,7 @@ if [[ "$UBUNTU_VERSION" == "24.04" ]]; then
         "libjpeg-dev"
         "libpng-dev"
         "libtiff-dev"
-        "libfreetype6-dev"
+        "libfreetype-dev"
         "liblcms2-dev"
         "libwebp-dev"
         "zlib1g-dev"
