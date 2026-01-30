@@ -4,7 +4,7 @@
 Write-Host "Getting current Vast.ai instance details..." -ForegroundColor Cyan
 
 # Load environment variables
-$env:VASTAI_API_KEY = "4986d1c01dc3eb354816dfe693384b7f81fe5f4bf048ee78db68f203d4101360"
+$env:VASTAI_API_KEY = "c0c517ae844d08ee03354fcf8cc9909eaaec857ed6e0a54128b3490a54808a4f"
 $env:ADMIN_API_KEY = "secure_admin_key_change_me"
 
 # Get running instances
