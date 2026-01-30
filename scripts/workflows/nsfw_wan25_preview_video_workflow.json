@@ -1,0 +1,117 @@
+{
+  "last_node_id": 12,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "WanVideoModelLoader",
+      "pos": [50, 100],
+      "size": [315, 82],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
+      "widgets_values": ["wan25_i2v_14b_fp8_high_scaled.safetensors", "fp8_e4m3fn"]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [50, 250],
+      "size": [315, 314],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [2], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": [], "slot_index": 1}
+      ],
+      "widgets_values": ["reference_character.png"]
+    },
+    {
+      "id": 3,
+      "type": "WanVideoT5TextEncode",
+      "pos": [50, 600],
+      "size": [315, 82],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [3, 4], "slot_index": 0}],
+      "widgets_values": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [450, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, masterpiece, realistic motion, consistency, nsfw"]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [450, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, blurry, watermark"]
+    },
+    {
+      "id": 6,
+      "type": "WanVideoVaeLoader",
+      "pos": [450, 450],
+      "size": [315, 58],
+      "outputs": [{"name": "VAE", "type": "VAE", "links": [7, 8], "slot_index": 0}],
+      "widgets_values": ["wan2.5_vae.safetensors"]
+    },
+    {
+      "id": 7,
+      "type": "VAEEncode",
+      "pos": [750, 250],
+      "size": [210, 46],
+      "inputs": [
+        {"name": "pixels", "type": "IMAGE", "link": 2},
+        {"name": "vae", "type": "VAE", "link": 7}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}]
+    },
+    {
+      "id": 8,
+      "type": "WanVideoSampler",
+      "pos": [1050, 50],
+      "size": [315, 450],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "positive", "type": "CONDITIONING", "link": 5},
+        {"name": "negative", "type": "CONDITIONING", "link": 6},
+        {"name": "latent_image", "type": "LATENT", "link": 9}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [10], "slot_index": 0}],
+      "widgets_values": [40, 7.5, 9988, "randomize"]
+    },
+    {
+      "id": 9,
+      "type": "VAEDecode",
+      "pos": [1400, 50],
+      "size": [210, 46],
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 10},
+        {"name": "vae", "type": "VAE", "link": 8}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [11], "slot_index": 0}]
+    },
+    {
+      "id": 10,
+      "type": "VHS_VideoCombine",
+      "pos": [1650, 50],
+      "size": [315, 350],
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 11}],
+      "widgets_values": ["aikings_wan25_preview", 24, 0, "video/h264-mp4", false, true, "", 6]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 8, 0, "MODEL"],
+    [2, 2, 0, 7, 0, "IMAGE"],
+    [3, 3, 0, 4, 0, "CLIP"],
+    [4, 3, 0, 5, 0, "CLIP"],
+    [5, 4, 0, 8, 1, "CONDITIONING"],
+    [6, 5, 0, 8, 2, "CONDITIONING"],
+    [7, 6, 0, 7, 1, "VAE"],
+    [8, 6, 0, 9, 1, "VAE"],
+    [9, 7, 0, 8, 3, "LATENT"],
+    [10, 8, 0, 9, 0, "LATENT"],
+    [11, 9, 0, 10, 0, "IMAGE"]
+  ],
+  "version": 0.4
+}

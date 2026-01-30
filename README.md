@@ -140,7 +140,8 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
-COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/
+COMFYUI_PROVISION_SCRIPT=https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/setup.sh
+SCRIPTS_BASE_URL=https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/
 ```
 
 ## 📊 API Endpoints

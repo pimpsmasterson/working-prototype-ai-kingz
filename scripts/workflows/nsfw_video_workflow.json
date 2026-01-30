@@ -1,0 +1,129 @@
+{
+  "last_node_id": 99,
+  "last_link_id": 100,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 100],
+      "size": [315, 98],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [9], "slot_index": 2}
+      ],
+      "widgets_values": ["ponyDiffusionV6XL.safetensors"]
+    },
+    {
+      "id": 99,
+      "type": "CLIPSetLastLayer",
+      "pos": [50, 250],
+      "size": [315, 58],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
+      "widgets_values": [-2]
+    },
+    {
+      "id": 2,
+      "type": "ADE_AnimateDiffLoaderGen1",
+      "pos": [50, 350],
+      "size": [315, 98],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [4], "slot_index": 0}
+      ],
+      "widgets_values": ["mm_sdxl_v1_beta.ckpt", "linear (AnimateDiff-SDXL)"]
+    },
+    {
+      "id": 3,
+      "type": "CLIPTextEncode",
+      "pos": [450, 50],
+      "size": [400, 100],
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 2}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}
+      ],
+      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, dancing, dynamic motion, beautiful detailed face, high quality, nsfw, masterpiece, best quality, smooth animation"]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [450, 200],
+      "size": [400, 100],
+      "inputs": [
+        {"name": "clip", "type": "CLIP", "link": 3}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}
+      ],
+      "widgets_values": ["score_6, score_5, score_4, source_pony, source_furry, static, frozen, choppy, low quality, worst quality, blurry, censored, watermark, bad anatomy, deformed"]
+    },
+    {
+      "id": 5,
+      "type": "EmptyLatentImage",
+      "pos": [450, 350],
+      "size": [315, 106],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}
+      ],
+      "widgets_values": [512, 512, 16]
+    },
+    {
+      "id": 6,
+      "type": "KSampler",
+      "pos": [900, 100],
+      "size": [315, 262],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 4},
+        {"name": "positive", "type": "CONDITIONING", "link": 5},
+        {"name": "negative", "type": "CONDITIONING", "link": 6},
+        {"name": "latent_image", "type": "LATENT", "link": 7}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}
+      ],
+      "widgets_values": [987654321, "randomize", 25, 7, "dpmpp_2m_sde", "karras", 1]
+    },
+    {
+      "id": 7,
+      "type": "VAEDecode",
+      "pos": [1250, 100],
+      "size": [210, 46],
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 8},
+        {"name": "vae", "type": "VAE", "link": 9}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [10], "slot_index": 0}
+      ]
+    },
+    {
+      "id": 8,
+      "type": "VHS_VideoCombine",
+      "pos": [1500, 100],
+      "size": [315, 290],
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 10}
+      ],
+      "widgets_values": ["aikings_video", 8, 0, "image/webp", false, true, ""]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "MODEL"],
+    [100, 1, 1, 99, 0, "CLIP"],
+    [2, 99, 0, 3, 0, "CLIP"],
+    [3, 99, 0, 4, 0, "CLIP"],
+    [4, 2, 0, 6, 0, "MODEL"],
+    [5, 3, 0, 6, 1, "CONDITIONING"],
+    [6, 4, 0, 6, 2, "CONDITIONING"],
+    [7, 5, 0, 6, 3, "LATENT"],
+    [8, 6, 0, 7, 0, "LATENT"],
+    [9, 1, 2, 7, 1, "VAE"],
+    [10, 7, 0, 8, 0, "IMAGE"]
+  ],
+  "version": 0.4
+}
