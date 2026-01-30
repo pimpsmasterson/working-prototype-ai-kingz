@@ -81,9 +81,17 @@ Look for `instances` and `ssh_host`/`ssh_port` in the response.
 
 7) Connect via SSH
 
-```powershell
-ssh -i $env:USERPROFILE\.ssh\id_rsa_vast root@INSTANCE_SSH_HOST -p INSTANCE_SSH_PORT
-```
+### Automated (Recommended)
+    
+    Run the helper script to auto-detect and connect:
+    ```powershell
+    .\scripts\tools\connect.ps1
+    ```
+    
+    ### Manual
+    ```powershell
+    ssh -i $env:USERPROFILE\.ssh\id_rsa_vast root@INSTANCE_SSH_HOST -p INSTANCE_SSH_PORT
+    ```
 
 8) Troubleshooting notes
 - If PM2 still shows demo key in logs (`demo_vasta...`), PM2 process was started with an env that didn't source `.env` — use `pm2 delete vastai-proxy` then `pm2 start config/ecosystem.config.js --update-env`.

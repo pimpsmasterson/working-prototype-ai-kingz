@@ -53,4 +53,3 @@ If something is unclear
 - Open an issue or ask for clarification and point to the specific file (example: [server/warm-pool.js](server/warm-pool.js#L1)).
 
 ---
-Please review this draft and tell me which areas need more detail or additional file links.

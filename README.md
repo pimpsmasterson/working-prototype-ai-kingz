@@ -12,6 +12,12 @@
 - **Reference image support** - Upload photos for AI consistency using IP-Adapter technology
 - **Character variations** - Same character, different outfits/scenarios
 - **Generation history** - Track all creations per character
+    
+    ### ⚡ **"Smart Boot" System**
+    - **Zero-Config Start**: No manual SSH/setup required.
+    - **Auto-Recovery**: Detects missing GPUs and provisions them instantly.
+    - **One-Click Connect**: Automated `connect.ps1` script to SSH into instances.
+    - **Live Feedback**: Real-time status in Studio UI and granular logs.
 
 ### 🚀 **Fully Automated Cloud GPU Management (Warm Pool)**
 - **One-Click GPU Rental** from Vast.ai marketplace via admin panel
