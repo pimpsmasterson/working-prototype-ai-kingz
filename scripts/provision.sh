@@ -34,7 +34,7 @@ fi
 COMFYUI_DIR=${WORKSPACE}/ComfyUI
 # Update the log file to the chosen workspace
 LOG_FILE="${WORKSPACE}/provision_v2.log"
-MAX_PAR_HF=4      # Parallel downloads for HuggingFace/Catbox
+MAX_PAR_HF=4      # Parallel downloads for HuggingFace
 MAX_PAR_CIVITAI=1 # Sequential for Civitai (avoids 429)
 
 # Tokens (passed via environment)
@@ -88,23 +88,13 @@ CHECKPOINT_MODELS=(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS - LoRAs (Cleaned Collection)
+# MODELS - LoRAs (Cleaned Collection - Removed unwanted catbox models)
 # ═══════════════════════════════════════════════════════════════════════════════
 LORA_MODELS=(
     "https://civitai.com/api/download/models/152309|pony_realism_v2.1.safetensors"
     "https://civitai.com/api/download/models/382152|expressiveh_hentai.safetensors"
-    "https://civitai.com/api/download/models/2612858|fondled.safetensors"
-    "https://civitai.com/api/download/models/2553151|wan_dr34ml4y_all_in_one.safetensors"
-    "https://civitai.com/api/download/models/2235288|wan_dr34mjob.safetensors"
-    "https://files.catbox.moe/f6r1nl.safetensors|shared_clothes.safetensors"
-    "https://files.catbox.moe/pk6hl3.safetensors|xray_glasses.safetensors"
-    "https://files.catbox.moe/wmshk3.safetensors|cunnilingus_gesture.safetensors"
-    "https://files.catbox.moe/9qixqa.safetensors|empty_eyes_drooling.safetensors"
-    "https://files.catbox.moe/yz5c9g.safetensors|glowing_eyes.safetensors"
-    "https://files.catbox.moe/tlt57h.safetensors|quadruple_amputee.safetensors"
-    "https://files.catbox.moe/odmswn.safetensors|ugly_bastard.safetensors"
-    "https://files.catbox.moe/z71ic0.safetensors|sex_machine.safetensors"
-    "https://files.catbox.moe/mxbbg2.safetensors|stasis_tank.safetensors"
+    # Removed: fondled.safetensors, wan_dr34ml4y_all_in_one.safetensors, wan_dr34mjob.safetensors
+    # Removed all catbox.moe downloads: shared_clothes, xray_glasses, cunnilingus_gesture, etc.
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
