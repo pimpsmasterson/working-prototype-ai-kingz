@@ -48,7 +48,7 @@ MAX_PAR_HF=4      # Parallel downloads for HuggingFace/Catbox
 MAX_PAR_CIVITAI=1 # Sequential for Civitai (avoids 429)
 
 # Tokens (passed via environment)
-CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
+CIVITAI_TOKEN="${CIVITAI_TOKEN:-8438cc6c34333df56032d72432c7b8ab}"
 HUGGINGFACE_HUB_TOKEN="${HUGGINGFACE_HUB_TOKEN:-}"
 
 log "📍 Working in: $WORKSPACE"

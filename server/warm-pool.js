@@ -27,12 +27,12 @@ const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY
 // Lowered to 6.0 to allow datacenter GPUs like P100/P40 which have high VRAM
 const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY || '6.0');
 
-// Configurable minimum disk (GB) for warm instances. Default to 150GB to ensure
+// Configurable minimum disk (GB) for warm instances. Default to 300GB to ensure
 // room for large models (Flux/SDXL) and custom nodes while meeting user requirements.
-const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '150', 10);
-const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 150;
-// Clamp to sane bounds: min 100GB, max 2000GB
-const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 100), 2000);
+const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '300', 10);
+const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 300;
+// Clamp to sane bounds: min 300GB, max 2000GB
+const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 300), 2000);
 /**
  * Check if a GPU meets minimum CUDA capability requirements
  * @param {number|string} cudaCapability - CUDA compute capability (e.g., 6.1, 8.6)
