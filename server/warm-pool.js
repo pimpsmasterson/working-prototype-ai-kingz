@@ -565,8 +565,8 @@ async function prewarm() {
                 return false;
             }
 
-            // High-speed download requirement
-            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '900'); // 900 Mbps minimum
+            // High-speed download requirement - minimum 1.2 Gbps (1200 Mbps)
+            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '1200'); // 1200 Mbps minimum
             if (typeof o.inet_down === 'number' && o.inet_down < minInetDown) {
                 reasons.push(`internet speed too low: ${o.inet_down.toFixed(1)} Mbps < ${minInetDown} Mbps`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
