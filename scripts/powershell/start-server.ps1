@@ -12,7 +12,7 @@ if (-not $env:AUDIT_SALT) { $env:AUDIT_SALT = "REPLACE_WITH_SECURE_SALT" }
 # Base URL for modular scripts (e.g. GitHub raw URL)
 if (-not $env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/" }
 # The main entry point script URL (points to the modular setup.sh)
-$env:COMFYUI_PROVISION_SCRIPT = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/setup.sh"
+$env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw"
 
 $env:WARM_POOL_SAFE_MODE = "0"
 $env:WARM_POOL_IDLE_MINUTES = "15"

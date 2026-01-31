@@ -19,10 +19,12 @@ LOG_FILE="/tmp/provision_v2.log"
 log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
-REQUIRED_CMDS=("aria2c" "git" "python3" "curl" "df" "awk")
-for cmd in "${REQUIRED_CMDS[@]}"; do
-    command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
-done
+check_required_cmds() {
+    REQUIRED_CMDS=("aria2c" "git" "python3" "curl" "df" "awk")
+    for cmd in "${REQUIRED_CMDS[@]}"; do
+        command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
+    done
+}
 
 log "🚀 Starting AI KINGS Provisioner v2.1 (Ironclad Edition)..."
 
@@ -86,12 +88,12 @@ NODES=(
 # MODELS - Checkpoints
 # ═══════════════════════════════════════════════════════════════════════════════
 CHECKPOINT_MODELS=(
-    "https://civitai.com/api/download/models/290640|ponyDiffusionV6XL.safetensors"
-    "https://civitai.com/api/download/models/206536|pmXL_v1.safetensors"
-    "https://civitai.com/api/download/models/128713|dreamshaper_8.safetensors"
+    "https://www.dropbox.com/scl/fi/p0uxwux03oq90l8fxmrqx/ponyDiffusionV6XL.safetensors?rlkey=nxd5ll1idx0uk6jvsqn7l4hmo&st=qkvcwub0&dl=1|ponyDiffusionV6XL.safetensors"
+    "https://www.dropbox.com/scl/fi/dd7aiju5petevb6nalinr/pmXL_v1.safetensors?rlkey=p4ukouvdd2o912ilcfbi6cqk3&st=bcxefpad&dl=1|pmXL_v1.safetensors"
+    "https://www.dropbox.com/scl/fi/v52p66ci8u7n8r5cqc1pi/dreamshaper_8.safetensors?rlkey=4f0133r062xr8nafpsxp2h9gq&st=5dqnp5wh&dl=1|dreamshaper_8.safetensors"
     "https://civitai.com/api/download/models/122606|revAnimated_v122.safetensors"
-    "https://civitai.com/api/download/models/914390|pony_realism_v2.2.safetensors"
-    "https://civitai.com/api/download/models/2514310|wai_illustrious_sdxl.safetensors"
+    "https://www.dropbox.com/scl/fi/hy476rxzeacsx8g3aodj0/pony_realism_v2.2.safetensors?rlkey=09k5sba46pqoptdu7h1tu03b4&st=jdk4lqsq&dl=1|pony_realism_v2.2.safetensors"
+    "https://www.dropbox.com/scl/fi/okhdb2r3i43l7f8hv07li/wai_illustrious_sdxl.safetensors?rlkey=t7r11yjr61ecdm0vrsgrkztc8&st=tm0bye1z&dl=1|wai_illustrious_sdxl.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -99,11 +101,11 @@ CHECKPOINT_MODELS=(
 # ═══════════════════════════════════════════════════════════════════════════════
 LORA_MODELS=(
     "https://civitai.com/api/download/models/152309|pony_realism_v2.1.safetensors"
-    "https://civitai.com/api/download/models/382152|expressiveh_hentai.safetensors"
-    "https://civitai.com/api/download/models/2612858|fondled.safetensors"
-    "https://civitai.com/api/download/models/2553151|wan_dr34ml4y_all_in_one.safetensors"
-    "https://civitai.com/api/download/models/2235288|wan_dr34mjob.safetensors"
-    "https://civitai.com/api/download/models/2612860|twerk.safetensors"
+    "https://www.dropbox.com/scl/fi/5whxkdo39m4w2oimcffx2/expressiveh_hentai.safetensors?rlkey=5ejkyjvethd1r7fn121x7cvs1&st=qqnc1m3p&dl=1|expressiveh_hentai.safetensors"
+    "https://www.dropbox.com/scl/fi/9drclw495plki15ynlmst/fondled.safetensors?rlkey=vh5efbuy0er4338xrkivilpnb&st=fyrtnto7&dl=1|fondled.safetensors"
+    "https://www.dropbox.com/scl/fi/hp8t53h5ylrhkphnq4cyu/wan_dr34ml4y_all_in_one.safetensors?rlkey=9bq4clb4gmiz4rp6i8g69fl9u&st=0uc8jhe2&dl=1|wan_dr34ml4y_all_in_one.safetensors"
+    "https://www.dropbox.com/scl/fi/ym112crqb6d7sdkqz5s9j/wan_dr34mjob.safetensors?rlkey=eqzd371f86g6tsof0fcecfn8n&st=rpa4v299&dl=1|wan_dr34mjob.safetensors"
+    "https://www.dropbox.com/scl/fi/0g4btjch885ij3kiauffm/twerk.safetensors?rlkey=8yqxhqpvs1osat76ynxadwkh8&st=x592u9sh&dl=1|twerk.safetensors"
     "https://huggingface.co/JollyIm/Defecation/resolve/main/defecation_v1.safetensors|defecation_v1.safetensors"
 )
 
@@ -176,8 +178,9 @@ activate_venv() {
 install_torch() {
     log_section "🧠 INSTALLING PYTORCH"
     activate_venv
+    log "   (Using PyTorch 2.5.1+cu118 for WanVideo & Ubuntu 24.04 compatibility)"
     "$VENV_PYTHON" -m pip install --no-cache-dir \
-        torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+        torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 \
         --index-url https://download.pytorch.org/whl/cu118
 }
 
@@ -211,15 +214,14 @@ install_comfyui() {
     log_section "🖥️  INSTALLING COMFYUI"
     if [[ ! -d "${COMFYUI_DIR}" ]]; then
         git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}"
-        cd "${COMFYUI_DIR}"
-        install_torch
-        install_essential_deps
-        "$VENV_PYTHON" -m pip install -q -r requirements.txt
-        cd "${WORKSPACE}"
-        log "✅ ComfyUI installed"
-    else
-        log "   ✅ ComfyUI already installed"
     fi
+    
+    cd "${COMFYUI_DIR}"
+    install_torch
+    install_essential_deps
+    "$VENV_PYTHON" -m pip install -q -r requirements.txt
+    cd "${WORKSPACE}"
+    log "✅ ComfyUI setup complete"
 }
 
 install_nodes() {
@@ -1828,8 +1830,10 @@ start_comfyui() {
 main() {
     log "--- Provisioning Start ---"
     install_apt_packages
+    check_required_cmds
     install_comfyui
     install_nodes
+  verify_installation
     install_models
     install_workflows
     start_comfyui
