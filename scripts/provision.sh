@@ -14,15 +14,10 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-# 1. DEFINE LOGGING & PRE-FLIGHT
+# 1. DEFINE LOGGING
 LOG_FILE="/tmp/provision_v2.log"
 log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
-
-REQUIRED_CMDS=("aria2c" "git" "python3" "curl" "df" "awk")
-for cmd in "${REQUIRED_CMDS[@]}"; do
-    command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
-done
 
 log "🚀 Starting AI KINGS Provisioner v2.1 (Ironclad Edition)..."
 
@@ -209,6 +204,13 @@ install_apt_packages() {
         exit 1
     }
     git lfs install --skip-repo 2>/dev/null || true
+    
+    # Verify required commands are now available
+    REQUIRED_CMDS=("aria2c" "git" "python3" "curl" "df" "awk")
+    for cmd in "${REQUIRED_CMDS[@]}"; do
+        command -v "$cmd" >/dev/null 2>&1 || { log "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
+    done
+    log "✅ All required commands verified"
 }
 
 install_comfyui() {
