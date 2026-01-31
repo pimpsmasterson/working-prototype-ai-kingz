@@ -77,14 +77,18 @@ NODES=(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS - Checkpoints
+# MODELS - Checkpoints (Complete Production Set)
 # ═══════════════════════════════════════════════════════════════════════════════
 CHECKPOINT_MODELS=(
+    # SDXL Models (1024x1024+)
     "https://civitai.com/api/download/models/290640|ponyDiffusionV6XL.safetensors"
     "https://civitai.com/api/download/models/206536|pmXL_v1.safetensors"
-    "https://civitai.com/api/download/models/128713|dreamshaper_8.safetensors"
     "https://civitai.com/api/download/models/914390|pony_realism_v2.2.safetensors"
     "https://civitai.com/api/download/models/2514310|wai_illustrious_sdxl.safetensors"
+    
+    # SD 1.5 Models (512x512, AnimateDiff compatible)
+    "https://civitai.com/api/download/models/128713|dreamshaper_8.safetensors"
+    "https://civitai.com/api/download/models/245598|revAnimated_v122.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
