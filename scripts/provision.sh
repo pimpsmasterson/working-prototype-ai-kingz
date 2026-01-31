@@ -9,30 +9,40 @@
 # ║   ✓ Full Ubuntu 24.04 Compatibility                                         ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONFIGURATION & LOGGING
+# ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
-# Early logging (use a temp log until workspace chosen)
+# 1. DEFINE LOGGING & PRE-FLIGHT
 LOG_FILE="/tmp/provision_v2.log"
 log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CONFIGURATION
-# ═══════════════════════════════════════════════════════════════════════════════
-# Ensure workspace exists and is writable. Prefer provided $WORKSPACE, fall back to
-# the user's home workspace if creating /workspace is not permitted.
+REQUIRED_CMDS=("aria2c" "git" "python3" "curl" "df" "awk")
+for cmd in "${REQUIRED_CMDS[@]}"; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
+done
+
+log "🚀 Starting AI KINGS Provisioner v2.1 (Ironclad Edition)..."
+
+# Ensure workspace exists and is writable.
 DEFAULT_WS=${WORKSPACE:-/workspace}
 if mkdir -p "$DEFAULT_WS" 2>/dev/null && cd "$DEFAULT_WS" 2>/dev/null; then
   WORKSPACE="$PWD"
-else
-  mkdir -p "$HOME/workspace" 2>/dev/null || true
-  cd "$HOME/workspace" 2>/dev/null || cd ~
-  WORKSPACE="$PWD"
-  log "⚠️  Could not use $DEFAULT_WS; falling back to $WORKSPACE"
+fi
+
+# 2.5 DISK SPACE CHECK (Ironclad)
+REQUIRED_GB=50
+AVAILABLE_KB=$(df "$WORKSPACE" | awk 'NR==2 {print $4}')
+if (( AVAILABLE_KB < REQUIRED_GB * 1024 * 1024 )); then
+    log "❌ ERROR: Insufficient disk space in $WORKSPACE."
+    log "   Need: ${REQUIRED_GB}GB, Have: $((AVAILABLE_KB / 1024 / 1024))GB"
+    # exit 1 # Warning only for now to allow partial progress
 fi
 
 COMFYUI_DIR=${WORKSPACE}/ComfyUI
-# Update the log file to the chosen workspace
+# Finalize the log file to the chosen workspace
 LOG_FILE="${WORKSPACE}/provision_v2.log"
 MAX_PAR_HF=4      # Parallel downloads for HuggingFace/Catbox
 MAX_PAR_CIVITAI=1 # Sequential for Civitai (avoids 429)
@@ -42,10 +52,6 @@ CIVITAI_TOKEN="${CIVITAI_TOKEN:-}"
 HUGGINGFACE_HUB_TOKEN="${HUGGINGFACE_HUB_TOKEN:-}"
 
 log "📍 Working in: $WORKSPACE"
-
-# Logging
-log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
-log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # APT PACKAGES (Cross-Ubuntu Compatible)
@@ -105,19 +111,27 @@ LORA_MODELS=(
     "https://files.catbox.moe/odmswn.safetensors|ugly_bastard.safetensors"
     "https://files.catbox.moe/z71ic0.safetensors|sex_machine.safetensors"
     "https://files.catbox.moe/mxbbg2.safetensors|stasis_tank.safetensors"
+    "https://huggingface.co/JollyIm/Defecation/resolve/main/defecation_v1.safetensors|defecation_v1.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODELS - Wan Video & Specialist Arrays
 # ═══════════════════════════════════════════════════════════════════════════════
-WAN_MODELS=(
+WAN_DIFFUSION_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors|wan2.1_t2v_1.3B_fp16.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn.safetensors|umt5_xxl_fp8_e4m3fn_scaled.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan2.1_vae.safetensors|wan2.1_vae.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+)
+
+WAN_CLIP_MODELS=(
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn.safetensors|umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+)
+
+WAN_VAE_MODELS=(
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan2.1_vae.safetensors|wan_2.1_vae.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors|wan2.2_vae.safetensors"
 )
+
 
 ANIMATEDIFF_MODELS=(
     "https://huggingface.co/camenduru/AnimateDiff-sdxl-beta/resolve/main/mm_sdxl_v10_beta.ckpt|mm_sdxl_v1_beta.ckpt"
@@ -149,6 +163,13 @@ RIFE_MODELS=(
 
 VENV_PYTHON="python3"
 activate_venv() {
+    # If already inside a virtualenv (VIRTUAL_ENV set), prefer that
+    if [[ -n "${VIRTUAL_ENV:-}" ]]; then
+        VENV_PYTHON="$(python3 -c 'import sys;print(sys.executable)')"
+        log "✅ Using existing virtual env: ${VIRTUAL_ENV}"
+        return 0
+    fi
+
     if [[ -f "/venv/main/bin/activate" ]]; then
         source /venv/main/bin/activate
         VENV_PYTHON="/venv/main/bin/python3"
@@ -157,14 +178,46 @@ activate_venv() {
         source "${WORKSPACE}/venv/bin/activate"
         VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
         log "✅ Activated venv: ${WORKSPACE}/venv"
+    else
+        log "📦 Creating virtual environment..."
+        python3 -m venv "${WORKSPACE}/venv"
+        source "${WORKSPACE}/venv/bin/activate"
+        VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
+        log "✅ Created/Activated venv: ${WORKSPACE}/venv"
     fi
+} 
+
+install_torch() {
+    log_section "🧠 INSTALLING PYTORCH"
+    activate_venv
+    "$VENV_PYTHON" -m pip install --no-cache-dir \
+        torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 \
+        --index-url https://download.pytorch.org/whl/cu118
 }
+
+install_essential_deps() {
+    log_section "📦 INSTALLING ESSENTIAL DEPENDENCIES"
+    activate_venv
+    "$VENV_PYTHON" -m pip install --no-cache-dir \
+        transformers==4.36.0 \
+        accelerate \
+        safetensors \
+        einops \
+        opencv-python-headless \
+        insightface \
+        onnxruntime-gpu \
+        xformers \
+        sentencepiece
+}
+
+
 
 install_apt_packages() {
     log_section "📦 INSTALLING SYSTEM PACKAGES"
     apt-get update -qq
-    apt-get install -y -qq "${APT_PACKAGES[@]}" 2>/dev/null || {
-        log "⚠️  Some packages may have failed, continuing..."
+    apt-get install -y -qq "${APT_PACKAGES[@]}" || {
+        log "❌ CRITICAL: Failed to install system packages"
+        exit 1
     }
     git lfs install --skip-repo 2>/dev/null || true
 }
@@ -174,12 +227,13 @@ install_comfyui() {
     if [[ ! -d "${COMFYUI_DIR}" ]]; then
         git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}"
         cd "${COMFYUI_DIR}"
-        activate_venv
+        install_torch
+        install_essential_deps
         "$VENV_PYTHON" -m pip install -q -r requirements.txt
         cd "${WORKSPACE}"
         log "✅ ComfyUI installed"
     else
-        log "✅ ComfyUI already exists"
+        log "   ✅ ComfyUI already installed"
     fi
 }
 
@@ -188,8 +242,8 @@ install_nodes() {
     activate_venv
     
     for repo in "${NODES[@]}"; do
-        # Robust trimming of trailing spaces if any
-        repo=$(echo "$repo" | xargs)
+        # Robust trimming of spaces and hidden characters
+        repo=$(echo "$repo" | tr -d '[:space:]')
         local dir="${repo##*/}"
         local path="${COMFYUI_DIR}/custom_nodes/${dir}"
         
@@ -197,16 +251,22 @@ install_nodes() {
             log "   ✅ $dir exists"
         else
             log "   📥 Cloning $dir..."
-            git clone --depth 1 "$repo" "$path" --recursive || {
+            # Shallow clone first. Some repos use submodules which don't interact well with --depth=1 + --recursive.
+            git clone --depth 1 "$repo" "$path" || {
                 log "   ⚠️  Failed to clone $dir"
                 continue
             }
+            # If the repo declares submodules, initialize them properly
+            if [[ -f "${path}/.gitmodules" ]]; then
+                log "   🔁 Initializing submodules for $dir"
+                (cd "$path" && git submodule update --init --recursive) || log "   ⚠️  Submodule init failed for $dir"
+            fi
         fi
         
         # Install requirements
         if [[ -f "${path}/requirements.txt" ]]; then
             "$VENV_PYTHON" -m pip install --no-cache-dir -q -r "${path}/requirements.txt" || true
-        fi
+        fi 
     done
     
     # Core high-performance dependencies
@@ -220,13 +280,10 @@ download_file() {
     local filename="$3"
     local filepath="${dir}/${filename}"
     
-    # Validation
+    # 1. Validation (Skip if valid)
     if [[ -f "$filepath" ]]; then
         local size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
-        if (( size > 1000000 )); then
-            log "   ✅ $filename (exists)"
-            return 0
-        fi
+        [[ $size -gt 1000000 ]] && { log "   ✅ $filename"; return 0; }
         rm -f "$filepath"
     fi
     
@@ -234,48 +291,47 @@ download_file() {
     local download_url="$url"
     local header_value=""
 
-    # Auth handling
-    if [[ -n "$CIVITAI_TOKEN" && "$url" == *"civitai.com" ]]; then
-      [[ "$url" == *"?"* ]] && download_url="${url}&token=${CIVITAI_TOKEN}" || download_url="${url}?token=${CIVITAI_TOKEN}"
-    fi
-    if [[ -n "$HUGGINGFACE_HUB_TOKEN" && "$url" == *"huggingface.co" ]]; then
-      header_value="Authorization: Bearer $HUGGINGFACE_HUB_TOKEN"
-    fi
+    # 2. Auth Handling (Security & Redirect Robustness)
+    if [[ -n "$CIVITAI_TOKEN" && "$url" == *"civitai.com"* ]]; then
+        # Use URL token for Civitai to ensure redirects (R2) preserve auth; avoid sending Authorization header.
+        [[ "$url" == *"?"* ]] && download_url="${url}&token=$CIVITAI_TOKEN" || download_url="${url}?token=$CIVITAI_TOKEN"
+        # Do NOT set header_value for Civitai to avoid duplicate/misapplied auth
+    elif [[ -n "$HUGGINGFACE_HUB_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        header_value="Authorization: Bearer $HUGGINGFACE_HUB_TOKEN"
+    fi 
 
-    log "   ⬇️  $filename"
+    log "   📥 $filename"
 
-    # Speed is king: 16 connections per server
+    # 3. IRONCLAD DOWNLOAD (aria2c with session file to hide tokens)
     if command -v aria2c &>/dev/null; then
-      if [[ -n "$header_value" ]]; then
-        aria2c -x16 -s16 -j1 --max-connection-per-server=16 \
-          --timeout=120 --retry-wait=5 --max-tries=3 \
-          --file-allocation=none --continue=true \
-          --header="$header_value" -d "$dir" -o "$filename" "$download_url" 2>/dev/null && {
-            if [[ -f "$filepath" && $(stat -c%s "$filepath") -gt 1000000 ]]; then
-              return 0
-            fi
-          }
-      else
-        aria2c -x16 -s16 -j1 --max-connection-per-server=16 \
-          --timeout=120 --retry-wait=5 --max-tries=3 \
-          --file-allocation=none --continue=true \
-          -d "$dir" -o "$filename" "$download_url" 2>/dev/null && {
-            if [[ -f "$filepath" && $(stat -c%s "$filepath") -gt 1000000 ]]; then
-              return 0
-            fi
-          }
-      fi
+        local session_file=$(mktemp)
+        echo "$download_url" > "$session_file"
+        echo "  dir=$dir" >> "$session_file"
+        echo "  out=$filename" >> "$session_file"
+        # Hide header in session file to prevent 'ps aux' visibility
+        [[ -n "$header_value" ]] && echo "  header=$header_value" >> "$session_file"
+
+        # Increased timeouts and retries for massive 14B models
+        aria2c -i "$session_file" -x16 -s16 -j1 --max-connection-per-server=16 \
+               --timeout=300 --retry-wait=10 --max-tries=10 \
+               --file-allocation=none --continue=true \
+               --quiet=true --log-level=error 2>/dev/null
+        
+        local exit_code=$?
+        rm -f "$session_file"
+        
+        if [[ $exit_code -eq 0 && -f "$filepath" && $(stat -c%s "$filepath") -gt 1000000 ]]; then
+            return 0
+        fi
     fi
 
-    if [[ -n "$header_value" ]]; then
-      wget -c -q --show-progress --timeout=300 --tries=3 --header="$header_value" -O "$filepath" "$download_url" 2>/dev/null
-    else
-      wget -c -q --show-progress --timeout=300 --tries=3 -O "$filepath" "$download_url" 2>/dev/null
-    fi
-    
-    # Final validation
+    # 4. FALLBACK (wget - last resort)
+    local wget_opts=("-c" "-q" "--show-progress" "--timeout=600" "--tries=10" "-O" "$filepath")
+    [[ -n "$header_value" ]] && wget_opts+=("--header=$header_value")
+    wget "${wget_opts[@]}" "$download_url" 2>/dev/null
+     
     if [[ ! -f "$filepath" || $(stat -c%s "$filepath") -lt 1000000 ]]; then
-        log "   ❌ $filename download failed or incomplete"
+        log "   ❌ $filename failed"
         rm -f "$filepath"
         return 1
     fi
@@ -303,8 +359,7 @@ smart_download_parallel() {
             pids+=($!)
             ((count++))
             if (( count >= max_p )); then
-                wait "${pids[0]}" 2>/dev/null || true
-                pids=("${pids[@]:1}")
+                wait -n 2>/dev/null || true
                 ((count--))
             fi
         fi
@@ -315,17 +370,65 @@ smart_download_parallel() {
 install_models() {
     log_section "📦 DOWNLOADING MODELS (STAGED)"
     
-    # Sequential for Civitai, Parallel for others
+    # Checkpoints & LoRAs
     smart_download_parallel "${COMFYUI_DIR}/models/checkpoints" 1 "${CHECKPOINT_MODELS[@]}"
     smart_download_parallel "${COMFYUI_DIR}/models/loras" 2 "${LORA_MODELS[@]}"
-    smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" 2 "${WAN_MODELS[@]}"
+    
+    # WAN Video (Specialized Directories)
+    smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" 2 "${WAN_DIFFUSION_MODELS[@]}"
+    smart_download_parallel "${COMFYUI_DIR}/models/clip" 2 "${WAN_CLIP_MODELS[@]}"
+    smart_download_parallel "${COMFYUI_DIR}/models/vae" 2 "${WAN_VAE_MODELS[@]}"
+    
+    # Others
     smart_download_parallel "${COMFYUI_DIR}/models/animatediff_models" 2 "${ANIMATEDIFF_MODELS[@]}"
     smart_download_parallel "${COMFYUI_DIR}/models/upscale_models" 2 "${UPSCALE_MODELS[@]}"
     smart_download_parallel "${COMFYUI_DIR}/models/controlnet" 2 "${CONTROLNET_MODELS[@]}"
     smart_download_parallel "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife" 2 "${RIFE_MODELS[@]}"
     smart_download_parallel "${COMFYUI_DIR}/models/ultralytics/bbox" 2 "${DETECTOR_MODELS[@]:0:2}"
     smart_download_parallel "${COMFYUI_DIR}/models/sams" 2 "${DETECTOR_MODELS[@]:2:1}"
+
+    # ControlNet Assets
+    download_file "https://huggingface.co/spaces/hysts/ControlNet/resolve/main/images/pose.png" \
+        "${COMFYUI_DIR}/user/default" "example_pose.png"
 }
+
+verify_installation() {
+    log_section "🔍 VERIFYING INSTALLATION"
+    local critical_nodes=(
+        "${COMFYUI_DIR}/custom_nodes/ComfyUI-WanVideoWrapper"
+        "${COMFYUI_DIR}/custom_nodes/ComfyUI-AnimateDiff-Evolved"
+        "${COMFYUI_DIR}/custom_nodes/ComfyUI-Impact-Pack"
+        "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation"
+    )
+    
+    for node in "${critical_nodes[@]}"; do
+        if [[ -d "$node" ]]; then
+            log "   ✅ $(basename "$node") exists"
+        else
+            log "   ❌ $(basename "$node") MISSING"
+        fi
+    done
+}
+
+validate_workflows() {
+    log_section "🔍 VALIDATING WORKFLOW JSON"
+    local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
+    if [[ ! -d "$workflows_dir" ]]; then
+        log "   ⚠️  Workflows directory not found: $workflows_dir"
+        return 0
+    fi
+    for wf in "$workflows_dir"/*.json; do
+        [[ ! -f "$wf" ]] && continue
+        if python3 -m json.tool "$wf" >/dev/null 2>&1; then
+            log "   ✅ $(basename "$wf") is valid JSON"
+        else
+            log "   ❌ $(basename "$wf") is invalid JSON"
+            python3 -m json.tool "$wf" 2>&1 | head -n 5
+            exit 1
+        fi
+    done
+}
+
 
 install_workflows() {
     log_section "📝 INSTALLING PRODUCTION WORKFLOWS"
@@ -1382,10 +1485,11 @@ WANWORKFLOW
       "class_type": "CLIPTextEncode",
       "pos": [750, 250],
       "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 6}],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 30}],
       "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9], "slot_index": 0}],
       "widgets_values": ["score_6, score_5, score_4, source_pony, low quality, worst quality, blurry, watermark, bad anatomy, deformed, human eyes on furry"]
     },
+
     {
       "id": 7,
       "class_type": "EmptyLatentImage",
@@ -1748,17 +1852,48 @@ CINEMAWORKFLOW
 }
 WAN22WORKFLOW
 
+
     # printf "   ✅ nsfw_wan22_master_video_workflow.json (Wan 2.2 MoE Expert Chain)\n"
     log "✅ Workflows complete"
 }
 
+install_cloudflared() {
+    log_section "🌐 INSTALLING CLOUDFLARE TUNNEL"
+    if [[ ! -f "/usr/local/bin/cloudflared" ]]; then
+        curl -L --output /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+        chmod +x /usr/local/bin/cloudflared
+        log "✅ cloudflared installed"
+    else
+        log "   ✅ cloudflared already installed"
+    fi
+}
+
 start_comfyui() {
-    log_section "🚀 STARTING COMFYUI"
+    log_section "🚀 STARTING COMFYUI & PUBLIC TUNNEL"
     cd "${COMFYUI_DIR}"
     activate_venv
+    
+    # Start ComfyUI in background
     nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 &
     log "✅ ComfyUI started on port 8188"
+
+    # Start Cloudflare Tunnel (Quick Tunnel)
+    log "🌐 Launching Cloudflare Tunnel..."
+    nohup cloudflared tunnel --url http://127.0.0.1:8188 > "${WORKSPACE}/tunnel.log" 2>&1 &
+    
+    # Wait for URL to appear in logs
+    sleep 5
+    local tunnel_url=$(grep -o 'https://[-a-z0-9.]*trycloudflare.com' "${WORKSPACE}/tunnel.log" | head -n 1)
+    if [[ -n "$tunnel_url" ]]; then
+        log "🚀 PUBLIC URL READY: $tunnel_url"
+        echo "************************************************"
+        echo "🔗 ACCESS YOUR STUDIO AT: $tunnel_url"
+        echo "************************************************"
+    else
+        log "⚠️  Tunnel URL not found yet, check ${WORKSPACE}/tunnel.log manually"
+    fi
 }
+
 
 main() {
     log "--- Provisioning Start ---"
@@ -1767,8 +1902,13 @@ main() {
     install_nodes
     install_models
     install_workflows
+    validate_workflows
+    install_cloudflared
+    verify_installation
     start_comfyui
     log "--- Provisioning Complete ---"
 }
+
+
 
 main "$@"
