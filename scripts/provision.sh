@@ -88,13 +88,18 @@ CHECKPOINT_MODELS=(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS - LoRAs (Cleaned Collection - Removed unwanted catbox models)
+# MODELS - LoRAs (Curated Production Collection)
 # ═══════════════════════════════════════════════════════════════════════════════
 LORA_MODELS=(
+    # Pony/SDXL LoRAs
     "https://civitai.com/api/download/models/152309|pony_realism_v2.1.safetensors"
     "https://civitai.com/api/download/models/382152|expressiveh_hentai.safetensors"
-    # Removed: fondled.safetensors, wan_dr34ml4y_all_in_one.safetensors, wan_dr34mjob.safetensors
-    # Removed all catbox.moe downloads: shared_clothes, xray_glasses, cunnilingus_gesture, etc.
+    
+    # Wan Video LoRAs (2.1 & 2.2)
+    "https://civitai.com/api/download/models/2553151|wan_dr34ml4y_all_in_one.safetensors"
+    "https://civitai.com/api/download/models/1610465|wan_dr34mjob.safetensors"
+    "https://civitai.com/api/download/models/1824672|singularunity_twerk_wan21.safetensors"
+    "https://civitai.com/api/download/models/2047419|fondled_2d3d_wan22.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
