@@ -40,55 +40,95 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 set -euo pipefail
 
+# Explicitly set screen/tmux variables to empty if unset (prevents -u flag errors)
+STY="${STY:-}"
+TMUX="${TMUX:-}"
+
 # Cleanup handler - kill all background download processes on exit
+# MODIFIED: Preserve state on SSH disconnect when running in screen session
 cleanup_on_exit() {
     local exit_code=$?
-    if [[ $exit_code -ne 0 ]]; then
-        echo "⚠️  Script interrupted (exit code: $exit_code) - cleaning up background processes..."
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PRESERVE STATE ON SSH DISCONNECT (Critical for Resumability)
+    # ═══════════════════════════════════════════════════════════════════════════════
+
+    # If running in screen/tmux, NEVER kill background processes on detach
+    if [[ -n "${STY:-}" ]] || [[ -n "${TMUX:-}" ]]; then
+        if [[ $exit_code -eq 0 ]] || [[ $exit_code -eq 129 ]] || [[ $exit_code -eq 1 ]]; then
+            echo "   ℹ️  Running in detached session - preserving all background processes"
+            echo "   ℹ️  Downloads and installations will continue in background"
+            echo "   ℹ️  To monitor: screen -r provision (or check logs)"
+            return 0  # Exit without killing anything
+        fi
     fi
 
-    # Kill all background jobs (download workers)
-  # Preserve ComfyUI PID if present to avoid killing the running server
-  local preserve_pid_file="${WORKSPACE:-/workspace}/comfyui.pid"
-  local preserve_pid=""
-  if [[ -f "$preserve_pid_file" ]]; then
-    preserve_pid=$(cat "$preserve_pid_file" 2>/dev/null || true)
-  fi
-
-  # Kill jobs except preserved PID
-  for p in $(jobs -p); do
-    if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
-      log "   ⛳ Preserving ComfyUI PID $preserve_pid from cleanup"
-      continue
+    # On normal exit (0) or SIGHUP (129 = SSH disconnect), preserve state
+    if [[ $exit_code -eq 0 ]]; then
+        echo "   ✅ Clean exit - state preserved"
+        return 0
+    elif [[ $exit_code -eq 129 ]]; then
+        echo "   ℹ️  SSH disconnect detected - preserving background processes"
+        return 0
     fi
-    kill -9 "$p" 2>/dev/null || true
-  done
 
-    # Kill any remaining aria2c or wget processes started by this script (avoid killing preserved PID)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # CLEANUP ONLY ON ACTUAL ERRORS
+    # ═══════════════════════════════════════════════════════════════════════════════
+    echo "⚠️  Error detected (exit code: $exit_code) - cleaning up background processes..."
+
+    # Preserve ComfyUI PID if present to avoid killing the running server
+    local preserve_pid_file="${WORKSPACE:-/workspace}/comfyui.pid"
+    local preserve_pid=""
+    if [[ -f "$preserve_pid_file" ]]; then
+        preserve_pid=$(cat "$preserve_pid_file" 2>/dev/null || true)
+        echo "   ⛳ Preserving ComfyUI PID: $preserve_pid"
+    fi
+
+    # Kill jobs except preserved PID (use SIGTERM first for graceful shutdown)
+    for p in $(jobs -p); do
+        if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
+            echo "   ⛳ Skipping ComfyUI PID $preserve_pid from cleanup"
+            continue
+        fi
+        kill -15 "$p" 2>/dev/null || true  # SIGTERM (graceful)
+    done
+
+    # Wait 2 seconds for graceful shutdown
+    sleep 2
+
+    # Force kill any remaining processes
+    for p in $(jobs -p); do
+        if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
+            continue
+        fi
+        kill -9 "$p" 2>/dev/null || true  # SIGKILL (force)
+    done
+
+    # Kill any remaining aria2c or wget processes started by this script
     if [[ -n "$preserve_pid" ]]; then
-      # Kill children of this script except the preserved PID
-      for c in $(pgrep -P $$ || true); do
-        if [[ "$c" == "$preserve_pid" ]]; then
-          log "   ⛳ Skipping kill of preserved PID $preserve_pid"
-          continue
-        fi
-        pkill -P "$c" -9 aria2c 2>/dev/null || true
-        pkill -P "$c" -9 wget 2>/dev/null || true
-      done
-      # Also kill any aria2c/wget not children of this script, but avoid the preserved PID
-      for pid in $(pgrep aria2c || true); do
-        if [[ "$pid" != "$preserve_pid" ]]; then
-          kill -9 "$pid" 2>/dev/null || true
-        fi
-      done
-      for pid in $(pgrep wget || true); do
-        if [[ "$pid" != "$preserve_pid" ]]; then
-          kill -9 "$pid" 2>/dev/null || true
-        fi
-      done
+        # Kill children of this script except the preserved PID
+        for c in $(pgrep -P $$ || true); do
+            if [[ "$c" == "$preserve_pid" ]]; then
+                continue
+            fi
+            pkill -P "$c" -15 aria2c 2>/dev/null || true  # SIGTERM first
+            pkill -P "$c" -15 wget 2>/dev/null || true
+        done
+        sleep 1
+        for c in $(pgrep -P $$ || true); do
+            if [[ "$c" == "$preserve_pid" ]]; then
+                continue
+            fi
+            pkill -P "$c" -9 aria2c 2>/dev/null || true  # SIGKILL if still alive
+            pkill -P "$c" -9 wget 2>/dev/null || true
+        done
     else
-      pkill -P $$ -9 aria2c 2>/dev/null || true
-      pkill -P $$ -9 wget 2>/dev/null || true
+        pkill -P $$ -15 aria2c 2>/dev/null || true
+        pkill -P $$ -15 wget 2>/dev/null || true
+        sleep 1
+        pkill -P $$ -9 aria2c 2>/dev/null || true
+        pkill -P $$ -9 wget 2>/dev/null || true
     fi
 
     exit $exit_code
@@ -103,34 +143,68 @@ log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EMERGENCY SSH FIX (Critical for Vast.ai)
+# SCREEN SESSION DETACHMENT (Survive SSH Disconnection)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Self-wrap in screen session if not already running in one
+if [[ -z "${STY:-}" ]] && [[ -z "${TMUX:-}" ]] && [[ "${1:-}" != "--already-wrapped" ]]; then
+    log "⚡ Not running in detached session - wrapping in screen..."
+
+    # Install screen if missing
+    if ! command -v screen >/dev/null 2>&1; then
+        log "   📦 Installing screen package..."
+        apt-get update -qq 2>&1 | grep -v "^debconf:" || true
+        apt-get install -y -qq screen 2>&1 | grep -v "^debconf:" || true
+    fi
+
+    # Ensure workspace exists
+    WORKSPACE="${WORKSPACE:-/workspace}"
+    mkdir -p "$WORKSPACE" 2>/dev/null || true
+
+    # Launch self in screen session with logging
+    screen -dmS provision -L -Logfile "${WORKSPACE}/provision_screen.log" \
+        bash "$0" --already-wrapped "$@"
+
+    log "✅ Provisioning launched in detached screen session 'provision'"
+    log "   📝 Screen log: ${WORKSPACE}/provision_screen.log"
+    log "   📋 Main log: ${WORKSPACE}/provision_v3.log"
+    log "   🔗 To attach: screen -r provision"
+    log "   👁️  To view logs: tail -f ${WORKSPACE}/provision_screen.log"
+    log ""
+    log "   ⚠️  SSH CONNECTION CAN NOW BE SAFELY CLOSED"
+    log "      The provisioning will continue running in the background."
+    exit 0
+fi
+
+# Remove --already-wrapped flag from arguments
+if [[ "$1" == "--already-wrapped" ]]; then
+    shift
+fi
+
+log "🎯 Running in detached session - SSH disconnection will be survived"
+
+  # List of filenames that are optional: failures for these will not abort provisioning
+  OPTIONAL_ASSETS=(
+    "example_pose.png"
+    "rife426.pth"
+  )
+
+  is_optional_file() {
+    local f="$1"
+    for opt in "${OPTIONAL_ASSETS[@]:-}"; do
+      if [[ "$opt" == "$f" ]]; then
+        return 0
+      fi
+    done
+    return 1
+  }
+# ═══════════════════════════════════════════════════════════════════════════════
+# EMERGENCY SSH FIX (DISABLED BY OPERATOR)
 # ═══════════════════════════════════════════════════════════════════════════════
 fix_ssh_permissions() {
-    log "🔐 Fixing SSH permissions for Vast.ai..."
-
-    # Fix home directory SSH
-    mkdir -p ~/.ssh 2>/dev/null || true
-    chmod 700 ~/.ssh 2>/dev/null || true
-    if [[ -f ~/.ssh/authorized_keys ]]; then
-        chmod 600 ~/.ssh/authorized_keys 2>/dev/null || true
-        log "   ✅ SSH permissions fixed (authorized_keys: 600)"
-    fi
-
-    # Fix /root SSH directory
-    if [[ -d /root/.ssh ]]; then
-        chmod 700 /root/.ssh 2>/dev/null || true
-        chown -R root:root /root/.ssh 2>/dev/null || true
-        if [[ -f /root/.ssh/authorized_keys ]]; then
-            chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
-        fi
-    fi
-
-    # Disable SSH strict mode temporarily for provisioning
-    if [[ -f /etc/ssh/sshd_config ]] && grep -q "StrictModes yes" /etc/ssh/sshd_config 2>/dev/null; then
-        sed -i 's/StrictModes yes/StrictModes no/g' /etc/ssh/sshd_config 2>/dev/null || true
-        systemctl reload ssh 2>/dev/null || true
-        log "   ✅ SSH StrictModes disabled temporarily"
-    fi
+    # Disabled to avoid provisioning hangs per operator request. This used to modify
+    # ~/.ssh and /root/.ssh permissions and temporarily toggle StrictModes.
+    log "🔐 SSH permission fix DISABLED by operator - skipping changes to ~/.ssh and /root/.ssh"
+    return 0
 }
 
 # Emergency recovery for critical system issues
@@ -167,6 +241,31 @@ check_required_cmds() {
     for cmd in "${REQUIRED_CMDS[@]}"; do
         command -v "$cmd" >/dev/null 2>&1 || { echo >&2 "❌ REQUIRED CMD MISSING: $cmd"; exit 1; }
     done
+}
+
+install_apt_packages() {
+    log_section "📦 INSTALLING APT PACKAGES"
+
+    # Update package list
+    log "   Updating apt package list..."
+    apt-get update -qq || {
+        log "⚠️  apt-get update failed, retrying once..."
+        sleep 5
+        apt-get update -qq || log "⚠️  apt-get update failed again, continuing anyway..."
+    }
+
+    # Install packages
+    log "   Installing system packages..."
+    for pkg in "${APT_PACKAGES[@]}"; do
+        if ! dpkg -l | grep -q "^ii  $pkg "; then
+            log "   Installing: $pkg"
+            apt-get install -y -qq "$pkg" 2>&1 | grep -v "^debconf:" || true
+        else
+            log "   ✓ Already installed: $pkg"
+        fi
+    done
+
+    log "✅ APT packages installed successfully"
 }
 
 validate_civitai_token() {
@@ -220,18 +319,11 @@ if mkdir -p "$DEFAULT_WS" 2>/dev/null && cd "$DEFAULT_WS" 2>/dev/null; then
   WORKSPACE="$PWD"
 fi
 
-# 2.2 FIX SSH PERMISSIONS (Critical for log collection and internal SSH)
-# Vast.ai creates authorized_keys with wrong permissions (644) which causes SSH auth failures
-# Fix this immediately to prevent "bad ownership or modes" errors during provisioning
-log "🔐 Fixing SSH permissions..."
-mkdir -p ~/.ssh 2>/dev/null || true
-chmod 700 ~/.ssh 2>/dev/null || true
-  if [[ -f ~/.ssh/authorized_keys ]]; then
-  chmod 600 ~/.ssh/authorized_keys 2>/dev/null || true
-  log "   ✅ SSH permissions fixed (authorized_keys: 600, .ssh: 700)"
-else
-  log "   ⚠️  authorized_keys not found yet (will be created later)"
-fi
+# 2.2 FIX SSH PERMISSIONS (DISABLED BY OPERATOR)
+# The SSH permission fixing step was disabled to avoid provisioning hangs (operator request).
+log "🔐 SSH permission fix DISABLED (operator request - skipping chmod on ~/.ssh)"
+
+# (Operator note): If you later need to re-enable this, restore the original mkdir/chmod/authorized_keys block above.
 
 # 2.5 DISK SPACE CHECK (Ironclad)
 # Minimum disk in GB required for provisioning (configurable via env MIN_DISK_GB)
@@ -283,6 +375,8 @@ NODES=(
     "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
     "https://github.com/rgthree/rgthree-comfy"
     "https://github.com/city96/ComfyUI-GGUF"
+    "https://github.com/VykosX/ComfyUI-TripoSR"
+    "https://github.com/Lightricks/ComfyUI-LTXVideo"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -335,6 +429,13 @@ CHECKPOINT_MODELS=(
 
     # SDXL VAE (320MB) - Official Stability AI repo
     "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors|https://www.dropbox.com/scl/fi/3qygk64xe2ui2ey74neto/sdxl_vae.safetensors?rlkey=xzsllv3hq5w1qx81h9b2xryq8&dl=1|sdxl_vae.safetensors"
+
+    # SDXL base & refiner (official HF) — used by SDXL workflows
+    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors?download=true||sd_xl_base_1.0.safetensors"
+    "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors?download=true||sd_xl_refiner_1.0.safetensors"
+
+    # LTX-2 distilled (video) — adds LTX-2 video capability
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled.safetensors||ltx-2-19b-distilled.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -343,6 +444,9 @@ CHECKPOINT_MODELS=(
 LORA_MODELS=(
     # Pony Realism v2.1 - HF primary (LyliaEngine), Civitai fallback
     "https://huggingface.co/LyliaEngine/ponyRealism_v21MainVAE/resolve/main/ponyRealism_v21MainVAE.safetensors|https://civitai.com/api/download/models/152309|pony_realism_v2.1.safetensors"
+
+    # LTX-2 camera control LoRA (dolly-left)
+    "https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left/resolve/main/ltx-2-19b-lora-camera-control-dolly-left.safetensors||ltx-2-19b-lora-camera-control-dolly-left.safetensors"
 
     # ExpressiveH Hentai - Dropbox only
     "https://www.dropbox.com/scl/fi/5whxkdo39m4w2oimcffx2/expressiveh_hentai.safetensors?rlkey=5ejkyjvethd1r7fn121x7cvs1&dl=1||expressiveh_hentai.safetensors"
@@ -361,27 +465,75 @@ LORA_MODELS=(
 
     # Defecation v1 - HF only (already working)
     "https://huggingface.co/JollyIm/Defecation/resolve/main/defecation_v1.safetensors||defecation_v1.safetensors"
+
+    # --- Catbox.moe Fetish LoRAs (dead links removed) ---
+    "https://files.catbox.moe/wmshk3.safetensors||cunnilingus_gesture.safetensors"
+    "https://files.catbox.moe/88e51n.rar||archive_lora.rar"
+    "https://files.catbox.moe/9qixqa.safetensors||empty_eyes_drooling.safetensors"
+    "https://files.catbox.moe/yz5c9g.safetensors||glowing_eyes.safetensors"
+    "https://files.catbox.moe/tlt57h.safetensors||quadruple_amputee.safetensors"
+    "https://files.catbox.moe/odmswn.safetensors||ugly_bastard.safetensors"
+    "https://files.catbox.moe/z71ic0.safetensors||sex_machine.safetensors"
+    "https://files.catbox.moe/mxbbg2.safetensors||stasis_tank.safetensors"
+
+    # --- BlackHat404/scatmodels (HuggingFace) ---
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/Soiling-V1.safetensors||Soiling-V1.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/turtleheading-V1.safetensors||turtleheading-V1.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/poop_squatV2.safetensors||poop_squatV2.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/Poop_SquatV3.safetensors||Poop_SquatV3.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDump.safetensors||HyperDump.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDumpPlus.safetensors||HyperDumpPlus.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODELS - Wan Video & Specialist Arrays
 # ═══════════════════════════════════════════════════════════════════════════════
 WAN_DIFFUSION_MODELS=(
+    # Wan 2.1 T2V (1.3B parameters, FP16)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors|wan2.1_t2v_1.3B_fp16.safetensors"
+
+    # Wan 2.2 T2V (14B parameters, FP8 quantized for speed)
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+
+    # Wan 2.2 TI2V (Text+Image-to-Video, 5B parameters, FP16)
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors|wan2.2_ti2v_5B_fp16.safetensors"
+
+    # Wan 2.2 Remix (FX-FeiHou) - High and Low Noise variants with Civitai fallbacks
+    "hf:FX-FeiHou/wan2.2-Remix||https://civitai.com/api/download/models/2567309?type=Model&format=SafeTensor&size=pruned&fp=fp8||https://civitai.com/api/download/models/915814?type=Model&format=SafeTensor&size=pruned&fp=fp16|wan2.2_remix_fp8.safetensors"
 )
 
 WAN_CLIP_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn.safetensors|umt5_xxl_fp8_e4m3fn.safetensors"
+)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODELS - Wan 2.2 LoRAs (Lightning Fast Video Generation)
+# ═══════════════════════════════════════════════════════════════════════════════
+WAN_LORA_MODELS=(
+    # Wan 2.2 T2V Lightning LoRAs (4-step generation for speed)
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors|wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors|wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
+
+    # Wan 2.2 I2V Lightning LoRAs (Image-to-Video 4-step)
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors|wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors|wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+)
+
+# MODELS - Text Encoders (General)
+TEXT_ENCODERS=(
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors|gemma_3_12B_it_fp4_mixed.safetensors"
 )
 
 WAN_VAE_MODELS=(
-    # Wan 2.1 VAE - Official HF (already optimal)
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors||wan_2.1_vae.safetensors"
+    # Wan 2.1 VAE - Official HF
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan2.1_vae.safetensors|wan2.1_vae.safetensors"
 
-    # Wan 2.2 VAE - Official HF (already optimal)
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors||wan2.2_vae.safetensors"
+    # Wan 2.2 VAE - Official HF
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors|wan2.2_vae.safetensors"
+
+    # Lumina Image 2.0 VAE - For advanced image encoding
+    "https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors|lumina_ae.safetensors"
 
     # SDXL VAE - Official Stability AI HF repo, Dropbox fallback
     "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors|https://www.dropbox.com/scl/fi/3qygk64xe2ui2ey74neto/sdxl_vae.safetensors?rlkey=xzsllv3hq5w1qx81h9b2xryq8&dl=1|sdxl_vae.safetensors"
@@ -396,6 +548,7 @@ ANIMATEDIFF_MODELS=(
 UPSCALE_MODELS=(
     "https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.pth|4x-UltraSharp.pth"
     "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth|RealESRGAN_x4plus.pth"
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors|ltx-2-spatial-upscaler-x2-1.0.safetensors"
 )
 
 CONTROLNET_MODELS=(
@@ -413,27 +566,36 @@ RIFE_MODELS=(
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS - Flux (Next-Gen Image Generation)
+# MODELS - FLUX (Next-Gen Image Generation & Refinement)
 # ═══════════════════════════════════════════════════════════════════════════════
-# FLUX_MODELS=(
-#     "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors|flux1-dev.safetensors"
-#     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors|flux1-schnell.safetensors"
-# )
-
-FLUX_MODELS=()
-
-# FLUX_VAE_MODELS=(
-#     "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors|flux_ae.safetensors"
-# )
+FLUX_MODELS=(
+    # FLUX Krea Dev - FP8 quantized for refinement and inpainting
+    "https://huggingface.co/Comfy-Org/FLUX.1-Krea-dev_ComfyUI/resolve/main/split_files/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors|flux1-krea-dev_fp8_scaled.safetensors"
+)
 
 FLUX_VAE_MODELS=()
 
-# FLUX_CLIP_MODELS=(
-#     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|clip_l.safetensors"
-#     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors|t5xxl_fp16.safetensors"
-# )
+# FLUX Text Encoders - Required for FLUX model operation
+FLUX_CLIP_MODELS=(
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|clip_l.safetensors"
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors|t5xxl_fp16.safetensors"
+)
 
-FLUX_CLIP_MODELS=()
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODELS - LTX-2 (Advanced Video Generation with Camera Control)
+# ═══════════════════════════════════════════════════════════════════════════════
+LTX_DIFFUSION_MODELS=(
+    # LTX-2 19B Development - FP8 quantized for video generation
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-dev-fp8.safetensors"
+)
+
+LTX_LORA_MODELS=(
+    # LTX-2 Camera Control - Dolly Left movement
+    "https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left/resolve/main/ltx-2-19b-lora-camera-control-dolly-left.safetensors|ltx-2-19b-lora-camera-control-dolly-left.safetensors"
+
+    # LTX-2 Distilled LoRA - 384 resolution for faster generation
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled-lora-384.safetensors|ltx-2-19b-distilled-lora-384.safetensors"
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FUNCTIONS
@@ -629,13 +791,33 @@ install_essential_deps() {
 
 
 
-install_apt_packages() {
-    log_section "📦 INSTALLING SYSTEM PACKAGES"
-    apt-get update -qq
-    apt-get install -y -qq "${APT_PACKAGES[@]}" 2>/dev/null || {
-        log "⚠️  Some packages may have failed, continuing..."
-    }
-    git lfs install --skip-repo 2>/dev/null || true
+install_hf_tools() {
+    log_section "🔧 INSTALLING HUGGING FACE TOOLS"
+    
+    # Install git-xet for large file support
+    if ! command -v git-xet >/dev/null 2>&1; then
+        log "   📦 Installing git-xet for large file support..."
+        # Note: winget is Windows-only, for Linux we'll use alternative installation
+        if command -v apt-get >/dev/null 2>&1; then
+            # Try to install via apt if available (may not be in default repos)
+            apt-get update -qq && apt-get install -y -qq git-lfs 2>/dev/null || log "   ⚠️  git-lfs install failed, continuing..."
+        fi
+    else
+        log "   ✅ git-xet already installed"
+    fi
+    
+    # Install Hugging Face CLI
+    if ! command -v hf >/dev/null 2>&1; then
+        log "   📦 Installing Hugging Face CLI..."
+        # Use the PowerShell installation method adapted for bash
+        if command -v curl >/dev/null 2>&1; then
+            curl -s -L https://hf.co/cli/install.sh | bash || log "   ⚠️  HF CLI install failed, continuing..."
+        else
+            log "   ⚠️  curl not available, skipping HF CLI install"
+        fi
+    else
+        log "   ✅ Hugging Face CLI already installed"
+    fi
 }
 
 install_comfyui() {
@@ -902,6 +1084,8 @@ download_file() {
     local filename="$3"
     local fallback_url="${4:-}"
     local filepath="${dir}/${filename}"
+  # Per-file verbose log path (used for diagnostics on failure)
+  local file_log="${WORKSPACE}/download-logs/${filename}.log"
 
     # 1. Validation (Skip if valid)
     if [[ -f "$filepath" ]]; then
@@ -949,10 +1133,25 @@ download_file() {
     [[ -n "$fallback_url" ]] && log "      Fallback: $fallback_url"
 
     [[ -f "/workspace/provision_errors.log" ]] || touch "/workspace/provision_errors.log"
+
+    # If file is optional, log and continue (do not abort provisioning)
+    if is_optional_file "$filename"; then
+      log "   ⚠️  OPTIONAL ASSET FAILED: $filename - continuing provisioning"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') OPTIONAL FAILED: $filename - primary: $url, fallback: ${fallback_url:-none}" >> "/workspace/provision_errors.log"
+      rm -f "$filepath"
+      return 0
+    fi
+
+    # Ensure file_log exists or point to a safe fallback
+    [[ -n "${file_log:-}" ]] || file_log="/dev/null"
     echo "$(date '+%Y-%m-%d %H:%M:%S') FAILED: $filename - primary: $url, fallback: ${fallback_url:-none}, logfile: ${file_log}" >> "/workspace/provision_errors.log"
-    # Also append a short diagnostic snippet (last 80 lines) to the error log
-    echo "--- DIAGNOSTIC: last 80 lines of ${file_log} ---" >> "/workspace/provision_errors.log"
-    tail -n 80 "${file_log}" >> "/workspace/provision_errors.log" 2>/dev/null || true
+    # Also append a short diagnostic snippet (last 80 lines) to the error log (if available)
+    if [[ -f "${file_log}" ]]; then
+      echo "--- DIAGNOSTIC: last 80 lines of ${file_log} ---" >> "/workspace/provision_errors.log"
+      tail -n 80 "${file_log}" >> "/workspace/provision_errors.log" 2>/dev/null || true
+    else
+      echo "--- DIAGNOSTIC: no per-file log available for ${filename} ---" >> "/workspace/provision_errors.log"
+    fi
     rm -f "$filepath"
     return 1
 }
@@ -1126,62 +1325,91 @@ smart_download_parallel() {
 install_models() {
     log_section "📦 DOWNLOADING MODELS (STAGED)"
 
-    # Calculate total model count
+    # Calculate total model count - includes all new arrays
     local total_models=0
-    total_models=$((${#CHECKPOINT_MODELS[@]} + ${#LORA_MODELS[@]} + ${#WAN_DIFFUSION_MODELS[@]} + ${#WAN_CLIP_MODELS[@]} + ${#WAN_VAE_MODELS[@]} + ${#ANIMATEDIFF_MODELS[@]} + ${#UPSCALE_MODELS[@]} + ${#CONTROLNET_MODELS[@]} + ${#RIFE_MODELS[@]} + 2 + 1 + ${#FLUX_MODELS[@]} + 1 + 1 + 1))
+    total_models=$((${#CHECKPOINT_MODELS[@]} + ${#LORA_MODELS[@]} + ${#WAN_DIFFUSION_MODELS[@]} + ${#WAN_CLIP_MODELS[@]} + ${#WAN_LORA_MODELS[@]} + ${#WAN_VAE_MODELS[@]} + ${#ANIMATEDIFF_MODELS[@]} + ${#UPSCALE_MODELS[@]} + ${#CONTROLNET_MODELS[@]} + ${#RIFE_MODELS[@]} + ${#DETECTOR_MODELS[@]} + ${#FLUX_MODELS[@]} + ${#FLUX_CLIP_MODELS[@]} + ${#TEXT_ENCODERS[@]} + ${#LTX_DIFFUSION_MODELS[@]} + ${#LTX_LORA_MODELS[@]}))
 
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
     log "║  🎯 TOTAL MODELS TO DOWNLOAD: $total_models                           "
-    log "║  📊 This may take 30-90 minutes depending on connection       "
+    log "║  📊 Estimated install size: 100GB+                            "
+    log "║  ⏱️  Est. time: 15-30 minutes on high-speed connection        "
     log "╚════════════════════════════════════════════════════════════════╝"
     log ""
 
-    log "🎨 [1/14] Downloading CHECKPOINTS..."
+    log "🎨 [1/18] Downloading CHECKPOINTS..."
     smart_download_parallel "${COMFYUI_DIR}/models/checkpoints" "$MAX_PAR_HF" "${CHECKPOINT_MODELS[@]}"
 
-    log "🎨 [2/14] Downloading LORAS..."
+    log "🎨 [2/18] Downloading GENERAL LORAS..."
     smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${LORA_MODELS[@]}"
 
-    log "🎥 [3/14] Downloading WAN DIFFUSION MODELS..."
+    log "⚡ [3/18] Downloading WAN LIGHTNING LORAS (4-step generation)..."
+    smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${WAN_LORA_MODELS[@]}"
+
+    log "🎥 [4/18] Downloading WAN DIFFUSION MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${WAN_DIFFUSION_MODELS[@]}"
 
-    log "📝 [4/14] Downloading WAN CLIP MODELS..."
+    log "📝 [5/18] Downloading WAN TEXT ENCODERS..."
     smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${WAN_CLIP_MODELS[@]}"
 
-    log "🎬 [5/14] Downloading WAN VAE MODELS..."
+    log "🎬 [6/18] Downloading WAN VAE MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/vae" "$MAX_PAR_HF" "${WAN_VAE_MODELS[@]}"
 
-    log "🎞️  [6/14] Downloading ANIMATEDIFF MODELS..."
+    log "🎞️  [7/18] Downloading ANIMATEDIFF MOTION MODULES..."
     smart_download_parallel "${COMFYUI_DIR}/models/animatediff_models" "$MAX_PAR_HF" "${ANIMATEDIFF_MODELS[@]}"
 
-    log "⬆️  [7/14] Downloading UPSCALE MODELS..."
+    log "⬆️  [8/18] Downloading UPSCALE MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/upscale_models" "$MAX_PAR_HF" "${UPSCALE_MODELS[@]}"
 
-    log "🎮 [8/14] Downloading CONTROLNET MODELS..."
+    log "🎮 [9/18] Downloading CONTROLNET MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/controlnet" "$MAX_PAR_HF" "${CONTROLNET_MODELS[@]}"
 
-    log "🎞️  [9/14] Downloading RIFE MODELS..."
+    log "🎞️  [10/18] Downloading RIFE FRAME INTERPOLATION..."
     smart_download_parallel "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife" "$MAX_PAR_HF" "${RIFE_MODELS[@]}"
 
-    log "🔍 [10/14] Downloading DETECTOR MODELS (bbox)..."
+    log "🔍 [11/18] Downloading DETECTOR MODELS (Face/Hand YOLO)..."
     smart_download_parallel "${COMFYUI_DIR}/models/ultralytics/bbox" "$MAX_PAR_HF" "${DETECTOR_MODELS[@]:0:2}"
 
-    log "🔍 [11/14] Downloading DETECTOR MODELS (SAM)..."
+    log "🔍 [12/18] Downloading SEGMENTATION MODEL (SAM)..."
     smart_download_parallel "${COMFYUI_DIR}/models/sams" "$MAX_PAR_HF" "${DETECTOR_MODELS[@]:2:1}"
 
-    # log "⚡ [12/14] Downloading FLUX MODELS..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/unet" "$MAX_PAR_HF" "${FLUX_MODELS[@]}"
+    log "⚡ [13/18] Downloading FLUX DIFFUSION MODELS..."
+    if [[ ${#FLUX_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${FLUX_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no FLUX models configured)"
+    fi
 
-    # log "⚡ [13/14] Downloading FLUX VAE..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/vae" "$MAX_PAR_HF" "${FLUX_VAE_MODELS[@]}"
+    log "⚡ [14/18] Downloading FLUX TEXT ENCODERS..."
+    if [[ ${#FLUX_CLIP_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${FLUX_CLIP_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no FLUX CLIP models configured)"
+    fi
 
-    # log "⚡ [14/14] Downloading FLUX CLIP..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${FLUX_CLIP_MODELS[@]}"
+    log "📝 [15/18] Downloading GENERAL TEXT ENCODERS..."
+    if [[ ${#TEXT_ENCODERS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${TEXT_ENCODERS[@]}"
+    else
+        log "   ⏭️  Skipped (no general text encoders configured)"
+    fi
 
-    log "🖼️  [BONUS] Downloading example pose image..."
-    download_file "https://huggingface.co/spaces/hysts/ControlNet/resolve/main/images/pose.png" \
-        "${COMFYUI_DIR}/user/default" "example_pose.png"
+    log "🎬 [16/18] Downloading LTX-2 DIFFUSION MODELS..."
+    if [[ ${#LTX_DIFFUSION_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${LTX_DIFFUSION_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no LTX-2 diffusion models configured)"
+    fi
+
+    log "🎥 [17/18] Downloading LTX-2 LORAS (Camera Control)..."
+    if [[ ${#LTX_LORA_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${LTX_LORA_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no LTX-2 LoRAs configured)"
+    fi
+
+    log "🎨 [18/18] Downloading LTX-2 SPATIAL UPSCALER..."
+    # Note: Already included in UPSCALE_MODELS array above
 
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
@@ -1318,11 +1546,114 @@ verify_installation() {
     fi
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# WORKFLOW SYNC FROM DROPBOX (Easiest Method for Updates)
+# ═══════════════════════════════════════════════════════════════════════════════
+sync_workflows_from_dropbox() {
+    log_section "🔄 SYNCING WORKFLOWS FROM DROPBOX"
+    local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
+    mkdir -p "$workflows_dir"
+
+    # Optional: Set this environment variable to enable Dropbox sync
+    # DROPBOX_WORKFLOWS_URL should be a shared link to your workflows folder
+    # Example: https://www.dropbox.com/sh/abc123xyz/AABBCCDDee?dl=0
+
+    if [[ -z "${DROPBOX_WORKFLOWS_URL:-}" ]]; then
+        log "⏭️  Skipping Dropbox sync (DROPBOX_WORKFLOWS_URL not set)"
+        log "   To enable: Set DROPBOX_WORKFLOWS_URL in .env to your shared workflows folder link"
+        return 0
+    fi
+
+    log "📥 Downloading workflows from Dropbox..."
+    log "   Source: ${DROPBOX_WORKFLOWS_URL}"
+
+    # Convert Dropbox share link to direct download URL
+    # Change dl=0 to dl=1 for direct download
+    local download_url="${DROPBOX_WORKFLOWS_URL//dl=0/dl=1}"
+    local temp_zip="/tmp/workflows_$(date +%s).zip"
+
+    # Download the workflows folder as zip
+    if wget -q --timeout=60 --tries=3 -O "$temp_zip" "$download_url"; then
+        log "✅ Downloaded workflows archive"
+
+        # Extract workflows
+        if command -v unzip >/dev/null 2>&1; then
+            if unzip -q -o "$temp_zip" -d "$workflows_dir" 2>/dev/null; then
+                local count=$(find "$workflows_dir" -name "*.json" -type f 2>/dev/null | wc -l)
+                log "✅ Extracted $count workflow files to $workflows_dir"
+                rm -f "$temp_zip"
+                return 0
+            else
+                log "⚠️  Failed to extract workflows archive"
+            fi
+        else
+            log "⚠️  unzip command not found, installing..."
+            apt-get install -y unzip >/dev/null 2>&1 && \
+                unzip -q -o "$temp_zip" -d "$workflows_dir" && \
+                log "✅ Extracted workflows" || \
+                log "❌ Failed to extract workflows"
+        fi
+        rm -f "$temp_zip"
+    else
+        log "⚠️  Failed to download from Dropbox"
+        log "   Check your DROPBOX_WORKFLOWS_URL is correct and accessible"
+        return 1
+    fi
+}
+
+# Alternative: Sync individual workflow files from direct links
+sync_workflows_from_links() {
+    log_section "🔄 SYNCING WORKFLOWS FROM DIRECT LINKS"
+    local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
+    mkdir -p "$workflows_dir"
+
+    # Define your workflow files as Dropbox direct download links
+    # Format: "DROPBOX_LINK|FILENAME"
+    # To get direct links: Share file in Dropbox → Copy link → Change dl=0 to dl=1
+    local workflow_links=(
+        # Example (replace with your actual Dropbox links):
+        # "https://www.dropbox.com/scl/fi/abc123/nsfw_pony_multiple_fetish.json?rlkey=xyz&dl=1|nsfw_pony_multiple_fetish_stacked_master_workflow.json"
+        # "https://www.dropbox.com/scl/fi/def456/nsfw_ltx_camera.json?rlkey=uvw&dl=1|nsfw_ltx_camera_control_hyperdump_scat_video_workflow.json"
+
+        # Add more workflows here...
+    )
+
+    if [[ ${#workflow_links[@]} -eq 0 ]]; then
+        log "⏭️  No workflow links configured"
+        log "   Edit provision-reliable.sh to add Dropbox links in sync_workflows_from_links()"
+        return 0
+    fi
+
+    local success=0
+    local failed=0
+
+    for link_pair in "${workflow_links[@]}"; do
+        IFS='|' read -r url filename <<< "$link_pair"
+
+        log "📥 Downloading: $filename"
+        if wget -q --timeout=30 --tries=2 -O "${workflows_dir}/${filename}" "$url"; then
+            ((success++))
+            log "   ✅ $filename"
+        else
+            ((failed++))
+            log "   ❌ Failed: $filename"
+        fi
+    done
+
+    log ""
+    log "✅ Downloaded $success workflow(s), $failed failed"
+}
+
 
 install_workflows() {
     log_section "📝 INSTALLING PRODUCTION WORKFLOWS"
     local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
     mkdir -p "$workflows_dir"
+
+    # NEW: Try syncing from Dropbox first (if configured)
+    sync_workflows_from_dropbox || true
+
+    # If Dropbox sync not configured, workflows will be created below from heredocs
 
 # NSFW IMAGE WORKFLOW (Pony XL - Fully Connected)
     # ═══════════════════════════════════════════════════════════════════════
@@ -2883,50 +3214,63 @@ FLUXWORKFLOW
       # Use Python to safely update JSON workflow files in-place
       # Export COMFYUI_DIR so Python can access it
       export COMFYUI_DIR
-      python3 - <<'PY'
-import json, os
+      python3 - <<'PYSCRIPT'
+import json
+import os
+
 wd = os.environ.get('COMFYUI_DIR')
 if not wd:
-  wd = os.getcwd()
+    wd = os.getcwd()
+
 wf_dir = os.path.join(wd, 'user', 'default', 'workflows')
-out_prefix = os.path.join('aikings_outputs')
+out_prefix = 'aikings_outputs'
+
 for fn in os.listdir(wf_dir):
-  if not fn.endswith('.json'):
-    continue
-  path = os.path.join(wf_dir, fn)
-  try:
-    with open(path, 'r', encoding='utf-8') as f:
-      data = json.load(f)
-  except Exception:
-    continue
-  changed = False
-  base = os.path.splitext(fn)[0]
-  for node in data.get('nodes', []):
-    c = node.get('class_type','')
-    if c == 'SaveImage':
-      w = node.get('widgets_values', [])
-      if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
-        if not w:
-          node['widgets_values'] = [os.path.join(out_prefix, base)]
-        else:
-          node['widgets_values'][0] = os.path.join(out_prefix, base)
-        changed = True
-    if 'VHS_VideoCombine' in c or c == 'VHS_VideoCombine':
-      w = node.get('widgets_values', [])
-      if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
-        if not w:
-          node['widgets_values'] = [os.path.join(out_prefix, base + '_video')] + w[1:]
-        else:
-          node['widgets_values'][0] = os.path.join(out_prefix, base + '_video')
-        changed = True
-  if changed:
+    if not fn.endswith('.json'):
+        continue
+    path = os.path.join(wf_dir, fn)
     try:
-      with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-      print(f'Normalized outputs in {fn}')
-    except Exception as e:
-      print('Failed to write', fn, e)
-PY
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        continue
+
+    changed = False
+    base = os.path.splitext(fn)[0]
+
+    for node in data.get('nodes', []):
+        c = node.get('class_type', '')
+
+        # Handle SaveImage nodes
+        if c == 'SaveImage':
+            w = node.get('widgets_values', [])
+            new_path = os.path.join(out_prefix, base)
+            if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
+                if not w:
+                    node['widgets_values'] = [new_path]
+                else:
+                    node['widgets_values'][0] = new_path
+                changed = True
+
+        # Handle VHS_VideoCombine nodes
+        if 'VHS_VideoCombine' in c or c == 'VHS_VideoCombine':
+            w = node.get('widgets_values', [])
+            new_path = os.path.join(out_prefix, base + '_video')
+            if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
+                if not w:
+                    node['widgets_values'] = [new_path] + (w[1:] if len(w) > 1 else [])
+                else:
+                    node['widgets_values'][0] = new_path
+                changed = True
+
+    if changed:
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+            print(f'Normalized outputs in {fn}')
+        except Exception as e:
+            print(f'Failed to write {fn}: {e}')
+PYSCRIPT
       log "✅ Workflow outputs normalized (directory: ${COMFYUI_DIR}/user/default/${outputs_subdir})"
     }
 
@@ -3087,42 +3431,174 @@ Environment=PYTHONUNBUFFERED=1
 [Install]
 WantedBy=multi-user.target
 EOF
+
+  # Ensure systemd notices the new unit and start it
+  log "   🔁 Reloading systemd daemon and enabling comfyui.service"
+  systemctl daemon-reload || log "   ⚠️  systemctl daemon-reload failed (non-systemd image?)"
+  systemctl enable --now comfyui.service || log "   ⚠️  systemctl enable/start comfyui.service failed (will attempt fallback start)"
+
+  # Verify ComfyUI process is running (fallback: start manually)
+  sleep 2
+  if ! sudo ss -tunlp | grep -q ":8188"; then
+    log "   ⚠️  comfy.service not listening on 8188; attempting manual start"
+    nohup ${VENV_PYTHON} ${COMFYUI_DIR}/main.py --listen 0.0.0.0 --port 8188 --enable-cors-header >/dev/null 2>&1 &
+  fi
+  sleep 1
+  if sudo ss -tunlp | grep -q ":8188"; then
+    log "   ✅ ComfyUI is listening on 8188"
+  else
+    log "   ❌ ComfyUI failed to start and is not listening on 8188"
+  fi
   chmod 644 "$svc_file" || true
   log "   ✅ Wrote systemd unit: $svc_file"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHECKPOINT SYSTEM (Resume from Last Completed Phase)
+# ═══════════════════════════════════════════════════════════════════════════════
+CHECKPOINT_FILE="${WORKSPACE:-/workspace}/.provision_checkpoint"
+DOWNLOADS_COMPLETE="${WORKSPACE:-/workspace}/.downloads_complete"
+
+checkpoint_save() {
+    local phase="$1"
+    echo "$phase" > "$CHECKPOINT_FILE"
+    log "📌 Checkpoint: $phase saved"
+}
+
+checkpoint_load() {
+    if [[ -f "$CHECKPOINT_FILE" ]]; then
+        cat "$CHECKPOINT_FILE"
+    else
+        echo "START"
+    fi
+}
+
+checkpoint_is_complete() {
+    local phase="$1"
+    local current=$(checkpoint_load)
+
+    # Phase progression: START → PACKAGES → COMFYUI → NODES → MODELS → WORKFLOWS → COMPLETE
+    case "$current" in
+        START)
+            return 1 ;;  # Nothing completed yet
+        PACKAGES)
+            [[ "$phase" == "START" ]] && return 0 || return 1 ;;
+        COMFYUI)
+            [[ "$phase" =~ ^(START|PACKAGES)$ ]] && return 0 || return 1 ;;
+        NODES)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI)$ ]] && return 0 || return 1 ;;
+        MODELS)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI|NODES)$ ]] && return 0 || return 1 ;;
+        WORKFLOWS)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI|NODES|MODELS)$ ]] && return 0 || return 1 ;;
+        COMPLETE)
+            return 0 ;;  # Everything completed
+        *)
+            log "⚠️  Unknown checkpoint state: $current"
+            return 1 ;;
+    esac
+}
+
+checkpoint_reset() {
+    rm -f "$CHECKPOINT_FILE"
+    log "🔄 Checkpoint reset - will start from beginning"
 }
 
 main() {
     log "--- Provisioning Start ---"
 
-    # Run emergency recovery FIRST to fix SSH and environment
-    emergency_recovery
+    # Load and display checkpoint status
+    local checkpoint=$(checkpoint_load)
+    log "📌 Current checkpoint: $checkpoint"
 
-    install_apt_packages
-    check_required_cmds
-
-    # Validate token before downloads - fail early to save time
-    if ! validate_civitai_token; then
-        log "❌ FATAL: Civitai token validation failed - cannot proceed with provisioning"
-        log "   Please set a valid CIVITAI_TOKEN and try again"
-        exit 1
+    if [[ "$checkpoint" != "START" ]]; then
+        log "   ✅ Resuming from previous run - completed phases will be skipped"
     fi
 
-    install_comfyui
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 1: SYSTEM PACKAGES & EMERGENCY RECOVERY
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "START"; then
+        log "⏭️  Skipping: Emergency recovery & APT packages (already done)"
+    else
+        log_section "PHASE 1: SYSTEM PACKAGES & EMERGENCY RECOVERY"
+        emergency_recovery
+        install_apt_packages
+        check_required_cmds
 
-    # Emergency recovery before nodes (git operations need SSH)
-    emergency_recovery
-    install_nodes
+        # Validate token before downloads - fail early to save time
+        if ! validate_civitai_token; then
+            log "❌ FATAL: Civitai token validation failed - cannot proceed with provisioning"
+            log "   Please set a valid CIVITAI_TOKEN and try again"
+            exit 1
+        fi
 
-    # Emergency recovery before models (large downloads)
-    emergency_recovery
-    install_models         # Download models FIRST
-    retry_failed_downloads # Check and report failed downloads
-    verify_installation    # Then verify (checks for models)
-    install_workflows
-    # Normalize workflow outputs so all generated assets go to a unified folder
-    update_workflow_outputs
-    start_comfyui
+        checkpoint_save "PACKAGES"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 2: COMFYUI INSTALLATION
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "PACKAGES"; then
+        log "⏭️  Skipping: ComfyUI installation (already done)"
+    else
+        log_section "PHASE 2: COMFYUI INSTALLATION"
+        install_comfyui
+        checkpoint_save "COMFYUI"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 3: CUSTOM NODES
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "COMFYUI"; then
+        log "⏭️  Skipping: Custom nodes (already done)"
+    else
+        log_section "PHASE 3: CUSTOM NODES"
+        emergency_recovery  # Ensure SSH is working for git operations
+        install_nodes
+        checkpoint_save "NODES"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 4: MODEL DOWNLOADS
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "NODES"; then
+        log "⏭️  Skipping: Model downloads (already done)"
+    else
+        log_section "PHASE 4: MODEL DOWNLOADS (Longest Phase)"
+        emergency_recovery
+        install_hf_tools
+        install_models
+        retry_failed_downloads
+        checkpoint_save "MODELS"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 5: WORKFLOWS & VERIFICATION
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "MODELS"; then
+        log "⏭️  Skipping: Workflows & verification (already done)"
+    else
+        log_section "PHASE 5: WORKFLOWS & VERIFICATION"
+        verify_installation
+        install_workflows
+        update_workflow_outputs
+        checkpoint_save "WORKFLOWS"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 6: START COMFYUI
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "WORKFLOWS"; then
+        log_section "PHASE 6: STARTING COMFYUI"
+        start_comfyui
+        checkpoint_save "COMPLETE"
+    fi
+
     log "--- Provisioning Complete ---"
+    log "✅ All phases completed successfully!"
+    log "   Checkpoint file: $CHECKPOINT_FILE"
+    log "   To reset checkpoint and start fresh: rm $CHECKPOINT_FILE"
 }
 
 main "$@"
