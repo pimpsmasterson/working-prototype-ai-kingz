@@ -86,8 +86,8 @@ We provide a `one-click-start.ps1` script that starts the server under PM2, wait
 │   (HTML/CSS/JS) │◄──►│   (Express.js)  │◄──►│   (Cloud GPUs)  │
 │                 │    │                 │    │                 │
 │ • Studio UI     │    │ • API proxying  │    │ • GPU rental    │
-│ • Muse manager  │    │ • Auth & audit  │    │ • Instance mgmt │
-│ • Gallery       │    │ • Error handling│    │ • ComfyUI       │
+│ • Muse manager  │    │ • Warm pool mgmt│    │ • Instance mgmt │
+│ • Gallery       │    │ • Auth & audit  │    │ • ComfyUI       │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                 ▲
                                 │
@@ -95,7 +95,7 @@ We provide a `one-click-start.ps1` script that starts the server under PM2, wait
                     │   Database      │
                     │   (SQLite)      │
                     │                 │
-                    │ • Warm pool     │
+                    │ • Instance state│
                     │ • Audit logs    │
                     │ • Usage events  │
                     └─────────────────┘
