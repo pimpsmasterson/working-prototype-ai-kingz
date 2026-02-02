@@ -90,7 +90,7 @@ df -h /workspace
 "@
 
 Write-Host "`nExecuting comprehensive diagnostics..." -ForegroundColor Yellow
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $investigateCmd | Out-File -FilePath "comfyui_diagnosis.txt"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $investigateCmd | Out-File -FilePath "comfyui_diagnosis.txt"
 
 Write-Host "`n✅ Diagnosis complete - saved to comfyui_diagnosis.txt" -ForegroundColor Green
 Write-Host "`nOpening file for review..." -ForegroundColor Cyan

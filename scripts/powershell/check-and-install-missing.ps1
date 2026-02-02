@@ -37,7 +37,7 @@ ls -1 diffusion_models/ 2>/dev/null
 "@
 
 Write-Host "`nChecking current files..." -ForegroundColor Yellow
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $checkCmd
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $checkCmd
 
 Write-Host "`n=== Downloading Missing Files ===" -ForegroundColor Cyan
 
@@ -97,14 +97,14 @@ echo 'All downloads complete!'
 "@
 
 Write-Host "`nStarting downloads..." -ForegroundColor Yellow
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $downloadCmd
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $downloadCmd
 
 Write-Host "`n=== Verifying Files ===" -ForegroundColor Cyan
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $checkCmd
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $checkCmd
 
 Write-Host "`n=== Restarting ComfyUI ===" -ForegroundColor Yellow
-$restartCmd = "pkill -f 'main.py' 2>/dev/null || true; sleep 3; cd /workspace/ComfyUI && source /venv/main/bin/activate && nohup python main.py --listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header > /workspace/comfyui_restart.log 2>&1 &; sleep 5; tail -20 /workspace/comfyui_restart.log"
-ssh -o StrictHostKeyChecking=no -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $restartCmd
+$restartCmd = "pkill -f 'main.py' 2>/dev/null || true; sleep 3; cd /workspace/ComfyUI && source /venv/main/bin/activate && setsid nohup python main.py --listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header > /workspace/comfyui_restart.log 2>&1 < /dev/null &; sleep 5; tail -20 /workspace/comfyui_restart.log"
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -i $SSH_KEY -p $SSH_PORT root@$SSH_HOST $restartCmd
 
 Write-Host "`n✅ Complete!" -ForegroundColor Green
 Write-Host "Access ComfyUI at: http://localhost:8188 (via SSH tunnel)" -ForegroundColor Cyan
