@@ -134,6 +134,7 @@ class VastAIAutomator {
             dph_total: { lte: config.maxPrice },
             total_flops: { gte: config.minFlops },
             gpu_ram: { gte: config.minRam * 1024 }, // Convert GB to MB
+            disk_space: { gte: 250 }, // 250GB minimum for provision-reliable.sh
             reliability: { gte: 0.95 }, // High reliability for stable performance
             inet_down: { gte: networkRequirement }, // Prioritize high-speed networks for NSFW workflows
             inet_up: { gte: 10 },   // Minimum 10 MB/s upload
@@ -355,26 +356,39 @@ cd /root/ComfyUI &&
         const response = await this.makeRequest(`/asks/${selectedOffer.id}/`, {
             method: 'PUT',
             body: {
-                image: 'pytorch/pytorch:latest',
+                image: 'nvidia/cuda:12.4.0-devel-ubuntu24.04',  // Clean Ubuntu base - no pre-configured provisioning
                 runtype: 'ssh',
                 target_state: 'running',
                 onstart: `
-cd /root &&
-git clone https://github.com/comfyanonymous/ComfyUI.git &&
-cd ComfyUI &&
-pip install -r requirements.txt &&
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 &&
-${modelDownloads} &&
-nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 &
+#!/bin/bash
+set -e
+export WORKSPACE=/workspace
+export CIVITAI_TOKEN="${this.civitaiToken || ''}"
+export HUGGINGFACE_HUB_TOKEN="${this.hfToken || ''}"
+
+# Download and execute custom provision script
+cd /workspace
+curl -fsSL "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" -o provision-reliable.sh
+chmod +x provision-reliable.sh
+
+# Run provision script in detached screen session (survives SSH disconnects)
+screen -dmS provision bash -c "./provision-reliable.sh 2>&1 | tee provision.log"
+
+# Monitor provisioning status
+echo "🚀 Provisioning started in screen session 'provision'"
+echo "📝 Logs: /workspace/provision.log"
+echo "🔗 To attach: screen -r provision"
                 `.trim(),
                 env: Object.assign({
-                    'PYTHONPATH': '/root/ComfyUI'
+                    'WORKSPACE': '/workspace',
+                    'PYTHONPATH': '/workspace/ComfyUI',
+                    'MIN_DISK_GB': '200'  // Provision script requires minimum 200GB
                 },
                 // Pass down tokens if available so instance can perform automated downloads
                 (this.hfToken ? { 'HUGGINGFACE_HUB_TOKEN': this.hfToken } : {}),
                 (this.civitaiToken ? { 'CIVITAI_TOKEN': this.civitaiToken } : {})
                 ),
-                disk: 64  // Increased disk space for models
+                disk: 250  // 250GB for models + workflows + cache (provision needs 200GB+)
             }
         });
 

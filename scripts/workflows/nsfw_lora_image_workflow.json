@@ -1,4 +1,145 @@
 {
+  "_meta": {
+    "title": "NSFW LoRA Image Master Workflow",
+    "description": "Focused LoRA-enhanced NSFW image generation using Pony Diffusion XL with realism optimization. Clean, efficient workflow for high-quality explicit content with precise LoRA control.",
+    "version": "1.0.0",
+    "category": "lora-generation",
+    "tags": ["lora", "pony-diffusion", "realism", "nsfw", "focused-workflow"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "base_model": {
+      "name": "Pony Diffusion V6 XL",
+      "filename": "ponyDiffusionV6XL.safetensors",
+      "type": "checkpoint",
+      "description": "Advanced Pony model optimized for character generation and NSFW content",
+      "url": "https://civitai.com/models/257749/pony-diffusion-v6-xl",
+      "hash": "Expected hash for verification"
+    },
+    "lora_model": {
+      "name": "Pony Realism v2.1",
+      "filename": "pony_realism_v2.1.safetensors",
+      "type": "lora",
+      "description": "Realism enhancement LoRA for Pony models, improves photorealistic quality",
+      "url": "https://civitai.com/models/372851/pony-realism",
+      "recommended_weight": 0.6,
+      "weight_range": "0.4-0.9",
+      "trigger_words": ["realistic", "photorealistic", "detailed skin"]
+    }
+  },
+  "quality_settings": {
+    "resolution": {
+      "width": 1024,
+      "height": 1024,
+      "aspect_ratio": "1:1",
+      "recommended_range": "768x768 to 1536x1536"
+    },
+    "sampling": {
+      "steps": 30,
+      "cfg_scale": 7.0,
+      "sampler": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "clip_skip": -2,
+      "recommended_steps_range": "25-40",
+      "recommended_cfg_range": "6.0-8.0"
+    },
+    "performance": {
+      "vram_usage": "~10-12GB",
+      "recommended_gpu": "RTX 3060+ or equivalent",
+      "generation_time": "~15-30 seconds",
+      "efficiency": "Optimized single-LoRA workflow"
+    }
+  },
+  "lora_configuration": {
+    "single_lora_focus": {
+      "description": "Streamlined workflow for single LoRA application",
+      "weight_optimization": "0.6-0.8 for balanced realism enhancement",
+      "clip_weight": "Match model weight for consistent application"
+    },
+    "realism_lora_specific": {
+      "pony_realism_v21": "Enhances photorealistic qualities in Pony generations",
+      "effect": "Improves skin texture, lighting, and overall realism",
+      "compatibility": "Works well with Pony base models"
+    },
+    "alternative_loras": [
+      {
+        "name": "HyperDump",
+        "weight": "0.7-0.9",
+        "use_case": "NSFW enhancement and explicit content"
+      },
+      {
+        "name": "Detail Tweaker",
+        "weight": "0.5-0.7",
+        "use_case": "Enhanced facial and anatomical details"
+      }
+    ]
+  },
+  "prompting_guide": {
+    "positive_prompt_structure": [
+      "Quality: score_9, score_8_up, score_7_up, masterpiece, photorealistic",
+      "Subject: 1girl, detailed face, beautiful eyes",
+      "Content: nsfw, explicit elements",
+      "Style: high quality, realistic details",
+      "LoRA triggers: Include realism-related terms if needed"
+    ],
+    "negative_prompt_structure": [
+      "Quality issues: score_6, score_5, score_4, low quality, blurry",
+      "Style filters: censored, watermark, ugly, cartoon, anime",
+      "Anatomy: bad anatomy, deformed (if realism-focused)"
+    ],
+    "lora_specific_prompting": {
+      "realism_enhancement": "Use 'photorealistic, detailed skin, realistic lighting'",
+      "consistency": "Keep prompt structure consistent for batch generation",
+      "trigger_words": "Include LoRA-specific trigger words for best results"
+    },
+    "example_prompts": [
+      "score_9, score_8_up, score_7_up, 1girl, detailed face, beautiful eyes, high quality, nsfw, photorealistic, detailed skin, realistic lighting, masterpiece",
+      "score_9, score_8_up, 1girl, nsfw, explicit pose, photorealistic, detailed anatomy, high resolution, cinematic lighting"
+    ]
+  },
+  "workflow_flow": {
+    "step_1": "Load Pony Diffusion XL base model",
+    "step_2": "Apply CLIP skip (-2) for better prompt following",
+    "step_3": "Load and apply Pony Realism v2.1 LoRA (0.8 weight)",
+    "step_4": "Encode positive and negative prompts",
+    "step_5": "Generate latent image (1024x1024)",
+    "step_6": "Sample with KSampler (30 steps, CFG 7.0)",
+    "step_7": "Decode latent to image with VAE",
+    "step_8": "Save final image"
+  },
+  "expected_output": {
+    "image_quality": "High-resolution photorealistic NSFW images",
+    "style": "Pony Diffusion with enhanced realism",
+    "resolution": "1024x1024 pixels",
+    "content": "Explicit content with detailed anatomy and realistic rendering",
+    "consistency": "Stable results with LoRA-specific characteristics"
+  },
+  "troubleshooting": {
+    "weak_lora_effect": {
+      "solution": "Increase LoRA weight to 0.9, add trigger words to prompt",
+      "alternative": "Try different realism LoRA if available"
+    },
+    "inconsistent_quality": {
+      "solution": "Use consistent prompt structure, check CLIP skip setting",
+      "alternative": "Adjust CFG scale or sampler settings"
+    },
+    "vram_issues": {
+      "solution": "Reduce resolution to 768x768, use --lowvram flag",
+      "alternative": "Switch to SD 1.5 models for lower VRAM usage"
+    },
+    "style_mismatch": {
+      "solution": "Ensure LoRA is compatible with Pony base model",
+      "alternative": "Use Pony-specific LoRAs for best results"
+    }
+  },
+  "optimization_tips": {
+    "lora_selection": "Choose LoRAs specifically trained on Pony models",
+    "weight_fine_tuning": "Test weight ranges (0.4-0.9) for optimal effect",
+    "batch_consistency": "Use same LoRA and weights for consistent batch results",
+    "prompt_optimization": "Include LoRA trigger words and style descriptors"
+  },
   "last_node_id": 99,
   "last_link_id": 100,
   "nodes": [

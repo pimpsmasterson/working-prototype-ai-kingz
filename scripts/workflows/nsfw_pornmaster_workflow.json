@@ -1,4 +1,127 @@
 {
+  "_meta": {
+    "title": "NSFW PornMaster Professional Workflow",
+    "description": "Elite photorealistic NSFW image generation using Pony XL with professional photography aesthetics. Optimized for DSLR-quality explicit content with natural lighting, detailed skin textures, and cinematic composition.",
+    "version": "1.0.0",
+    "category": "professional-nsfw",
+    "tags": ["pornmaster", "pony-xl", "photorealistic", "professional", "dslr-quality", "nsfw"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "base_model": {
+      "name": "Pony Diffusion XL v1 (PornMaster)",
+      "filename": "pmXL_v1.safetensors",
+      "type": "checkpoint",
+      "description": "Specialized Pony XL model fine-tuned for high-quality NSFW content with professional aesthetics",
+      "url": "https://civitai.com/models/257749/pony-diffusion-v6-xl",
+      "hash": "Expected hash for verification",
+      "specialization": "Optimized for explicit content with photorealistic quality"
+    }
+  },
+  "quality_settings": {
+    "resolution": {
+      "width": 832,
+      "height": 1216,
+      "aspect_ratio": "2:3 (portrait optimized for figure photography)",
+      "recommended_range": "768x1152 to 1024x1536"
+    },
+    "sampling": {
+      "steps": 30,
+      "cfg_scale": 7.0,
+      "sampler": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "clip_skip": -2,
+      "recommended_steps_range": "25-40",
+      "recommended_cfg_range": "6.5-8.0"
+    },
+    "performance": {
+      "vram_usage": "~10-12GB",
+      "recommended_gpu": "RTX 3060+ or equivalent",
+      "generation_time": "~20-35 seconds",
+      "quality_focus": "Professional-grade output"
+    }
+  },
+  "pornmaster_characteristics": {
+    "aesthetic_focus": {
+      "photorealism": "DSLR-quality photography style",
+      "lighting": "Natural, professional lighting setups",
+      "composition": "Cinematic and magazine-quality framing",
+      "detail_level": "Ultra-high resolution with 8K aesthetics"
+    },
+    "content_optimization": {
+      "skin_texture": "Detailed, realistic skin rendering",
+      "anatomy": "Accurate proportions and natural forms",
+      "explicit_content": "High-quality NSFW with professional presentation",
+      "avoided_styles": "Cartoon, anime, 3D render, fake/plastic looks"
+    }
+  },
+  "prompting_guide": {
+    "positive_prompt_structure": [
+      "Quality foundation: score_9, score_8_up, score_7_up",
+      "Photography style: photorealistic, professional photography, dslr quality",
+      "Subject: beautiful woman, detailed skin texture",
+      "Technical: natural lighting, high resolution, sharp focus, 8k uhd",
+      "Content: nsfw, explicit elements",
+      "Composition: cinematic framing, professional pose"
+    ],
+    "negative_prompt_structure": [
+      "Style rejection: cartoon, anime, illustration, 3d render",
+      "Quality issues: fake, plastic, low quality, blurry",
+      "Undesired content: censored, watermark, text, ugly, deformed"
+    ],
+    "professional_prompting_tips": {
+      "lighting_emphasis": "Focus on 'natural lighting, studio lighting, cinematic lighting'",
+      "technical_quality": "Include 'sharp focus, high resolution, 8k uhd, dslr quality'",
+      "skin_detail": "Use 'detailed skin texture, realistic skin, natural skin'",
+      "composition": "Add 'professional photography, magazine cover, editorial style'"
+    },
+    "example_prompts": [
+      "score_9, score_8_up, score_7_up, photorealistic, professional photography, beautiful woman, detailed skin texture, natural lighting, high resolution, sharp focus, 8k uhd, dslr quality, nsfw, explicit pose, cinematic composition",
+      "score_9, score_8_up, photorealistic, studio lighting, beautiful woman, detailed skin, natural pose, high quality, sharp focus, 8k, dslr, nsfw, professional erotic photography"
+    ]
+  },
+  "workflow_flow": {
+    "step_1": "Load PornMaster Pony XL base model",
+    "step_2": "Apply CLIP skip (-2) for enhanced prompt following",
+    "step_3": "Encode professional photography-style prompts",
+    "step_4": "Generate latent image (832x1216 portrait aspect)",
+    "step_5": "Sample with KSampler (30 steps, CFG 7.0)",
+    "step_6": "Decode latent to high-quality image",
+    "step_7": "Save professional-grade NSFW image"
+  },
+  "expected_output": {
+    "image_quality": "DSLR-quality photorealistic NSFW images",
+    "style": "Professional erotic photography with natural lighting",
+    "resolution": "832x1216 pixels (portrait optimized)",
+    "content": "High-end explicit content with detailed skin and professional composition",
+    "aesthetic": "Magazine-quality, editorial-style NSFW photography"
+  },
+  "troubleshooting": {
+    "artificial_lighting": {
+      "solution": "Emphasize 'natural lighting' in prompts, reduce 'cinematic' if too dramatic",
+      "alternative": "Add 'studio lighting, professional lighting' for controlled results"
+    },
+    "skin_texture_issues": {
+      "solution": "Strengthen 'detailed skin texture, realistic skin' in positive prompt",
+      "alternative": "Increase steps to 35-40 for better detail rendering"
+    },
+    "composition_problems": {
+      "solution": "Add specific framing terms like 'close-up, full body, portrait'",
+      "alternative": "Adjust aspect ratio or use different resolution"
+    },
+    "quality_inconsistency": {
+      "solution": "Ensure consistent prompt structure, check CLIP skip setting",
+      "alternative": "Use higher CFG (7.5-8.0) for more stable results"
+    }
+  },
+  "optimization_tips": {
+    "professional_focus": "Maintain photography terminology throughout prompts",
+    "lighting_consistency": "Choose between natural or studio lighting and stick to it",
+    "detail_enhancement": "Combine technical quality terms with descriptive elements",
+    "aspect_ratio": "Portrait aspect works well for figure photography focus"
+  },
   "last_node_id": 99,
   "last_link_id": 100,
   "nodes": [

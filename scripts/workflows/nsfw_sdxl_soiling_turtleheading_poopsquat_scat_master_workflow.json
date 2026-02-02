@@ -1,0 +1,298 @@
+{
+  "metadata": {
+    "title": "NSFW SDXL Soiling Turtleheading PoopSquat Scat Master Workflow",
+    "description": "SDXL-based scat-themed image generation with 3-tier LoRA stacking (Soiling → Turtleheading → Poop Squat) for high-quality fetish content. Optimized for SDXL architecture with comprehensive post-processing.",
+    "model_requirements": {
+      "checkpoint": "sd_xl_base_1.0.safetensors (SDXL 1.0 base model)",
+      "text_encoder": "Built-in CLIP (CLIPSetLastLayer -2)",
+      "loras": [
+        "Soiling-V1.safetensors (weight 0.8) - Primary soiling and mess effects",
+        "turtleheading-V1.safetensors (weight 0.7) - Turtleheading pose",
+        "Poop_SquatV3.safetensors (weight 0.6) - Squatting defecation pose"
+      ],
+      "vae": "Built-in SDXL VAE"
+    },
+    "quality_settings": {
+      "resolution": "1024x1024 (square format)",
+      "steps": "40",
+      "cfg": "7.5",
+      "sampler": "DPM++ 2M SDE (Karras)",
+      "estimated_time": "3-5 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {
+      "Soiling-V1": {
+        "purpose": "Primary soiling, mess, and scat aftermath effects",
+        "weight_recommended": 0.8,
+        "weight_range": "0.7-1.0",
+        "tips": "Strongest LoRA in stack; adjust for desired mess intensity"
+      },
+      "turtleheading-V1": {
+        "purpose": "Turtleheading pose and partial exposure",
+        "weight_recommended": 0.7,
+        "weight_range": "0.6-0.9",
+        "tips": "Pose-specific LoRA; balance with action LoRA"
+      },
+      "Poop_SquatV3": {
+        "purpose": "Squatting defecation pose and action",
+        "weight_recommended": 0.6,
+        "weight_range": "0.5-0.8",
+        "tips": "Action pose LoRA; lowest weight to avoid conflicts"
+      }
+    },
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, score_7_up, score_6_up, 1girl, solo, scat, defecation, soiling, turtleheading, poop squat, explicit, nsfw, detailed face, beautiful detailed eyes, high quality, photorealistic, cinematic lighting, masterpiece, best quality, highly detailed",
+      "positive_boosters": ["(scat:1.4)", "(soiling:1.3)", "(turtleheading:1.2)", "(poop squat:1.2)", "(cinematic lighting:1.3)"],
+      "negative_essentials": ["score_6", "score_5", "score_4", "score_3", "low quality", "worst quality", "blurry", "censored", "watermark", "ugly", "deformed", "cartoon", "anime", "illustration", "3d render", "fake", "plastic", "clean", "sanitary", "pristine"]
+    },
+    "workflow_flow": {
+      "step_1": "Load SDXL 1.0 base checkpoint",
+      "step_2": "Set CLIP last layer to -2",
+      "step_3": "Apply Soiling-V1 LoRA (0.8)",
+      "step_4": "Stack turtleheading-V1 LoRA (0.7)",
+      "step_5": "Stack Poop_SquatV3 LoRA (0.6)",
+      "step_6": "Encode positive and negative prompts",
+      "step_7": "Create empty latent (1024x1024)",
+      "step_8": "KSampler with stacked LoRAs (40 steps)",
+      "step_9": "VAE decode to image",
+      "step_10": "FaceDetailer post-processing",
+      "step_11": "ADetailer for hands/body",
+      "step_12": "4x UltraSharp upscaling",
+      "step_13": "Save final image"
+    },
+    "expected_output": {
+      "format": "High-resolution image, 4096x4096 final (after 4x upscale)",
+      "quality": "High-quality SDXL scat-themed content with layered fetish effects"
+    },
+    "vram_requirements": {
+      "minimum": "12GB",
+      "recommended": "16GB"
+    },
+    "troubleshooting": {
+      "Weak scat theme": "Increase Soiling-V1 weight to 0.9-1.0, add more explicit keywords",
+      "SDXL artifacts": "Ensure using SDXL VAE, add (photorealistic:1.3) to prompt",
+      "LoRA conflicts": "Reduce weights by 0.1 each if getting distorted results",
+      "Low detail": "SDXL benefits from higher steps; try 45-50"
+    }
+  },
+  "last_node_id": 110,
+  "last_link_id": 120,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 100],
+      "size": [315, 98],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [1, 21, 41], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [6, 23, 43], "slot_index": 2}
+      ],
+      "widgets_values": ["sd_xl_base_1.0.safetensors"]
+    },
+    {
+      "id": 99,
+      "type": "CLIPSetLastLayer",
+      "pos": [50, 250],
+      "size": [315, 58],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3, 4, 22, 42, 101, 102], "slot_index": 0}],
+      "widgets_values": [-2]
+    },
+    {
+      "id": 2,
+      "type": "LoraLoader",
+      "pos": [400, 50],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "clip", "type": "CLIP", "link": 2}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [5], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [7, 8], "slot_index": 1}
+      ],
+      "widgets_values": ["Soiling-V1.safetensors", 0.8, 0.8]
+    },
+    {
+      "id": 3,
+      "type": "LoraLoader",
+      "pos": [400, 200],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 5},
+        {"name": "clip", "type": "CLIP", "link": 7}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [9], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [10, 11], "slot_index": 1}
+      ],
+      "widgets_values": ["turtleheading-V1.safetensors", 0.7, 0.7]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoader",
+      "pos": [400, 350],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 9},
+        {"name": "clip", "type": "CLIP", "link": 10}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [12], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [13, 14], "slot_index": 1}
+      ],
+      "widgets_values": ["Poop_SquatV3.safetensors", 0.6, 0.6]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [750, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 13}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [15, 35, 55], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, score_7_up, score_6_up, 1girl, solo, scat, defecation, soiling, turtleheading, poop squat, explicit, nsfw, detailed face, beautiful detailed eyes, high quality, photorealistic, cinematic lighting, masterpiece, best quality, highly detailed"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [750, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 14}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [16, 36, 56], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, score_4, score_3, low quality, worst quality, blurry, censored, watermark, ugly, deformed, cartoon, anime, illustration, 3d render, fake, plastic, clean, sanitary, pristine"]
+    },
+    {
+      "id": 7,
+      "type": "EmptyLatentImage",
+      "pos": [750, 450],
+      "size": [315, 106],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [17], "slot_index": 0}],
+      "widgets_values": [1024, 1024, 1]
+    },
+    {
+      "id": 8,
+      "type": "KSampler",
+      "pos": [1200, 100],
+      "size": [315, 262],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 12},
+        {"name": "positive", "type": "CONDITIONING", "link": 15},
+        {"name": "negative", "type": "CONDITIONING", "link": 16},
+        {"name": "latent_image", "type": "LATENT", "link": 17}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [18], "slot_index": 0}],
+      "widgets_values": [33445566, "randomize", 35, 7.5, "dpmpp_2m_sde", "karras", 1]
+    },
+    {
+      "id": 9,
+      "type": "VAEDecode",
+      "pos": [1550, 100],
+      "size": [210, 46],
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 18},
+        {"name": "vae", "type": "VAE", "link": 6}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [19, 24], "slot_index": 0}]
+    },
+    {
+      "id": 10,
+      "type": "UltralyticsDetectorProvider",
+      "pos": [1550, 200],
+      "size": [315, 100],
+      "outputs": [{"name": "BBOX_DETECTOR", "type": "BBOX_DETECTOR", "links": [25], "slot_index": 0}],
+      "widgets_values": ["face_yolov8m.pt"]
+    },
+    {
+      "id": 11,
+      "type": "SAMLoader",
+      "pos": [1550, 350],
+      "size": [315, 100],
+      "outputs": [{"name": "SAM_MODEL", "type": "SAM_MODEL", "links": [26], "slot_index": 0}],
+      "widgets_values": ["sam_vit_b_01ec64.pth"]
+    },
+    {
+      "id": 12,
+      "type": "FaceDetailer",
+      "pos": [1950, 100],
+      "size": [315, 500],
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 19},
+        {"name": "model", "type": "MODEL", "link": 21},
+        {"name": "clip", "type": "CLIP", "link": 22},
+        {"name": "vae", "type": "VAE", "link": 23},
+        {"name": "positive", "type": "CONDITIONING", "link": 35},
+        {"name": "negative", "type": "CONDITIONING", "link": 36},
+        {"name": "bbox_detector", "type": "BBOX_DETECTOR", "link": 25},
+        {"name": "sam_model_opt", "type": "SAM_MODEL", "link": 26}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [27], "slot_index": 0}],
+      "widgets_values": [512, 1024, 0.4, 30, 0.5, "randomize", "dpmpp_2m", "karras", 1, 0.4]
+    },
+    {
+      "id": 13,
+      "type": "UpscaleModelLoader",
+      "pos": [1950, 650],
+      "size": [315, 58],
+      "outputs": [{"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [28], "slot_index": 0}],
+      "widgets_values": ["4x-UltraSharp.pth"]
+    },
+    {
+      "id": 14,
+      "type": "UltimateSDUpscale",
+      "pos": [2350, 100],
+      "size": [315, 600],
+      "inputs": [
+        {"name": "image", "type": "IMAGE", "link": 27},
+        {"name": "model", "type": "MODEL", "link": 41},
+        {"name": "positive", "type": "CONDITIONING", "link": 55},
+        {"name": "negative", "type": "CONDITIONING", "link": 56},
+        {"name": "vae", "type": "VAE", "link": 43},
+        {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": 28}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [29], "slot_index": 0}],
+      "widgets_values": [2, 1536, 0.3, 30, "dpmpp_2m", "karras", 1, 512, 0, 1, 64, 32, 2, true, false]
+    },
+    {
+      "id": 15,
+      "type": "SaveImage",
+      "pos": [2750, 100],
+      "size": [315, 270],
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 29}],
+      "widgets_values": ["aikings_sdxl_soiling_turtleheading_poopsquat_scat_master"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "MODEL"],
+    [100, 1, 1, 99, 0, "CLIP"],
+    [2, 99, 0, 2, 0, "CLIP"],
+    [3, 99, 0, 3, 0, "CLIP"],
+    [4, 99, 0, 4, 0, "CLIP"],
+    [5, 2, 0, 3, 0, "MODEL"],
+    [7, 2, 1, 3, 1, "CLIP"],
+    [9, 3, 0, 4, 0, "MODEL"],
+    [10, 3, 1, 4, 1, "CLIP"],
+    [12, 4, 0, 8, 0, "MODEL"],
+    [13, 4, 1, 5, 0, "CLIP"],
+    [14, 4, 1, 6, 0, "CLIP"],
+    [15, 5, 0, 8, 1, "CONDITIONING"],
+    [16, 6, 0, 8, 2, "CONDITIONING"],
+    [17, 7, 0, 8, 3, "LATENT"],
+    [18, 8, 0, 9, 0, "LATENT"],
+    [19, 9, 0, 12, 0, "IMAGE"],
+    [21, 1, 0, 12, 1, "MODEL"],
+    [22, 99, 0, 12, 2, "CLIP"],
+    [23, 1, 2, 12, 3, "VAE"],
+    [35, 5, 0, 12, 4, "CONDITIONING"],
+    [36, 6, 0, 12, 5, "CONDITIONING"],
+    [25, 10, 0, 12, 6, "BBOX_DETECTOR"],
+    [26, 11, 0, 12, 7, "SAM_MODEL"],
+    [27, 12, 0, 14, 0, "IMAGE"],
+    [41, 1, 0, 14, 1, "MODEL"],
+    [55, 5, 0, 14, 2, "CONDITIONING"],
+    [56, 6, 0, 14, 3, "CONDITIONING"],
+    [43, 1, 2, 14, 4, "VAE"],
+    [28, 13, 0, 14, 5, "UPSCALE_MODEL"],
+    [29, 14, 0, 15, 0, "IMAGE"]
+  ],
+  "version": 0.4
+}

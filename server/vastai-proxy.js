@@ -35,6 +35,20 @@ const path = require('path');
 try { require('dotenv').config(); } catch (e) { /* no dotenv available */ }
 const fs = require('fs');
 const pm2 = require('pm2');
+const tokenManager = require('../lib/token-manager');
+
+// Start periodic token validation (every 10 minutes)
+tokenManager.startPeriodicValidation(600000);
+
+// Listen for token failures
+tokenManager.on('token-invalid', ({ service, error }) => {
+  console.error(`❌ ${service} token validation FAILED: ${error}`);
+  console.error(`   Please update ${service.toUpperCase()}_TOKEN in your .env file`);
+});
+
+tokenManager.on('token-validated', ({ service }) => {
+  console.log(`✅ ${service} token validated successfully`);
+});
 
 // Validate required environment variables
 const requiredEnvVars = [
@@ -225,13 +239,35 @@ app.get('/api/proxy/gpu-status', (req, res) => {
 });
 
 // Simple admin authentication (API key via header 'x-admin-key')
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'admin_dev_key';
-if (!process.env.ADMIN_API_KEY) process.env.ADMIN_API_KEY = ADMIN_API_KEY;
-function requireAdmin(req, res, next) {
-    const key = req.headers['x-admin-key'] || req.query.adminKey;
-    if (!key || key !== process.env.ADMIN_API_KEY) return res.status(403).json({ error: 'forbidden - invalid admin key' });
-    next();
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || null;
+const INSECURE_ADMIN_DEFAULTS = ['secure_admin_key_change_me', 'admin_dev_key', 'admin', 'changeme', 'password', '1234'];
+
+if (!ADMIN_API_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+        console.error('FATAL: ADMIN_API_KEY is required in production. Set ADMIN_API_KEY and restart. Example: ADMIN_API_KEY=your-strong-key pm2 restart vastai-proxy --update-env');
+        process.exit(1);
+    } else {
+        console.warn('⚠️ Warning: ADMIN_API_KEY is not set. Running in development mode without admin auth. This is NOT safe for production.');
+    }
+} else {
+    if (process.env.NODE_ENV === 'production' && INSECURE_ADMIN_DEFAULTS.includes(ADMIN_API_KEY.toLowerCase())) {
+        console.error('FATAL: ADMIN_API_KEY appears to be a default/insecure value. Set a strong ADMIN_API_KEY and restart with: pm2 restart vastai-proxy --update-env');
+        process.exit(1);
+    }
 }
+
+function requireAdmin(req, res, next) {
+    const key = req.headers['x-admin-key'] || req.headers['x-admin-api-key'] || req.query.adminKey;
+    if (!process.env.ADMIN_API_KEY) {
+        return res.status(403).json({ error: 'forbidden - admin authentication not configured on server' });
+    }
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        try { logAuthAttempt(req, false); } catch (e) {}
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+    try { logAuthAttempt(req, true); } catch (e) {}
+    next();
+} 
 
 // Log admin auth attempts: wrap requireAdmin-like checks where needed
 function logAuthAttempt(req, success) {
@@ -350,7 +386,7 @@ app.post('/api/proxy/admin/reload-state', express.json(), (req, res) => {
 });
 
 // Admin state reset (protected)
-app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
+app.post('/api/proxy/admin/reset-state', express.json(), async (req, res) => {
     const key = req.headers['x-admin-key'] || req.query.adminKey;
     if (!key || key !== process.env.ADMIN_API_KEY) {
         return res.status(403).json({ error: 'forbidden' });
@@ -358,9 +394,10 @@ app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
     try {
         const db = require('./db').db;
         db.prepare('UPDATE warm_pool SET instance = NULL, isPrewarming = 0 WHERE id = 1').run();
-        // Force warm-pool module to reload state
+
+        // Force warm-pool module to reload state (now async with instance validation)
         if (typeof warmPool.load === 'function') {
-            warmPool.load();
+            await warmPool.load();
         }
 
         // Audit the reset
@@ -375,7 +412,18 @@ app.post('/api/proxy/admin/reset-state', express.json(), (req, res) => {
             });
         } catch (e) { }
 
-        res.json({ status: 'ok', message: 'WarmPool state reset successfully' });
+        // Return updated state for confirmation
+        // Note: Use db.getState() directly since warmPool doesn't export this function
+        const currentState = require('./db').getState();
+        res.json({
+            status: 'ok',
+            message: 'WarmPool state reset successfully',
+            state: {
+                instance: currentState.instance,
+                isPrewarming: currentState.isPrewarming,
+                lastAction: currentState.lastAction
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1362,6 +1410,53 @@ app.post('/api/proxy/admin/set-tokens', (req, res) => {
     res.json({ huggingface: !!process.env.HUGGINGFACE_HUB_TOKEN, civitai: !!process.env.CIVITAI_TOKEN, vastai: !!process.env.VASTAI_API_KEY });
 });
 
+// Validate all tokens (tests actual API connectivity)
+app.post('/api/proxy/admin/validate-tokens', requireAdmin, async (req, res) => {
+  try {
+    console.log('[TokenManager] Admin requested token validation');
+    const results = await tokenManager.validateAll(false); // Force validation, bypass cache
+    res.json({ success: true, validation: results });
+  } catch (err) {
+    console.error('[TokenManager] Validation error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update token at runtime (without restart) and validate
+app.post('/api/proxy/admin/update-token', requireAdmin, async (req, res) => {
+  try {
+    const { service, token } = req.body;
+    if (!service || !token) {
+      return res.status(400).json({ error: 'service and token required' });
+    }
+
+    // Map service name to environment variable
+    const envVarMap = {
+      vastai: 'VASTAI_API_KEY',
+      huggingface: 'HUGGINGFACE_HUB_TOKEN',
+      civitai: 'CIVITAI_TOKEN'
+    };
+
+    const envVar = envVarMap[service.toLowerCase()];
+    if (!envVar) {
+      return res.status(400).json({ error: `Unknown service: ${service}` });
+    }
+
+    // Update environment variable
+    process.env[envVar] = token;
+    console.log(`[TokenManager] Updated ${service} token at runtime`);
+
+    // Clear cache and validate new token
+    tokenManager.clearCache();
+    const result = await tokenManager.validateAll(false);
+
+    res.json({ success: true, validation: result });
+  } catch (err) {
+    console.error('[TokenManager] Token update error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // GENERATION & GALLERY ENDPOINTS
 // ============================================================================
@@ -1529,6 +1624,15 @@ function startProxy(port = PORT) {
         const boundPort = addr ? addr.port : port;
         console.log(`Vast.ai proxy running on http://localhost:${boundPort}/ (ready)`);
     });
+
+    // Set server timeout to 30 minutes (1800000ms) to allow for long-running operations
+    // like prewarm (which can take 5-15 minutes for provisioning)
+    server.timeout = 1800000; // 30 minutes
+    server.keepAliveTimeout = 65000; // Slightly higher than default nginx timeout
+    server.headersTimeout = 66000; // Should be higher than keepAliveTimeout
+
+    console.log(`Server timeouts configured: timeout=${server.timeout}ms, keepAlive=${server.keepAliveTimeout}ms`);
+
     return server;
 }
 
@@ -1549,9 +1653,35 @@ if (require.main === module) {
             console.log('[DEBUG] Server is now listening');
             const addr = server.address();
             console.log('[DEBUG] Server bound to:', addr);
+            try { checkPm2EnvConsistency(); } catch (e) { /* non-fatal */ }
             // Keep process alive
             setInterval(() => {}, 1 << 30);
         });
+
+// Check PM2 environment for mismatched ADMIN_API_KEY (non-fatal advisory)
+function checkPm2EnvConsistency() {
+    try {
+        pm2.connect((err) => {
+            if (err) { console.warn('PM2 check skipped (pm2 not available):', err.message); return; }
+            pm2.list((err, list) => {
+                if (err) { pm2.disconnect(); return; }
+                for (const proc of list) {
+                    try {
+                        if (proc && (proc.name === 'vastai-proxy' || (proc.pm2_env && proc.pm2_env.pm_exec_path && proc.pm2_env.pm_exec_path.indexOf('server/vastai-proxy.js') !== -1))) {
+                            const pm2EnvAdmin = proc.pm2_env && proc.pm2_env.env && proc.pm2_env.env.ADMIN_API_KEY;
+                            if (pm2EnvAdmin && pm2EnvAdmin !== process.env.ADMIN_API_KEY) {
+                                console.warn('⚠️ PM2 env ADMIN_API_KEY differs from current process ADMIN_API_KEY. If you updated .env, run: pm2 restart vastai-proxy --update-env');
+                            }
+                        }
+                    } catch (e) { /* ignore per-process */ }
+                }
+                pm2.disconnect();
+            });
+        });
+    } catch (e) {
+        console.warn('PM2 env consistency check failed:', e && e.message ? e.message : e);
+    }
+}
         console.log('[DEBUG] startProxy() called, server object:', !!server);
     } catch (err) {
         console.error('❌ Failed to start server:', err);

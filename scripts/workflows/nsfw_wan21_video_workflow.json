@@ -1,4 +1,50 @@
 {
+  "metadata": {
+    "title": "NSFW Wan 2.1 Video Workflow",
+    "description": "Lightweight text-to-video workflow using Wan 2.1 1.3B model for faster NSFW video generation. Good for testing and quick iterations with lower VRAM requirements.",
+    "model_requirements": {
+      "checkpoint": "wan2.1_t2v_1.3B_fp16.safetensors (1.3B parameter model, lighter than 14B)",
+      "text_encoder": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "loras": [],
+      "vae": "wan2.1_vae.safetensors"
+    },
+    "quality_settings": {
+      "resolution": "832x480 (480P, 5:3 aspect ratio)",
+      "steps": "30",
+      "cfg": "7.0",
+      "sampler": "Euler (randomize seed)",
+      "estimated_time": "4-6 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, score_7_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, nsfw, realistic motion + specific content",
+      "positive_boosters": ["(highly detailed:1.3)", "(smooth motion:1.2)", "(realistic motion:1.4)"],
+      "negative_essentials": ["score_6", "score_5", "score_4", "low quality", "worst quality", "blurry", "watermark", "bad anatomy"]
+    },
+    "workflow_flow": {
+      "step_1": "Load Wan 2.1 T2V 1.3B model",
+      "step_2": "Load UMT5-XXL text encoder",
+      "step_3": "Encode positive and negative prompts",
+      "step_4": "Create empty latent video (832x480, 81 frames)",
+      "step_5": "Single sampling pass (30 steps)",
+      "step_6": "VAE decode to video frames",
+      "step_7": "Combine frames into MP4 video (16 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 832x480 resolution, 81 frames, 16 FPS",
+      "quality": "Good quality NSFW video with realistic motion, faster generation than Wan 2.2"
+    },
+    "vram_requirements": {
+      "minimum": "16GB",
+      "recommended": "24GB"
+    },
+    "troubleshooting": {
+      "OOM errors": "Use FP8 model version if available, reduce resolution to 640x384",
+      "Low quality output": "Increase steps to 40-50, use Wan 2.2 model instead",
+      "Stuttering motion": "Increase frame count to 97-121, lower FPS to 12 for smoother playback",
+      "Weak NSFW content": "Add explicit keywords with weights: (nsfw:1.4), (explicit:1.3)"
+    }
+  },
   "last_node_id": 10,
   "last_link_id": 10,
   "nodes": [

@@ -1,4 +1,173 @@
 {
+  "_meta": {
+    "title": "NSFW Ultimate Image Master Workflow",
+    "description": "Elite NSFW image generation pipeline with comprehensive post-processing: FaceDetailer for facial enhancement, Ultimate SD Upscale for 4x quality improvement, and advanced conditioning. Produces professional-grade explicit content with maximum detail and quality.",
+    "version": "1.0.0",
+    "category": "ultimate-quality",
+    "tags": ["ultimate", "facedetailer", "upscaling", "post-processing", "high-quality", "nsfw"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "base_model": {
+      "name": "Pony Diffusion XL v1",
+      "filename": "pmXL_v1.safetensors",
+      "type": "checkpoint",
+      "description": "High-quality Pony model for detailed NSFW generation",
+      "url": "https://civitai.com/models/257749/pony-diffusion-v6-xl",
+      "hash": "Expected hash for verification"
+    },
+    "upscale_model": {
+      "name": "4x UltraSharp",
+      "filename": "4x-UltraSharp.pth",
+      "type": "upscale-model",
+      "description": "High-quality 4x upscaling model for sharp, detailed enlargement",
+      "url": "https://huggingface.co/uwg/upscaler",
+      "hash": "Expected hash for verification"
+    },
+    "detection_models": {
+      "face_detector": {
+        "name": "YOLOv8 Face Detector",
+        "filename": "face_yolov8m.pt",
+        "type": "bbox-detector",
+        "description": "Accurate face detection for FaceDetailer processing"
+      },
+      "sam_model": {
+        "name": "SAM ViT-B",
+        "filename": "sam_vit_b_01ec64.pth",
+        "type": "sam-model",
+        "description": "Segment Anything Model for precise face segmentation"
+      }
+    }
+  },
+  "quality_settings": {
+    "base_resolution": {
+      "width": 832,
+      "height": 1216,
+      "aspect_ratio": "2:3 (portrait optimized)"
+    },
+    "final_resolution": {
+      "width": 1664,
+      "height": 2432,
+      "upscale_factor": "2x (from FaceDetailer) + 2x (from Ultimate Upscale) = 4x total",
+      "target_resolution": "Up to 2048x3072 depending on settings"
+    },
+    "sampling": {
+      "steps": 30,
+      "cfg_scale": 7.0,
+      "sampler": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "clip_skip": -2,
+      "face_detail_steps": 20,
+      "upscale_steps": 20
+    },
+    "performance": {
+      "vram_usage": "~16-24GB",
+      "recommended_gpu": "RTX 3090+ or equivalent",
+      "generation_time": "~2-4 minutes",
+      "processing_stages": "Base generation + Face detail + Upscaling"
+    }
+  },
+  "post_processing_pipeline": {
+    "face_enhancement": {
+      "detector": "YOLOv8m for face detection",
+      "segmentation": "SAM ViT-B for precise face masking",
+      "refinement": "Inpainting with base model at 384x1024 resolution",
+      "strength": "0.4 denoising strength for natural enhancement"
+    },
+    "upscaling": {
+      "model": "4x-UltraSharp for sharp, detailed enlargement",
+      "method": "Ultimate SD Upscale with tile-based processing",
+      "refinement": "Additional sampling during upscale (20 steps)",
+      "denoising": "0.35 strength for quality enhancement"
+    }
+  },
+  "prompting_guide": {
+    "base_generation_prompts": {
+      "positive": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, beautiful detailed face, beautiful detailed eyes, high quality, nsfw, masterpiece, best quality, photorealistic, cinematic lighting",
+      "negative": "score_6, score_5, score_4, source_pony, source_furry, low quality, worst quality, blurry, censored, watermark, ugly, bad anatomy, deformed, extra limbs, bad hands, bad fingers"
+    },
+    "face_detailer_prompts": {
+      "positive": "detailed face, sharp eyes, high quality, masterpiece",
+      "negative": "blurry, deformed, ugly, messy, bad anatomy, low quality"
+    },
+    "prompting_strategy": {
+      "base_focus": "Overall composition and body in main prompts",
+      "face_focus": "Facial details and quality in FaceDetailer prompts",
+      "consistency": "Maintain style consistency across all prompt stages",
+      "quality_emphasis": "Multiple quality tags for maximum detail extraction"
+    }
+  },
+  "workflow_flow": {
+    "stage_1_base_generation": "Generate base image (832x1216) with Pony XL",
+    "stage_2_face_detection": "Detect faces using YOLOv8 and SAM segmentation",
+    "stage_3_face_enhancement": "Inpaint and enhance facial details with FaceDetailer",
+    "stage_4_upscaling": "4x upscale with Ultimate SD Upscale and UltraSharp model",
+    "stage_5_final_output": "Save ultra-high quality NSFW image (up to 2048x3072)"
+  },
+  "expected_output": {
+    "image_quality": "Professional-grade NSFW images with exceptional detail",
+    "facial_quality": "Enhanced facial features with sharp eyes and detailed skin",
+    "resolution": "1664x2432 to 2048x3072 pixels (4x total upscale)",
+    "processing_artifacts": "Minimal to none due to advanced post-processing",
+    "style_consistency": "Maintained across base generation and enhancement stages"
+  },
+  "advanced_configuration": {
+    "face_detailer_settings": {
+      "bbox_threshold": 0.4,
+      "bbox_dilation": 0,
+      "bbox_crop_factor": 1,
+      "sam_detection_hint": "Use 'face' for best results",
+      "sam_dilation": 0,
+      "sam_threshold": 0.4,
+      "sam_bbox_expansion": 0,
+      "sam_mask_hint_threshold": 0.7,
+      "sam_mask_hint_use_negative": "Use 'Guess' mode"
+    },
+    "ultimate_upscale_settings": {
+      "upscale_by": 2.0,
+      "seed": 1,
+      "steps": 20,
+      "cfg": 7.0,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras",
+      "denoise": 0.35,
+      "tile_width": 512,
+      "tile_height": 0,
+      "mask_blur": 8,
+      "tile_padding": 32,
+      "seam_fix_mode": 2,
+      "seam_fix_denoise": 1,
+      "seam_fix_width": 64,
+      "seam_fix_mask_blur": 4,
+      "seam_fix_padding": 16
+    }
+  },
+  "troubleshooting": {
+    "face_detection_failures": {
+      "solution": "Adjust bbox_threshold lower (0.3-0.4), ensure clear facial features",
+      "alternative": "Use different face detector model if available"
+    },
+    "upscaling_artifacts": {
+      "solution": "Increase tile_padding, adjust denoise strength (0.3-0.4)",
+      "alternative": "Use smaller upscale factor (1.5x) for problem images"
+    },
+    "vram_issues": {
+      "solution": "Reduce tile_width to 256, use --lowvram flag",
+      "alternative": "Process in stages or use CPU for upscaling"
+    },
+    "inconsistent_faces": {
+      "solution": "Strengthen face detailer prompts, increase denoising slightly",
+      "alternative": "Use higher base resolution before upscaling"
+    }
+  },
+  "optimization_tips": {
+    "performance": "Use FP16 precision and appropriate tile sizes for VRAM efficiency",
+    "quality": "Fine-tune face detailer settings for specific facial features",
+    "consistency": "Maintain prompt consistency across all processing stages",
+    "batch_processing": "Process similar images together for efficient face detection"
+  },
   "last_node_id": 101,
   "last_link_id": 104,
   "nodes": [

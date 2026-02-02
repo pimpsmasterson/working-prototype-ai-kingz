@@ -1,4 +1,51 @@
 {
+  "metadata": {
+    "title": "NSFW Wan 2.2 Master Video Workflow",
+    "description": "Primary text-to-video workflow using Wan 2.2 A14B MoE model with two-stage sampling for high-quality NSFW video generation. Combines high-noise and low-noise experts for optimal cinematic results.",
+    "model_requirements": {
+      "checkpoint": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors and wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors (FP8 scaled versions for memory efficiency)",
+      "text_encoder": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "loras": [],
+      "vae": "wan2.2_vae.safetensors"
+    },
+    "quality_settings": {
+      "resolution": "832x480 (480P, 5:3 aspect ratio)",
+      "steps": "25 (high noise) + 10 (low noise) = 35 total",
+      "cfg": "7.0",
+      "sampler": "Euler (randomize seed)",
+      "estimated_time": "8-12 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, mo-e motion + specific NSFW content",
+      "positive_boosters": ["(highly detailed:1.3)", "(smooth motion:1.2)", "(mo-e motion:1.4)", "(subsurface scattering:1.5)"],
+      "negative_essentials": ["score_6", "score_5", "low quality", "worst quality", "watermark"]
+    },
+    "workflow_flow": {
+      "step_1": "Load high-noise and low-noise Wan 2.2 T2V models",
+      "step_2": "Load UMT5-XXL text encoder",
+      "step_3": "Encode positive and negative prompts",
+      "step_4": "Create empty latent video (832x480, 81 frames)",
+      "step_5": "First sampling pass with high-noise model (25 steps)",
+      "step_6": "Second sampling pass with low-noise model (10 steps)",
+      "step_7": "VAE decode to video frames",
+      "step_8": "Combine frames into MP4 video (24 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 832x480 resolution, 81 frames, 24 FPS",
+      "quality": "High-quality cinematic NSFW video with smooth motion and realistic textures"
+    },
+    "vram_requirements": {
+      "minimum": "24GB (with model offloading)",
+      "recommended": "48GB+ (full precision)"
+    },
+    "troubleshooting": {
+      "OOM errors": "Enable --offload_model True, --convert_model_dtype, --t5_cpu options",
+      "Low quality output": "Increase total steps to 40-50, reduce resolution to 640x384",
+      "Stuttering motion": "Increase frame count to 97-121, use RIFE frame interpolation",
+      "Weak NSFW content": "Add explicit keywords with weights: (hyper dump:1.4), (scat:1.3)"
+    }
+  },
   "last_node_id": 15,
   "last_link_id": 20,
   "nodes": [

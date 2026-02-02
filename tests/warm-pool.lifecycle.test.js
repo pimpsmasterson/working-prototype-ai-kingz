@@ -24,7 +24,7 @@ describe('Warm-pool lifecycle (mocked)', function () {
     // Mock bundles -> one offer
     nock('https://console.vast.ai')
       .post('/api/v0/bundles/')
-      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 12288, disk_space: 320, reliability: 0.99, inet_down: 600 }] });
+      .reply(200, { offers: [{ id: 123, dph_total: 0.5, rentable: true, rented: false, verification: 'verified', gpu_ram: 24576, cuda_max_good: 8.6, disk_space: 600, reliability: 0.99, inet_down: 2500 }] });
 
     // Mock asks PUT -> rent
     nock('https://console.vast.ai')

@@ -1,4 +1,4 @@
-# AI Kings One-Click Start Script (v3.0)
+﻿# AI Kings One-Click Start Script (v3.0)
 # This script provides a complete one-click startup with:
 # - Environment validation
 # - Clean state reset
@@ -738,97 +738,6 @@ if ($prewarmSuccess) {
                     if ($comfyReady) {
                         Write-Host "   🎉 Instance fully ready! ComfyUI is running and accessible." -ForegroundColor Green
                         $instanceReady = $true
-
-                        # ═══════════════════════════════════════════════════════════════
-                        # Start SSH Log Collection (Now that instance is READY)
-                        # ═══════════════════════════════════════════════════════════════
-                        try {
-                            Write-Host ""
-                            Write-Host "   📋 Setting up SSH log collection..." -ForegroundColor Cyan
-
-                            # Get fresh status to ensure we have SSH details
-                            $freshStatus = Invoke-RestMethod `
-                                -Uri "http://localhost:3000/api/proxy/admin/warm-pool/status" `
-                                -Headers @{ 'x-admin-key' = $env:ADMIN_API_KEY } `
-                                -Method GET `
-                                -TimeoutSec 10 `
-                                -ErrorAction Stop
-
-                            if ($freshStatus.instances -and $freshStatus.instances.Count -gt 0) {
-                                $sshInstance = $freshStatus.instances[0]
-
-                                if ($sshInstance.ssh_host -and $sshInstance.ssh_port) {
-                                    Write-Host "   SSH: $($sshInstance.ssh_host):$($sshInstance.ssh_port)" -ForegroundColor Gray
-
-                                    # Create logs directory
-                                    $logsDir = Join-Path $PSScriptRoot 'logs'
-                                    if (-not (Test-Path $logsDir)) {
-                                        New-Item -ItemType Directory -Path $logsDir -Force | Out-Null
-                                    }
-
-                                    # Prepare log file
-                                    $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-                                    $logFile = Join-Path $logsDir "provision_$($sshInstance.contractId)_$timestamp.log"
-
-                                    # Find SSH key (check multiple locations)
-                                    $sshKeyPath = $null
-                                    $possibleKeys = @(
-                                        (Join-Path $env:USERPROFILE '.ssh\id_rsa_vast'),
-                                        (Join-Path $env:USERPROFILE '.ssh\id_rsa'),
-                                        (Join-Path $PSScriptRoot 'id_rsa_vast')
-                                    )
-
-                                    foreach ($keyPath in $possibleKeys) {
-                                        if (Test-Path $keyPath) {
-                                            $sshKeyPath = $keyPath
-                                            break
-                                        }
-                                    }
-
-                                    if ($sshKeyPath) {
-                                        # Build node command arguments
-                                        $collectorScript = Join-Path $PSScriptRoot 'scripts\collect_provision_logs.js'
-
-                                        if (Test-Path $collectorScript) {
-                                            $collectorArgs = @(
-                                                "`"$collectorScript`"",
-                                                '--host', $sshInstance.ssh_host,
-                                                '--port', $sshInstance.ssh_port.ToString(),
-                                                '--key', "`"$sshKeyPath`"",
-                                                '--contract-id', $sshInstance.contractId.ToString(),
-                                                '--output', "`"$logFile`"",
-                                                '--timeout', '7200'
-                                            )
-
-                                            # Start log collector in hidden window (no empty windows!)
-                                            $processInfo = Start-Process `
-                                                -FilePath "node" `
-                                                -ArgumentList ($collectorArgs -join ' ') `
-                                                -WorkingDirectory $PSScriptRoot `
-                                                -WindowStyle Hidden `
-                                                -PassThru `
-                                                -ErrorAction Stop
-
-                                            if ($processInfo) {
-                                                Write-Host "   ✅ Log collector started (PID: $($processInfo.Id))" -ForegroundColor Green
-                                                Write-Host "   📁 Logs: $logFile" -ForegroundColor Gray
-                                            }
-                                        } else {
-                                            Write-Host "   ⚠️  Log collector script not found: $collectorScript" -ForegroundColor Yellow
-                                        }
-                                    } else {
-                                        Write-Host "   ⚠️  SSH key not found. Skipping log collection." -ForegroundColor Yellow
-                                        Write-Host "   Expected locations: ~/.ssh/id_rsa_vast or ~/.ssh/id_rsa" -ForegroundColor Gray
-                                    }
-                                } else {
-                                    Write-Host "   ⚠️  SSH details not available yet" -ForegroundColor Yellow
-                                }
-                            }
-                        } catch {
-                            Write-Host "   ⚠️  Log collection setup failed: $($_.Exception.Message)" -ForegroundColor Yellow
-                            Write-Host "   Continuing without log collection..." -ForegroundColor Gray
-                        }
-
                         break
                     } else {
                         Write-Host "   ⚠️  Instance running but ComfyUI not accessible yet..." -ForegroundColor Yellow
@@ -860,19 +769,12 @@ if ($prewarmSuccess) {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SSH Log Collection - Now integrated at proper timing (after instance ready)
-# See above in Step 8 where it runs after ComfyUI is confirmed accessible
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # SUCCESS SUMMARY
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
 Write-Host "║   ✅ AI KINGS STARTED SUCCESSFULLY!                           ║" -ForegroundColor Green
 Write-Host "╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
-Write-Host ""
-Write-Host "📝 SSH log collection enabled (starts after instance is ready)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "🌐 Server URLs:" -ForegroundColor Cyan
 Write-Host "   Health Check: http://localhost:3000/api/proxy/health" -ForegroundColor White
@@ -884,6 +786,4 @@ Write-Host "   Invoke-RestMethod -Uri 'http://localhost:3000/api/proxy/admin/war
 Write-Host ""
 Write-Host "To Stop Server:" -ForegroundColor Cyan
 Write-Host "   Get-Process node | Stop-Process -Force" -ForegroundColor White
-Write-Host ""
-Write-Host "Provisioning logs will appear in: ./logs/" -ForegroundColor Cyan
 Write-Host ""

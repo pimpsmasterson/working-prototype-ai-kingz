@@ -1,4 +1,51 @@
 {
+  "metadata": {
+    "title": "NSFW General Video Workflow",
+    "description": "General NSFW video generation using AnimateDiff with Pony SDXL checkpoint. Creates animated sequences with smooth motion for various content types.",
+    "model_requirements": {
+      "checkpoint": "ponyDiffusionV6XL.safetensors (Pony SDXL model)",
+      "text_encoder": "Built-in CLIP (CLIPSetLastLayer -2)",
+      "loras": [],
+      "vae": "Built-in VAE from checkpoint"
+    },
+    "quality_settings": {
+      "resolution": "512x512 (square format)",
+      "steps": "25",
+      "cfg": "7.0",
+      "sampler": "DPM++ 2M SDE (Karras)",
+      "estimated_time": "2-3 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, [action], dynamic motion, beautiful detailed face, high quality, nsfw, masterpiece, best quality, smooth animation",
+      "positive_boosters": ["(dynamic motion:1.3)", "(smooth animation:1.2)", "(beautiful detailed face:1.4)"],
+      "negative_essentials": ["score_6", "score_5", "score_4", "source_pony", "source_furry", "static", "frozen", "choppy", "low quality", "worst quality", "blurry", "censored", "watermark", "bad anatomy", "deformed"]
+    },
+    "workflow_flow": {
+      "step_1": "Load Pony SDXL checkpoint",
+      "step_2": "Set CLIP last layer to -2",
+      "step_3": "Load AnimateDiff motion module (mm_sdxl_v1_beta.ckpt)",
+      "step_4": "Encode positive and negative prompts",
+      "step_5": "Create empty latent (512x512, 16 frames)",
+      "step_6": "KSampler with AnimateDiff motion (25 steps)",
+      "step_7": "VAE decode to frames",
+      "step_8": "Combine into WebP animation (8 FPS)"
+    },
+    "expected_output": {
+      "format": "WebP animation, 512x512 resolution, 16 frames, 8 FPS",
+      "quality": "Smooth animated NSFW content with pony-style aesthetics"
+    },
+    "vram_requirements": {
+      "minimum": "12GB",
+      "recommended": "16GB"
+    },
+    "troubleshooting": {
+      "Choppy animation": "Increase frame count to 24-32, use different motion module",
+      "Low quality output": "Increase steps to 30-40, use higher resolution (768x768)",
+      "Static frames": "Add (dynamic motion:1.4) to prompt, check AnimateDiff model",
+      "Weak NSFW content": "Add explicit keywords: (nsfw:1.3), (rating_explicit:1.2)"
+    }
+  },
   "last_node_id": 99,
   "last_link_id": 100,
   "nodes": [

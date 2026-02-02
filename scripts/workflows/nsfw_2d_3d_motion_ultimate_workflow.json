@@ -1,0 +1,150 @@
+{
+  "_meta": {
+    "title": "NSFW 2D-3D-Motion Ultimate Workflow",
+    "description": "Comprehensive workflow supporting 2D image generation, 3D model conversion, and motion/video creation. Choose between static 3D models or animated sequences with cinematic motion.",
+    "version": "1.0.0",
+    "category": "ultimate-multimodal",
+    "tags": ["2d", "3d", "motion", "video", "triposr", "animatediff", "multimodal", "nsfw"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "base_model": {
+      "name": "Pony Diffusion XL v1",
+      "filename": "pmXL_v1.safetensors",
+      "type": "checkpoint",
+      "description": "High-quality Pony model for detailed NSFW generation",
+      "url": "https://civitai.com/models/257749/pony-diffusion-v6-xl"
+    },
+    "motion_module": {
+      "name": "AnimateDiff Motion Module",
+      "filename": "mm_sd_v15_v2.ckpt",
+      "type": "motion-module",
+      "description": "Motion module for adding cinematic movement to generated images",
+      "url": "https://huggingface.co/guoyww/animatediff"
+    },
+    "triposr_model": {
+      "name": "TripoSR Model",
+      "filename": "model.ckpt",
+      "type": "triposr-checkpoint",
+      "description": "Pre-trained TripoSR model for single-image 3D reconstruction",
+      "url": "https://huggingface.co/stabilityai/TripoSR"
+    },
+    "upscale_model": {
+      "name": "4x UltraSharp",
+      "filename": "4x-UltraSharp.pth",
+      "type": "upscale-model",
+      "description": "High-quality 4x upscaling model for sharp, detailed enlargement"
+    }
+  },
+  "output_modes": {
+    "mode_2d_static": {
+      "description": "Generate high-quality static 2D NSFW images",
+      "resolution": "1664x2432 (4x upscaled)",
+      "processing": "Base generation + FaceDetailer + Upscaling"
+    },
+    "mode_3d_static": {
+      "description": "Generate 2D images and convert to 3D GLTF models",
+      "resolution": "1024x1024 (2D) → 3D mesh",
+      "processing": "Base generation → TripoSR 3D conversion → GLTF export"
+    },
+    "mode_2d_motion": {
+      "description": "Generate animated 2D video sequences with motion",
+      "resolution": "2048x3072 (4x upscaled)",
+      "frames": "48 frames (24 FPS)",
+      "processing": "AnimateDiff motion + Frame interpolation + Upscaling"
+    }
+  },
+  "quality_settings": {
+    "base_resolution": {
+      "2d_static": "832x1216",
+      "3d_static": "1024x1024",
+      "2d_motion": "512x768"
+    },
+    "final_resolution": {
+      "2d_static": "1664x2432 (4x upscale)",
+      "3d_static": "High-detail 3D mesh",
+      "2d_motion": "2048x3072 (4x upscale)"
+    },
+    "sampling": {
+      "steps": 30,
+      "cfg_scale": 7.0,
+      "sampler": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "clip_skip": -2
+    }
+  },
+  "prompting_guide": {
+    "2d_static_prompts": {
+      "positive": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, beautiful detailed face, beautiful detailed eyes, high quality, nsfw, masterpiece, best quality, photorealistic, cinematic lighting",
+      "negative": "score_6, score_5, score_4, source_pony, source_furry, low quality, worst quality, blurry, censored, watermark, ugly, bad anatomy, deformed"
+    },
+    "3d_static_prompts": {
+      "positive": "score_9, score_8_up, score_7_up, 1girl, solo, detailed face, beautiful eyes, high quality, nsfw, explicit, photorealistic, clean background, 3d model ready, solid form",
+      "negative": "score_6, score_5, score_4, low quality, worst quality, blurry, censored, watermark, ugly, deformed, cartoon, anime, illustration, multiple subjects, background objects"
+    },
+    "2d_motion_prompts": {
+      "positive": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, smooth motion, cinematic lighting, dynamic camera, high quality, nsfw, masterpiece, best quality, photorealistic, fluid movement",
+      "negative": "score_6, score_5, score_4, source_pony, source_furry, static, frozen, choppy, blurry, low quality, worst quality, watermark, deformed, bad anatomy"
+    }
+  },
+  "workflow_flow": {
+    "2d_static_path": [
+      "Load Pony XL checkpoint",
+      "Encode prompts with CLIP skip -2",
+      "Generate base image (832x1216)",
+      "FaceDetailer enhancement",
+      "4x UltraSharp upscaling",
+      "Save high-quality 2D image"
+    ],
+    "3d_static_path": [
+      "Load Pony XL checkpoint",
+      "Encode 3D-optimized prompts",
+      "Generate clean 2D image (1024x1024)",
+      "Load TripoSR model",
+      "Convert 2D to 3D mesh",
+      "Export as GLTF model",
+      "Save 3D model file"
+    ],
+    "2d_motion_path": [
+      "Load Pony XL checkpoint",
+      "Load AnimateDiff motion module",
+      "Encode motion-optimized prompts",
+      "Create latent video (512x768, 24 frames)",
+      "KSampler with motion (30 steps)",
+      "VAE decode to frames",
+      "RIFE frame interpolation (24→48 frames)",
+      "4x upscaling with motion compensation",
+      "Combine into MP4 video (24 FPS)"
+    ]
+  },
+  "performance_requirements": {
+    "2d_static": {
+      "vram": "~16-24GB",
+      "time": "~2-4 minutes",
+      "gpu": "RTX 3090+"
+    },
+    "3d_static": {
+      "vram": "~8-12GB",
+      "time": "~1-2 minutes",
+      "gpu": "RTX 2060+"
+    },
+    "2d_motion": {
+      "vram": "~24-32GB",
+      "time": "~5-8 minutes",
+      "gpu": "RTX 3090+"
+    }
+  },
+  "expected_output": {
+    "2d_static": "Professional 1664x2432 NSFW image with enhanced faces and 4x upscaling",
+    "3d_static": "Detailed 3D GLTF model from 2D generation, viewable in 3D software",
+    "2d_motion": "Cinematic 2048x3072 MP4 video with 48 smooth frames at 24 FPS"
+  },
+  "usage_instructions": {
+    "selecting_mode": "Choose workflow path based on desired output: static 2D, 3D model, or motion video",
+    "prompt_adaptation": "Use mode-specific prompts for optimal results - 3D mode needs clean backgrounds, motion mode needs movement keywords",
+    "resolution_considerations": "3D mode uses square resolution for best reconstruction, motion mode uses vertical for cinematic feel",
+    "quality_tradeoffs": "Motion mode requires more VRAM but creates dynamic content, 3D mode is fastest but creates static models"
+  }
+}

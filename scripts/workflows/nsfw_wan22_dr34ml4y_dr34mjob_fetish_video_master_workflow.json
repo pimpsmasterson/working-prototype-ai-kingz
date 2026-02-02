@@ -1,0 +1,255 @@
+{
+  "metadata": {
+    "title": "NSFW Wan 2.2 dr34ml4y dr34mjob Fetish Video Master Workflow",
+    "description": "Advanced Wan 2.2 video workflow with custom fetish LoRAs (dr34ml4y and dr34mjob) for extreme NSFW content. Generates two variants using high-noise and low-noise expert models for different visual styles.",
+    "model_requirements": {
+      "checkpoint": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors and wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors (FP8 scaled MoE experts)",
+      "text_encoder": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "loras": [
+        "wan_dr34ml4y_all_in_one.safetensors (weight 0.8) - Multi-fetish enhancement",
+        "wan_dr34mjob.safetensors (weight 0.7) - Specialized fetish actions"
+      ],
+      "vae": "wan2.2_vae.safetensors"
+    },
+    "quality_settings": {
+      "resolution": "832x1216 (portrait aspect ratio)",
+      "steps": "25 (per sampling stage)",
+      "cfg": "7.5",
+      "sampler": "DPM++ 2M (Karras)",
+      "estimated_time": "8-12 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {
+      "wan_dr34ml4y_all_in_one": {
+        "purpose": "Multi-fetish theme enhancement with layered effects",
+        "weight_recommended": 0.8,
+        "weight_range": "0.6-1.0",
+        "tips": "Higher weights (0.9-1.0) for stronger fetish emphasis, lower for subtle integration"
+      },
+      "wan_dr34mjob": {
+        "purpose": "Specialized fetish actions and poses",
+        "weight_recommended": 0.7,
+        "weight_range": "0.5-0.9",
+        "tips": "Adjust based on desired intensity; can stack with other fetish LoRAs"
+      }
+    },
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, [dr34m l4y/dr34mjob], explicit sex, detailed anatomy, mo-e motion, smooth animation",
+      "positive_boosters": ["(detailed anatomy:1.3)", "(mo-e motion:1.2)", "(realistic texture:1.4)", "(explicit sex:1.3)"],
+      "negative_essentials": ["score_6", "score_5", "low quality", "worst quality", "watermark", "static", "frozen", "clean", "sanitary"]
+    },
+    "workflow_flow": {
+      "step_1": "Load high-noise and low-noise Wan 2.2 models",
+      "step_2": "Load UMT5-XXL text encoder",
+      "step_3": "Apply dr34ml4y LoRA to high-noise model",
+      "step_4": "Apply dr34mjob LoRA to low-noise model",
+      "step_5": "Encode prompts for both variants",
+      "step_6": "Generate latent video (832x1216, 49 frames)",
+      "step_7": "Sample high-noise variant (25 steps)",
+      "step_8": "Sample low-noise variant (25 steps)",
+      "step_9": "Decode both latents to videos",
+      "step_10": "Save two MP4 files (24 FPS each)"
+    },
+    "expected_output": {
+      "format": "Two MP4 videos, 832x1216 resolution, 49 frames each, 24 FPS",
+      "quality": "High-quality NSFW fetish videos with different noise characteristics and LoRA themes"
+    },
+    "vram_requirements": {
+      "minimum": "20GB",
+      "recommended": "24GB+"
+    },
+    "troubleshooting": {
+      "Weak fetish theme": "Increase LoRA weights: dr34ml4y to 0.9-1.0, dr34mjob to 0.8-0.9",
+      "Low quality output": "Increase steps to 30-40, use non-FP8 models",
+      "Inconsistent results": "Ensure prompts match LoRA themes exactly",
+      "OOM errors": "Use FP8 models (already enabled), reduce resolution to 640x832"
+    }
+  },
+  "last_node_id": 25,
+  "last_link_id": 30,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "WanVideoModelLoader",
+      "pos": [50, 100],
+      "size": [315, 82],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
+      "widgets_values": ["wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "fp8_e4m3fn"]
+    },
+    {
+      "id": 2,
+      "type": "WanVideoModelLoader",
+      "pos": [50, 200],
+      "size": [315, 82],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [2], "slot_index": 0}],
+      "widgets_values": ["wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "fp8_e4m3fn"]
+    },
+    {
+      "id": 3,
+      "type": "WanVideoT5TextEncode",
+      "pos": [50, 350],
+      "size": [315, 82],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [3, 4, 5], "slot_index": 0}],
+      "widgets_values": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoader",
+      "pos": [450, 50],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "clip", "type": "CLIP", "link": 3}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [6], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [7, 8], "slot_index": 1}
+      ],
+      "widgets_values": ["wan_dr34ml4y_all_in_one.safetensors", 0.8, 0.8]
+    },
+    {
+      "id": 5,
+      "type": "LoraLoader",
+      "pos": [450, 200],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 2},
+        {"name": "clip", "type": "CLIP", "link": 4}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [9], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [10, 11], "slot_index": 1}
+      ],
+      "widgets_values": ["wan_dr34mjob.safetensors", 0.7, 0.7]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [850, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 7}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [12, 13], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, dr34m, l4y, explicit sex, detailed anatomy, mo-e motion, smooth animation"]
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [850, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 8}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [14, 15], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, static, frozen, clean, sanitary"]
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [850, 450],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 10}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [16, 17], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, dr34mjob, explicit sex, detailed anatomy, mo-e motion, smooth animation"]
+    },
+    {
+      "id": 9,
+      "type": "CLIPTextEncode",
+      "pos": [850, 650],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 11}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [18, 19], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, static, frozen, clean, sanitary"]
+    },
+    {
+      "id": 10,
+      "type": "EmptyWanVideoLatent",
+      "pos": [1350, 100],
+      "size": [315, 200],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [20, 21], "slot_index": 0}],
+      "widgets_values": [832, 1216, 49, 24, 8, 1234567890]
+    },
+    {
+      "id": 11,
+      "type": "WanVideoSampler",
+      "pos": [1750, 50],
+      "size": [315, 400],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 6},
+        {"name": "positive", "type": "CONDITIONING", "link": 12},
+        {"name": "negative", "type": "CONDITIONING", "link": 14},
+        {"name": "latent", "type": "LATENT", "link": 20}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [22], "slot_index": 0}],
+      "widgets_values": [25, 7.5, 50, "dpmpp_2m", "karras", 1.0, 1234567890]
+    },
+    {
+      "id": 12,
+      "type": "WanVideoSampler",
+      "pos": [1750, 500],
+      "size": [315, 400],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 9},
+        {"name": "positive", "type": "CONDITIONING", "link": 16},
+        {"name": "negative", "type": "CONDITIONING", "link": 18},
+        {"name": "latent", "type": "LATENT", "link": 21}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [23], "slot_index": 0}],
+      "widgets_values": [25, 7.5, 50, "dpmpp_2m", "karras", 1.0, 1234567890]
+    },
+    {
+      "id": 13,
+      "type": "WanVideoDecoder",
+      "pos": [2150, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "latent", "type": "LATENT", "link": 22}],
+      "outputs": [{"name": "VIDEO", "type": "VIDEO", "links": [24], "slot_index": 0}],
+      "widgets_values": []
+    },
+    {
+      "id": 14,
+      "type": "WanVideoDecoder",
+      "pos": [2150, 200],
+      "size": [315, 58],
+      "inputs": [{"name": "latent", "type": "LATENT", "link": 23}],
+      "outputs": [{"name": "VIDEO", "type": "VIDEO", "links": [25], "slot_index": 0}],
+      "widgets_values": []
+    },
+    {
+      "id": 15,
+      "type": "SaveVideo",
+      "pos": [2550, 100],
+      "size": [315, 200],
+      "inputs": [{"name": "video", "type": "VIDEO", "link": 24}],
+      "widgets_values": ["aikings_wan22_dr34ml4y_high_noise_fetish_video", "mp4", 24, 8]
+    },
+    {
+      "id": 16,
+      "type": "SaveVideo",
+      "pos": [2550, 350],
+      "size": [315, 200],
+      "inputs": [{"name": "video", "type": "VIDEO", "link": 25}],
+      "widgets_values": ["aikings_wan22_dr34mjob_low_noise_fetish_video", "mp4", 24, 8]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 4, 0, "MODEL"],
+    [2, 2, 0, 5, 0, "MODEL"],
+    [3, 3, 0, 4, 1, "CLIP"],
+    [4, 3, 0, 5, 1, "CLIP"],
+    [5, 3, 0, 6, 0, "CLIP"],
+    [6, 4, 0, 11, 0, "MODEL"],
+    [7, 4, 1, 6, 0, "CLIP"],
+    [8, 4, 1, 7, 0, "CLIP"],
+    [9, 5, 0, 12, 0, "MODEL"],
+    [10, 5, 1, 8, 0, "CLIP"],
+    [11, 5, 1, 9, 0, "CLIP"],
+    [12, 6, 0, 11, 1, "CONDITIONING"],
+    [14, 7, 0, 11, 2, "CONDITIONING"],
+    [16, 8, 0, 12, 1, "CONDITIONING"],
+    [18, 9, 0, 12, 2, "CONDITIONING"],
+    [20, 10, 0, 11, 3, "LATENT"],
+    [21, 10, 0, 12, 3, "LATENT"],
+    [22, 11, 0, 13, 0, "LATENT"],
+    [23, 12, 0, 14, 0, "LATENT"],
+    [24, 13, 0, 15, 0, "VIDEO"],
+    [25, 14, 0, 16, 0, "VIDEO"]
+  ],
+  "version": 0.4
+}

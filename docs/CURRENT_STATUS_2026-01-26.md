@@ -121,3 +121,7 @@ Which should I do next? Reply with the number (1, 2, or 3) and I will start imme
 
 File location: [docs/CURRENT_STATUS_2026-01-26.md](docs/CURRENT_STATUS_2026-01-26.md)
 
+## Update (2026-01-31)
+
+- **Embedded Dropbox links**: To make provisioning deterministic and reduce failures during prewarm, the known Dropbox model links were embedded directly into the provisioning scripts (`scripts/provision-core.sh` and `scripts/provision.sh`) on **2026-01-31**. The local file `data/dropbox_links.txt` was also generated and is used for overrides if present. See `docs/DROPBOX_INTEGRATION.md` for details and a list of the added models.
+

@@ -33,7 +33,25 @@
       "Bash(grep:*)",
       "Bash(powershell.exe -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like ''*vastai*'' -or $true } | Select-Object Id, ProcessName, StartTime | Format-Table -AutoSize\")",
       "Bash(ssh -i ~/.ssh/id_rsa_vast -o StrictHostKeyChecking=no -p 16696 root@ssh7.vast.ai 'export CIVITAI_TOKEN=\"\"5b27198680e7f18ed806ca813826b62f\"\" && cd /workspace/ComfyUI/models && echo \"\"=== DOWNLOADING PONY V6 XL ===\"\" && wget -q --show-progress -O checkpoints/ponyDiffusionV6XL_v6StartWithThisOne.safetensors \"\"https://civitai.com/api/download/models/290640?token=${CIVITAI_TOKEN}\"\" 2>&1 && echo \"\"=== DOWNLOADING PONY REALISM LORA ===\"\" && wget -q --show-progress -O loras/pony_realism_v2.1.safetensors \"\"https://civitai.com/api/download/models/152309?token=${CIVITAI_TOKEN}\"\" 2>&1 && echo \"\"=== DONE ===\"\" && ls -lh checkpoints/pony* loras/pony*')",
-      "Bash(ssh -i ~/.ssh/id_rsa_vast -o StrictHostKeyChecking=no -p 28304 root@ssh1.vast.ai \"export CIVITAI_TOKEN=5b27198680e7f18ed806ca813826b62f && cd /workspace/ComfyUI/models && echo ''=== Starting Pony V6 XL download ==='' && wget -q --show-progress -O checkpoints/ponyDiffusionV6XL_v6StartWithThisOne.safetensors ''https://civitai.com/api/download/models/290640?token=5b27198680e7f18ed806ca813826b62f'' 2>&1 && echo ''=== Pony V6 XL DONE ==='' && echo ''=== Starting Pony Realism LoRA ==='' && wget -q --show-progress -O loras/pony_realism_v2.1.safetensors ''https://civitai.com/api/download/models/152309?token=5b27198680e7f18ed806ca813826b62f'' 2>&1 && echo ''=== Pony Realism DONE ==='' && ls -la checkpoints/ loras/\")"
+      "Bash(ssh -i ~/.ssh/id_rsa_vast -o StrictHostKeyChecking=no -p 28304 root@ssh1.vast.ai \"export CIVITAI_TOKEN=5b27198680e7f18ed806ca813826b62f && cd /workspace/ComfyUI/models && echo ''=== Starting Pony V6 XL download ==='' && wget -q --show-progress -O checkpoints/ponyDiffusionV6XL_v6StartWithThisOne.safetensors ''https://civitai.com/api/download/models/290640?token=5b27198680e7f18ed806ca813826b62f'' 2>&1 && echo ''=== Pony V6 XL DONE ==='' && echo ''=== Starting Pony Realism LoRA ==='' && wget -q --show-progress -O loras/pony_realism_v2.1.safetensors ''https://civitai.com/api/download/models/152309?token=5b27198680e7f18ed806ca813826b62f'' 2>&1 && echo ''=== Pony Realism DONE ==='' && ls -la checkpoints/ loras/\")",
+      "Bash(bash -n:*)",
+      "WebFetch(domain:civitai.com)",
+      "WebFetch(domain:gist.githubusercontent.com)",
+      "Bash(git log:*)",
+      "Bash(bash:*)",
+      "Bash(pm2 list:*)",
+      "Bash(test:*)",
+      "Bash(pm2 delete:*)",
+      "Bash(pkill:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(powershell:*)",
+      "Bash(node:*)",
+      "Bash(pm2 restart:*)",
+      "Bash(pm2 logs:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: Add SSH setup to warm-pool onstart & fix Windows NUL file bug\n\n- warm-pool.js: Add SSH directory setup to onstart command for proper key handling\n- Fix PowerShell scripts using /dev/null on Windows \\(creates NUL file bug\\)\n- Change all SSH UserKnownHostsFile from /dev/null to nul \\(Windows null device\\)\n- Affected files:\n  - one-click-start-fixed.ps1\n  - one-click-start.ps1\n  - scripts/powershell/check-and-install-missing.ps1\n  - scripts/powershell/investigate-failures.ps1\n\nThis ensures instances provision correctly with custom gist script and prevents\nreserved device name files from being created in the project root.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(tasklist:*)",
+      "Bash(Get-Process -Name node -ErrorAction SilentlyContinue)"
     ]
   }
 }

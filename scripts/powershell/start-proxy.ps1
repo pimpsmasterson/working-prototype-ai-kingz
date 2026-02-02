@@ -29,7 +29,12 @@ $env:VASTAI_API_KEY = if ($env:VASTAI_API_KEY) { $env:VASTAI_API_KEY } else { "V
 $env:HUGGINGFACE_HUB_TOKEN = if ($env:HUGGINGFACE_HUB_TOKEN) { $env:HUGGINGFACE_HUB_TOKEN } else { "HUGGINGFACE_HUB_TOKEN_PLACEHOLDER" }
 $env:CIVITAI_TOKEN = if ($env:CIVITAI_TOKEN) { $env:CIVITAI_TOKEN } else { "CIVITAI_TOKEN_PLACEHOLDER" }
 $env:COMFYUI_PROVISION_SCRIPT = if ($env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT } else { "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
-$env:SCRIPTS_BASE_URL = if ($env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL } else { "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/" }
+$env:SCRIPTS_BASE_URL = if ($env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL } else { "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
+# Enforce restrictions: set PROVISION_ALLOWED_SCRIPTS to the exact gist by default, restrict external hosts, and enable strict mode
+$env:PROVISION_ALLOWED_SCRIPTS = if ($env:PROVISION_ALLOWED_SCRIPTS) { $env:PROVISION_ALLOWED_SCRIPTS } else { "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
+# Leave PROVISION_ALLOWED_HOSTS empty by default to skip host-level validation (set if you want explicit host checks)
+$env:PROVISION_ALLOWED_HOSTS = if ($env:PROVISION_ALLOWED_HOSTS) { $env:PROVISION_ALLOWED_HOSTS } else { "" }
+$env:PROVISION_STRICT = if ($env:PROVISION_STRICT) { $env:PROVISION_STRICT } else { "true" }
 
 Write-Host "Admin API Key: $env:ADMIN_API_KEY" -ForegroundColor Green
 Write-Host "Vast.ai API Key: $($env:VASTAI_API_KEY.Substring(0, [Math]::Min(10, $env:VASTAI_API_KEY.Length)))..." -ForegroundColor Green

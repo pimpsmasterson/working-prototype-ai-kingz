@@ -1,4 +1,53 @@
 {
+  "metadata": {
+    "title": "NSFW Cinema Production Workflow",
+    "description": "Film-grade NSFW video production with advanced AnimateDiff context scheduling, frame interpolation, and professional post-processing for cinematic quality.",
+    "model_requirements": {
+      "checkpoint": "pmXL_v1.safetensors (PornMaster XL model)",
+      "text_encoder": "Built-in CLIP",
+      "loras": [],
+      "vae": "Built-in VAE from checkpoint"
+    },
+    "quality_settings": {
+      "resolution": "1152x2048 final (2x upscale from 576x1024)",
+      "steps": "30",
+      "cfg": "7.0",
+      "sampler": "DPM++ 2M SDE (Karras) with advanced scheduling",
+      "estimated_time": "12-20 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, masterpiece, best quality, cinematic, wide shot, full body, [subject], detailed background, professional lighting, realistic proportions, detailed faces, beautiful eyes, nsfw, explicit, dynamic pose, interaction",
+      "positive_boosters": ["(cinematic:1.3)", "(professional lighting:1.2)", "(realistic proportions:1.4)", "(detailed faces:1.3)"],
+      "negative_essentials": ["score_6", "score_5", "score_4", "source_pony", "source_furry", "low quality", "worst quality", "blurry", "censored", "watermark", "ugly", "bad anatomy", "deformed", "extra limbs", "bad hands", "bad fingers", "close-up", "cropped", "out of frame", "jpeg artifacts", "duplicate", "mutation"]
+    },
+    "workflow_flow": {
+      "step_1": "Load PornMaster XL checkpoint",
+      "step_2": "Load AnimateDiff with uniform context options (16 frames context, 4 steps)",
+      "step_3": "Encode detailed positive and negative prompts",
+      "step_4": "Create empty latent (576x1024, 32 frames)",
+      "step_5": "Advanced KSampler with AnimateDiff context scheduling (30 steps)",
+      "step_6": "VAE decode to frames",
+      "step_7": "RIFE frame interpolation (32→64 frames)",
+      "step_8": "4x UltraSharp upscaling (2304x4096)",
+      "step_9": "Scale back to 50% (1152x2048) for optimal quality",
+      "step_10": "Combine into MP4 video (24 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 1152x2048 resolution, 64 frames, 24 FPS",
+      "quality": "Film-grade cinematic NSFW video with smooth interpolated motion and professional post-processing"
+    },
+    "vram_requirements": {
+      "minimum": "20GB",
+      "recommended": "32GB+"
+    },
+    "troubleshooting": {
+      "OOM during processing": "Reduce base resolution to 448x800, use 2x interpolation instead of 4x",
+      "Context scheduling issues": "Adjust AnimateDiff context options: try 12,1,3 or 20,2,4",
+      "Quality loss in downscale": "Skip the 0.5x scale step, keep 4x resolution (more VRAM needed)",
+      "Weak cinematic feel": "Add (film grain:1.2), (cinematic lighting:1.4) to prompt"
+    }
+  },
   "last_node_id": 18,
   "last_link_id": 25,
   "nodes": [

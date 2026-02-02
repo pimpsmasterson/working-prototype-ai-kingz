@@ -1,4 +1,159 @@
 {
+  "_meta": {
+    "title": "NSFW ControlNet Pose Master Workflow",
+    "description": "Advanced pose-controlled NSFW image generation using OpenPose ControlNet. Generate explicit content that precisely follows reference pose images with high anatomical accuracy and dynamic positioning.",
+    "version": "1.0.0",
+    "category": "pose-control",
+    "tags": ["controlnet", "openpose", "pose-control", "nsfw", "anatomy", "pony-diffusion"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "base_model": {
+      "name": "Pony Diffusion XL v1",
+      "filename": "pmXL_v1.safetensors",
+      "type": "checkpoint",
+      "description": "High-quality Pony model optimized for character and NSFW generation",
+      "url": "https://civitai.com/models/257749/pony-diffusion-v6-xl",
+      "hash": "Expected hash for verification"
+    },
+    "controlnet_model": {
+      "name": "OpenPose XL2",
+      "filename": "OpenPoseXL2.safetensors",
+      "type": "controlnet",
+      "description": "Advanced OpenPose model for SDXL with improved pose detection",
+      "url": "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0",
+      "recommended_version": "XL2 for best SDXL compatibility"
+    }
+  },
+  "quality_settings": {
+    "resolution": {
+      "width": 832,
+      "height": 1216,
+      "aspect_ratio": "2:3 (portrait optimized)",
+      "recommended_range": "768x1024 to 1024x1536"
+    },
+    "sampling": {
+      "steps": 30,
+      "cfg_scale": 7.0,
+      "sampler": "dpmpp_2m_sde",
+      "scheduler": "karras",
+      "clip_skip": -2,
+      "recommended_steps_range": "25-40",
+      "recommended_cfg_range": "6.0-8.0"
+    },
+    "controlnet": {
+      "strength": 0.85,
+      "start_percent": 0.0,
+      "end_percent": 1.0,
+      "strength_range": "0.7-1.0 for pose control"
+    },
+    "performance": {
+      "vram_usage": "~12-16GB",
+      "recommended_gpu": "RTX 3080+ or equivalent",
+      "generation_time": "~20-40 seconds",
+      "controlnet_overhead": "+2-3GB VRAM"
+    }
+  },
+  "pose_input_requirements": {
+    "image_format": "Clear pose reference image (PNG/JPG)",
+    "optimal_pose_image": {
+      "subject": "Single person in clear pose",
+      "visibility": "Full body or key pose elements visible",
+      "quality": "High contrast, well-lit, minimal clothing/obstructions",
+      "resolution": "512x512 minimum for pose detection"
+    },
+    "pose_types_supported": [
+      "Standing poses",
+      "Sitting positions",
+      "Dynamic action poses",
+      "Explicit/exposed positions",
+      "Multiple limb configurations"
+    ],
+    "detection_notes": "OpenPose detects keypoints for pose skeleton - ensure reference shows desired pose clearly"
+  },
+  "controlnet_configuration": {
+    "model_selection": {
+      "openpose_xl2": "Best for SDXL compatibility and accuracy",
+      "alternative": "OpenPose (original) for SD 1.5 models"
+    },
+    "strength_guidance": {
+      "low_strength": "0.5-0.7 (loose pose following, more creative freedom)",
+      "medium_strength": "0.7-0.85 (balanced pose control and generation)",
+      "high_strength": "0.85-1.0 (strict pose adherence, less variation)"
+    },
+    "advanced_settings": {
+      "start_percent": "0.0 (apply from beginning)",
+      "end_percent": "1.0 (apply throughout generation)",
+      "guidance_end": "Adjust for partial pose control if needed"
+    }
+  },
+  "prompting_guide": {
+    "positive_prompt_structure": [
+      "Quality: score_9, score_8_up, score_7_up, masterpiece, photorealistic",
+      "Subject: 1girl, beautiful face, detailed eyes",
+      "Pose: dynamic pose, specific position descriptions",
+      "Content: nsfw, explicit elements",
+      "Style: high quality, detailed anatomy"
+    ],
+    "negative_prompt_structure": [
+      "Quality issues: score_6, score_5, score_4, low quality, blurry",
+      "Anatomy problems: bad anatomy, deformed, extra limbs",
+      "Undesired: censored, watermark, ugly"
+    ],
+    "pose_specific_prompting": {
+      "anatomy_focus": "Include 'detailed anatomy, correct proportions' for better pose following",
+      "pose_description": "Describe desired pose elements in prompt to reinforce ControlNet",
+      "variation_control": "Use consistent pose references for batch generation"
+    },
+    "example_prompts": [
+      "score_9, score_8_up, score_7_up, 1girl, beautiful face, detailed eyes, high quality, nsfw, dynamic pose, spread legs, explicit, masterpiece, photorealistic, detailed anatomy, correct proportions",
+      "score_9, score_8_up, 1girl, nsfw, kneeling pose, hands behind back, explicit exposure, photorealistic, detailed skin texture, cinematic lighting"
+    ]
+  },
+  "workflow_flow": {
+    "step_1": "Load Pony XL base model and CLIP",
+    "step_2": "Apply CLIP skip (-2) for better prompt following",
+    "step_3": "Encode positive and negative prompts",
+    "step_4": "Load pose reference image",
+    "step_5": "Load OpenPose XL2 ControlNet model",
+    "step_6": "Apply ControlNet with pose control (strength 0.85)",
+    "step_7": "Generate latent image (832x1216)",
+    "step_8": "Sample with KSampler (30 steps, CFG 7.0)",
+    "step_9": "Decode and save final image"
+  },
+  "expected_output": {
+    "pose_accuracy": "High fidelity to reference pose skeleton",
+    "content_quality": "Photorealistic NSFW images with correct anatomy",
+    "variation": "Consistent pose with prompt-driven variations",
+    "resolution": "832x1216 pixels (portrait optimized)",
+    "style": "Pony Diffusion characteristics with pose control"
+  },
+  "troubleshooting": {
+    "poor_pose_following": {
+      "solution": "Increase ControlNet strength to 0.9-1.0, use clearer pose reference",
+      "alternative": "Try different pose angle or simplify reference image"
+    },
+    "anatomy_artifacts": {
+      "solution": "Add 'correct proportions, detailed anatomy' to positive prompt",
+      "alternative": "Use higher resolution or different sampler"
+    },
+    "inconsistent_results": {
+      "solution": "Use same pose reference for batch, maintain consistent prompts",
+      "alternative": "Lower CFG slightly for more stable generation"
+    },
+    "vram_issues": {
+      "solution": "Reduce resolution to 768x1024, use --lowvram flag",
+      "alternative": "Switch to SD 1.5 ControlNet models (lower VRAM)"
+    }
+  },
+  "optimization_tips": {
+    "pose_preparation": "Use clean, high-contrast pose references for best detection",
+    "batch_generation": "Process multiple images with same pose for consistency",
+    "strength_balancing": "Find sweet spot between pose control and creative freedom",
+    "prompt_enhancement": "Reinforce pose elements in text prompts alongside ControlNet"
+  },
   "last_node_id": 99,
   "last_link_id": 100,
   "nodes": [

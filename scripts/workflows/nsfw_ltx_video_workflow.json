@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "title": "NSFW LTX-2 Video Workflow",
+    "description": "Standard LTX-2 video generation workflow for NSFW content with camera control capabilities. Uses distilled 19B model for efficient high-quality video output.",
+    "model_requirements": {
+      "checkpoint": "ltx-2-19b-distilled.safetensors (LTX-2 distilled model)",
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors (Gemma 3 12B text encoder)",
+      "loras": [],
+      "vae": "Built-in LTX-2 VAE"
+    },
+    "quality_settings": {
+      "resolution": "832x1216 (portrait aspect ratio)",
+      "steps": "25",
+      "cfg": "7.5",
+      "sampler": "DPM++ 2M (Karras)",
+      "estimated_time": "5-8 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, [fetish content], mo-e motion + camera directions",
+      "positive_boosters": ["(mo-e motion:1.3)", "(realistic texture:1.2)", "(cinematic:1.4)"],
+      "negative_essentials": ["score_6", "score_5", "low quality", "worst quality", "watermark", "clean"]
+    },
+    "workflow_flow": {
+      "step_1": "Load LTX-2 distilled model",
+      "step_2": "Load Gemma 3 text encoder",
+      "step_3": "Encode positive and negative prompts",
+      "step_4": "Generate latent video (832x1216, 49 frames, 24 FPS)",
+      "step_5": "Sample with LTX-2 sampler (25 steps)",
+      "step_6": "Decode latent to video",
+      "step_7": "Save as MP4 video (24 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 832x1216 resolution, 49 frames, 24 FPS",
+      "quality": "High-quality NSFW video with natural camera movement and cinematic motion"
+    },
+    "vram_requirements": {
+      "minimum": "20GB",
+      "recommended": "24GB"
+    },
+    "troubleshooting": {
+      "Camera not moving": "Add camera control LoRAs or keywords: (camera dolly left:1.3)",
+      "Low quality output": "Increase steps to 30-40, use non-distilled model (more VRAM)",
+      "Aspect ratio issues": "Adjust latent generator dimensions: try 1024x1024 for square",
+      "Weak NSFW content": "Add explicit keywords: (scat:1.4), (defecation:1.3), (nsfw:1.2)"
+    }
+  },
+  "last_node_id": 12,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LTXVideoModelLoader",
+      "pos": [50, 100],
+      "size": [315, 58],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
+      "widgets_values": ["ltx-2-19b-distilled.safetensors"]
+    },
+    {
+      "id": 2,
+      "type": "LTXVideoTextEncoderLoader",
+      "pos": [50, 200],
+      "size": [315, 58],
+      "outputs": [{"name": "TEXT_ENCODER", "type": "TEXT_ENCODER", "links": [2], "slot_index": 0}],
+      "widgets_values": ["gemma_3_12B_it_fp4_mixed.safetensors"]
+    },
+    {
+      "id": 3,
+      "type": "CLIPTextEncode",
+      "pos": [450, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [3, 4], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, mo-e motion"]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [450, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5, 6], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, clean"]
+    },
+    {
+      "id": 5,
+      "type": "LTXVideoLatentGenerator",
+      "pos": [450, 450],
+      "size": [315, 200],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}],
+      "widgets_values": [832, 1216, 49, 24, 8, 1234567890]
+    },
+    {
+      "id": 6,
+      "type": "LTXVideoSampler",
+      "pos": [850, 100],
+      "size": [315, 400],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "positive", "type": "CONDITIONING", "link": 3},
+        {"name": "negative", "type": "CONDITIONING", "link": 4},
+        {"name": "latent", "type": "LATENT", "link": 7}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
+      "widgets_values": [25, 7.5, 50, "dpmpp_2m", "karras", 1.0, 1234567890]
+    },
+    {
+      "id": 7,
+      "type": "LTXVideoDecoder",
+      "pos": [1250, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "latent", "type": "LATENT", "link": 8}],
+      "outputs": [{"name": "VIDEO", "type": "VIDEO", "links": [9], "slot_index": 0}],
+      "widgets_values": []
+    },
+    {
+      "id": 8,
+      "type": "SaveVideo",
+      "pos": [1650, 100],
+      "size": [315, 200],
+      "inputs": [{"name": "video", "type": "VIDEO", "link": 9}],
+      "widgets_values": ["aikings_ltx_nsfw_video", "mp4", 24, 8]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 6, 0, "MODEL"],
+    [2, 2, 0, 3, 0, "CLIP"],
+    [3, 3, 0, 6, 1, "CONDITIONING"],
+    [4, 3, 0, 6, 2, "CONDITIONING"],
+    [5, 4, 0, 6, 1, "CONDITIONING"],
+    [6, 4, 0, 6, 2, "CONDITIONING"],
+    [7, 5, 0, 6, 3, "LATENT"],
+    [8, 6, 0, 7, 0, "LATENT"],
+    [9, 7, 0, 8, 0, "VIDEO"]
+  ],
+  "version": 0.4
+}

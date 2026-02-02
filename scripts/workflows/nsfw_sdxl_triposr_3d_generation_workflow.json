@@ -1,0 +1,140 @@
+{
+  "last_node_id": 15,
+  "last_link_id": 17,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CheckpointLoaderSimple",
+      "pos": [50, 100],
+      "size": [315, 98],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [10], "slot_index": 1},
+        {"name": "VAE", "type": "VAE", "links": [3], "slot_index": 2}
+      ],
+      "widgets_values": ["sd_xl_base_1.0.safetensors"]
+    },
+    {
+      "id": 2,
+      "type": "CLIPSetLastLayer",
+      "pos": [50, 250],
+      "size": [315, 58],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 10}],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0}],
+      "widgets_values": [-2]
+    },
+    {
+      "id": 3,
+      "type": "CLIPTextEncode",
+      "pos": [400, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [4], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, score_7_up, 1girl, solo, detailed face, beautiful eyes, high quality, nsfw, explicit, scat, defecation, photorealistic, cinematic lighting, masterpiece, best quality, highly detailed, 3d model, clean background"]
+    },
+    {
+      "id": 4,
+      "type": "CLIPTextEncode",
+      "pos": [400, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, score_4, low quality, worst quality, blurry, censored, watermark, ugly, deformed, cartoon, anime, illustration, 3d render, fake, plastic"]
+    },
+    {
+      "id": 5,
+      "type": "EmptyLatentImage",
+      "pos": [400, 450],
+      "size": [315, 106],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [6], "slot_index": 0}],
+      "widgets_values": [1024, 1024, 1]
+    },
+    {
+      "id": 6,
+      "type": "KSampler",
+      "pos": [850, 100],
+      "size": [315, 262],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "positive", "type": "CONDITIONING", "link": 4},
+        {"name": "negative", "type": "CONDITIONING", "link": 5},
+        {"name": "latent_image", "type": "LATENT", "link": 6}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}],
+      "widgets_values": [11223344, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 1]
+    },
+    {
+      "id": 7,
+      "type": "VAEDecode",
+      "pos": [1200, 100],
+      "size": [210, 46],
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 7},
+        {"name": "vae", "type": "VAE", "link": 3}
+      ],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [8, 11], "slot_index": 0}]
+    },
+    {
+      "id": 8,
+      "type": "SaveImage",
+      "pos": [1200, 200],
+      "size": [315, 270],
+      "inputs": [{"name": "images", "type": "IMAGE", "link": 8}],
+      "widgets_values": ["aikings_2d_source_for_3d"]
+    },
+    {
+      "id": 9,
+      "type": "TripoSRModelLoader",
+      "pos": [1600, 100],
+      "size": [315, 58],
+      "outputs": [{"name": "TRIPOSR_MODEL", "type": "TRIPOSR_MODEL", "links": [12], "slot_index": 0}],
+      "widgets_values": ["model.ckpt"]
+    },
+    {
+      "id": 10,
+      "type": "TripoSRSampler",
+      "pos": [1600, 200],
+      "size": [315, 200],
+      "inputs": [
+        {"name": "model", "type": "TRIPOSR_MODEL", "link": 12},
+        {"name": "image", "type": "IMAGE", "link": 11}
+      ],
+      "outputs": [{"name": "MESH", "type": "MESH", "links": [13], "slot_index": 0}],
+      "widgets_values": [false, 256, 256, 0.5, 0.5, 0.5]
+    },
+    {
+      "id": 11,
+      "type": "TripoSRMeshToGLTF",
+      "pos": [2000, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "mesh", "type": "MESH", "link": 13}],
+      "outputs": [{"name": "GLTF", "type": "GLTF", "links": [14], "slot_index": 0}],
+      "widgets_values": [false]
+    },
+    {
+      "id": 12,
+      "type": "SaveGLTF",
+      "pos": [2400, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "gltf", "type": "GLTF", "link": 14}],
+      "widgets_values": ["aikings_nsfw_3d_model.gltf"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 6, 0, "MODEL"],
+    [10, 1, 1, 2, 0, "CLIP"],
+    [2, 2, 0, 3, 0, "CLIP"],
+    [3, 2, 0, 4, 0, "CLIP"],
+    [4, 3, 0, 6, 1, "CONDITIONING"],
+    [5, 4, 0, 6, 2, "CONDITIONING"],
+    [6, 5, 0, 6, 3, "LATENT"],
+    [7, 6, 0, 7, 0, "LATENT"],
+    [3, 1, 2, 7, 1, "VAE"],
+    [8, 7, 0, 8, 0, "IMAGE"],
+    [11, 7, 0, 10, 1, "IMAGE"],
+    [12, 9, 0, 10, 0, "TRIPOSR_MODEL"],
+    [13, 10, 0, 11, 0, "MESH"],
+    [14, 11, 0, 12, 0, "GLTF"]
+  ],
+  "version": 0.4
+}

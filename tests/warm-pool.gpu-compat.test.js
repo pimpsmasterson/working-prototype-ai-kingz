@@ -118,13 +118,13 @@ describe('WarmPool GPU Compatibility', function() {
                 .reply(200, {
                     offers: [
                         // Legacy GPU - should be filtered out
-                        { id: 1, gpu_name: 'TITAN Xp', cuda_max_good: 6.1, dph_total: 0.3, rentable: true, rented: false, gpu_ram: 12288, disk_space: 250 },
+                        { id: 1, gpu_name: 'TITAN Xp', cuda_max_good: 6.1, dph_total: 0.3, rentable: true, rented: false, gpu_ram: 12288, disk_space: 600, inet_down: 2500 },
                         // Legacy GPU - should be filtered out
-                        { id: 2, gpu_name: 'GTX 1080 Ti', cuda_max_good: 6.1, dph_total: 0.25, rentable: true, rented: false, gpu_ram: 11264, disk_space: 250 },
+                        { id: 2, gpu_name: 'GTX 1080 Ti', cuda_max_good: 6.1, dph_total: 0.25, rentable: true, rented: false, gpu_ram: 11264, disk_space: 600, inet_down: 2500 },
                         // Modern GPU - should be selected (cheapest compatible)
-                        { id: 3, gpu_name: 'RTX 3090', cuda_max_good: 8.6, dph_total: 0.5, rentable: true, rented: false, gpu_ram: 24576, disk_space: 250 },
+                        { id: 3, gpu_name: 'RTX 3090', cuda_max_good: 8.6, dph_total: 0.5, rentable: true, rented: false, gpu_ram: 24576, disk_space: 600, inet_down: 2500 },
                         // Modern GPU - more expensive
-                        { id: 4, gpu_name: 'RTX 4090', cuda_max_good: 8.9, dph_total: 0.7, rentable: true, rented: false, gpu_ram: 24576, disk_space: 250 }
+                        { id: 4, gpu_name: 'RTX 4090', cuda_max_good: 8.9, dph_total: 0.7, rentable: true, rented: false, gpu_ram: 24576, disk_space: 600, inet_down: 2500 }
                     ]
                 });
 
@@ -169,8 +169,8 @@ describe('WarmPool GPU Compatibility', function() {
                 .times(3) // Will retry 3 times
                 .reply(200, {
                     offers: [
-                        { id: 1, gpu_name: 'TITAN Xp', cuda_max_good: 6.1, dph_total: 0.3, rentable: true, rented: false, gpu_ram: 12288, disk_space: 250 },
-                        { id: 2, gpu_name: 'GTX 1080 Ti', cuda_max_good: 6.1, dph_total: 0.25, rentable: true, rented: false, gpu_ram: 11264, disk_space: 250 }
+                        { id: 1, gpu_name: 'TITAN Xp', cuda_max_good: 6.1, dph_total: 0.3, rentable: true, rented: false, gpu_ram: 12288, disk_space: 600, inet_down: 2500 },
+                        { id: 2, gpu_name: 'GTX 1080 Ti', cuda_max_good: 6.1, dph_total: 0.25, rentable: true, rented: false, gpu_ram: 11264, disk_space: 600, inet_down: 2500 }
                     ]
                 });
 

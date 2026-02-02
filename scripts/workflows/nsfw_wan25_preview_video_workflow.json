@@ -1,4 +1,51 @@
 {
+  "metadata": {
+    "title": "NSFW Wan 2.5 Preview Video Workflow",
+    "description": "Quick preview image-to-video workflow using Wan 2.5 model for fast NSFW video generation from reference images. Ideal for testing concepts and character consistency.",
+    "model_requirements": {
+      "checkpoint": "wan25_i2v_14b_fp8_high_scaled.safetensors (FP8 scaled for efficiency)",
+      "text_encoder": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "loras": [],
+      "vae": "wan2.5_vae.safetensors"
+    },
+    "quality_settings": {
+      "resolution": "Input image resolution (maintains aspect ratio)",
+      "steps": "40",
+      "cfg": "7.5",
+      "sampler": "Euler (randomize seed)",
+      "estimated_time": "3-5 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, masterpiece, realistic motion, consistency, nsfw + character description",
+      "positive_boosters": ["(consistent character:1.3)", "(smooth motion:1.2)", "(realistic motion:1.4)"],
+      "negative_essentials": ["score_6", "score_5", "blurry", "watermark"]
+    },
+    "workflow_flow": {
+      "step_1": "Load Wan 2.5 I2V model",
+      "step_2": "Load reference image",
+      "step_3": "Load UMT5-XXL text encoder",
+      "step_4": "Encode positive and negative prompts",
+      "step_5": "Load VAE and encode reference image to latent",
+      "step_6": "Sample video from image latent (40 steps)",
+      "step_7": "VAE decode to video frames",
+      "step_8": "Combine frames into MP4 video (24 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, input resolution, variable frames, 24 FPS",
+      "quality": "Fast preview quality NSFW video maintaining character consistency from reference image"
+    },
+    "vram_requirements": {
+      "minimum": "16GB",
+      "recommended": "24GB"
+    },
+    "troubleshooting": {
+      "Inconsistent character": "Use higher CFG (8.0-9.0), add (consistency:1.4) to prompt",
+      "Low quality output": "Increase steps to 50-60, use Wan 2.2 model instead",
+      "Motion artifacts": "Add (smooth motion:1.3) to positive prompt",
+      "Weak NSFW content": "Add explicit scene description with weights: (nsfw scene:1.4)"
+    }
+  },
   "last_node_id": 12,
   "last_link_id": 15,
   "nodes": [

@@ -7,4 +7,6 @@ coverage/
 data/backup_*
 *.log
 .DS_Store
+# Dropbox-generated link list (may contain private paths/filenames)
+data/dropbox_links.txt
 

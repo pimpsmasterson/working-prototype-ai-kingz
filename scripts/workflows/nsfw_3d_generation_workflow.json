@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "title": "NSFW 3D Generation Workflow (TripoSR)",
+    "description": "Fast 3D mesh generation from 2D NSFW images using TripoSR. Converts explicit images into detailed 3D models with GLTF output for 3D viewing and printing.",
+    "version": "1.0.0",
+    "category": "3d-generation",
+    "tags": ["3d", "triposr", "mesh-generation", "nsfw", "gltf", "3d-modeling"],
+    "author": "AI Kings Prototype",
+    "date_created": "2024-01-26",
+    "last_updated": "2024-01-26"
+  },
+  "model_requirements": {
+    "triposr_model": {
+      "name": "TripoSR Model",
+      "filename": "model.ckpt",
+      "type": "triposr-checkpoint",
+      "description": "Pre-trained TripoSR model for single-image 3D reconstruction",
+      "url": "https://huggingface.co/stabilityai/TripoSR",
+      "hash": "Expected hash for verification",
+      "size": "~1.2GB"
+    },
+    "dependencies": {
+      "torch": ">=2.0.0",
+      "torchvision": ">=0.15.0",
+      "numpy": ">=1.21.0",
+      "pillow": ">=9.0.0",
+      "rembg": ">=2.0.0"
+    }
+  },
+  "quality_settings": {
+    "resolution": {
+      "input_resolution": "256x256 (TripoSR optimized)",
+      "output_mesh_resolution": "High detail mesh",
+      "recommended_input": "Clean, well-lit images with clear subject"
+    },
+    "sampling": {
+      "foreground_ratio": 0.5,
+      "chunk_size": 8192,
+      "mc_resolution": 256,
+      "recommended_foreground_ratio": "0.3-0.7"
+    },
+    "performance": {
+      "vram_usage": "~4-6GB",
+      "recommended_gpu": "RTX 2060+ or equivalent",
+      "generation_time": "~30-60 seconds per model",
+      "batch_processing": "Single image processing"
+    }
+  },
+  "input_requirements": {
+    "image_format": "PNG/JPG with transparency support",
+    "optimal_input": {
+      "lighting": "Even, front-facing lighting",
+      "background": "Clean or transparent background (rembg recommended)",
+      "subject": "Clear, well-defined NSFW subject",
+      "resolution": "512x512 minimum, 1024x1024 optimal"
+    },
+    "preprocessing": {
+      "background_removal": "Use rembg or similar for clean backgrounds",
+      "image_orientation": "Subject should face camera directly",
+      "quality_check": "Avoid blurry or low-contrast images"
+    }
+  },
+  "workflow_flow": {
+    "step_1": "Load input NSFW image (PNG/JPG)",
+    "step_2": "Load TripoSR model checkpoint",
+    "step_3": "Generate 3D mesh from image (256x256 sampling)",
+    "step_4": "Convert mesh to GLTF format",
+    "step_5": "Save GLTF 3D model file"
+  },
+  "expected_output": {
+    "file_format": "GLTF (.gltf)",
+    "mesh_quality": "Detailed 3D mesh with proper topology",
+    "compatibility": "Compatible with Blender, Three.js, Unity",
+    "use_cases": "3D viewing, printing, animation, VR/AR applications",
+    "nsfw_focus": "Preserves explicit anatomical details in 3D form"
+  },
+  "triposr_specific_settings": {
+    "foreground_ratio": {
+      "description": "Controls how much of the image is treated as foreground",
+      "optimal_range": "0.3-0.7",
+      "effect": "Lower values = tighter mesh, higher values = more inclusive"
+    },
+    "chunk_size": {
+      "description": "Processing chunk size for memory efficiency",
+      "default": 8192,
+      "advanced": "Reduce if VRAM limited"
+    },
+    "mc_resolution": {
+      "description": "Marching cubes resolution for mesh detail",
+      "default": 256,
+      "range": "128-512 (higher = more detail but slower)"
+    }
+  },
+  "troubleshooting": {
+    "poor_mesh_quality": {
+      "solution": "Use higher quality input images, adjust foreground_ratio",
+      "alternative": "Try different lighting angles or image preprocessing"
+    },
+    "mesh_artifacts": {
+      "solution": "Lower mc_resolution, ensure clean background",
+      "alternative": "Use image segmentation tools before processing"
+    },
+    "vram_issues": {
+      "solution": "Reduce mc_resolution to 128, use smaller chunk_size",
+      "alternative": "Process on CPU (slower but lower VRAM)"
+    },
+    "incomplete_mesh": {
+      "solution": "Adjust foreground_ratio, ensure subject is well-defined",
+      "alternative": "Use manual masking for complex NSFW poses"
+    }
+  },
+  "optimization_tips": {
+    "input_preparation": "Use consistent lighting and clean backgrounds for best results",
+    "batch_processing": "Process similar images together for efficiency",
+    "output_usage": "GLTF files can be imported into 3D software for further refinement",
+    "nsfw_considerations": "3D models preserve explicit details - consider privacy and usage restrictions"
+  },
+  "last_node_id": 10,
+  "last_link_id": 12,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [50, 100],
+      "size": [315, 314],
+      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [1], "slot_index": 0}],
+      "widgets_values": ["example.png", "image"]
+    },
+    {
+      "id": 2,
+      "type": "TripoSRModelLoader",
+      "pos": [400, 100],
+      "size": [315, 58],
+      "outputs": [{"name": "TRIPOSR_MODEL", "type": "TRIPOSR_MODEL", "links": [2], "slot_index": 0}],
+      "widgets_values": ["model.ckpt"]
+    },
+    {
+      "id": 3,
+      "type": "TripoSRSampler",
+      "pos": [750, 100],
+      "size": [315, 200],
+      "inputs": [
+        {"name": "model", "type": "TRIPOSR_MODEL", "link": 2},
+        {"name": "image", "type": "IMAGE", "link": 1}
+      ],
+      "outputs": [{"name": "MESH", "type": "MESH", "links": [3], "slot_index": 0}],
+      "widgets_values": [false, 256, 256, 0.5, 0.5, 0.5]
+    },
+    {
+      "id": 4,
+      "type": "TripoSRMeshToGLTF",
+      "pos": [1100, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "mesh", "type": "MESH", "link": 3}],
+      "outputs": [{"name": "GLTF", "type": "GLTF", "links": [4], "slot_index": 0}],
+      "widgets_values": [false]
+    },
+    {
+      "id": 5,
+      "type": "SaveGLTF",
+      "pos": [1450, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "gltf", "type": "GLTF", "link": 4}],
+      "widgets_values": ["output_3d_model.gltf"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 3, 1, "IMAGE"],
+    [2, 2, 0, 3, 0, "TRIPOSR_MODEL"],
+    [3, 3, 0, 4, 0, "MESH"],
+    [4, 4, 0, 5, 0, "GLTF"]
+  ],
+  "version": 0.4
+}

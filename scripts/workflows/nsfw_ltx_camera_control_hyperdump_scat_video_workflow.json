@@ -1,0 +1,222 @@
+{
+  "metadata": {
+    "title": "LTX-2 Camera Control NSFW Scat Video",
+    "description": "Generate camera-motion controlled fetish videos using LTX-2 19B model with HyperDump theme. Supports dolly-left camera movement for dynamic scenes. Optimized for high-quality scat-themed content with smooth camera transitions.",
+    "model_requirements": {
+      "checkpoint": "ltx-2-19b-dev-fp8.safetensors (19B parameters, FP8 quantized)",
+      "text_encoder": "gemma_3_12B_it_fp4_mixed.safetensors (Gemma 3 12B for advanced prompt understanding)",
+      "loras": [
+        "ltx-2-19b-lora-camera-control-dolly-left.safetensors (weight 0.8) - Camera movement control",
+        "HyperDump.safetensors (weight 1.0-1.2) - Scat fetish theme enhancement"
+      ],
+      "upscaler_optional": "ltx-2-spatial-upscaler-x2-1.0.safetensors for 2x resolution boost"
+    },
+    "quality_settings": {
+      "resolution": "832x1216 (portrait), 49 frames at 24 FPS = 2 seconds",
+      "steps": "25 steps (balance speed/quality) - Use 15-20 for previews, 30-40 for production",
+      "cfg": "7.5 (moderate guidance) - Lower (5-6) for more creativity, higher (8-10) for prompt adherence",
+      "sampler": "dpmpp_2m + karras scheduler (best quality for LTX-2)",
+      "estimated_time": "3-5 minutes on high-end GPU (RTX 4090), 8-12 minutes on mid-range"
+    },
+    "lora_stack_guide": {
+      "camera_control_lora": {
+        "purpose": "Enables smooth dolly-left camera movement",
+        "weight_recommended": 0.8,
+        "weight_range": "0.6-1.0 (higher = more pronounced movement)",
+        "tips": "If camera movement too subtle, increase to 0.9-1.0. If jerky/unstable, decrease to 0.6-0.7"
+      },
+      "hyperdump_lora": {
+        "purpose": "Enhances scat/defecation theme with explicit details",
+        "weight_recommended": "1.0-1.2",
+        "weight_current": "0.7 (SHOULD BE INCREASED)",
+        "tips": "Higher weights (1.2-1.5) for extreme content. Lower (0.8-1.0) for subtle. Current 0.7 is too low for strong fetish theme."
+      },
+      "stacking_order": "Camera Control → Fetish Theme. This order ensures camera movement is applied first, then content styling."
+    },
+    "prompting_tips": {
+      "positive_structure": "Start with quality tags (score_9, masterpiece) → Subject (1girl, full body) → Action (scat, hyper dump) → Camera (dolly left) → Style modifiers (realistic texture, detailed anatomy)",
+      "positive_boosters": [
+        "(realistic texture:1.3) - Enhances skin and material realism",
+        "(detailed anatomy:1.4) - Improves body accuracy",
+        "(smooth camera movement:1.2) - Emphasizes camera control effect",
+        "(mo-e motion:1.3) - Adds natural movement fluidity"
+      ],
+      "negative_essentials": [
+        "score_6, score_5 - Quality filters",
+        "static camera - Prevents frozen camera",
+        "frozen, watermark - Basic quality guards",
+        "clean, sanitary - Removes anti-fetish elements"
+      ],
+      "advanced_prompting": "For stronger fetish emphasis, add: (explicit defecation:1.4), (visible mess:1.3), (intense expression:1.2). For artistic variant: (cinematic lighting:1.3), (dramatic angle:1.2)"
+    },
+    "workflow_flow": {
+      "step_1": "Load LTX-2 19B model (FP8 for speed)",
+      "step_2": "Load Gemma 3 text encoder (12B for complex prompts)",
+      "step_3": "Apply Camera Control LoRA (0.8 weight)",
+      "step_4": "Stack HyperDump LoRA (1.0-1.2 weight)",
+      "step_5": "Encode positive prompt with quality tags + fetish keywords",
+      "step_6": "Encode negative prompt to filter unwanted elements",
+      "step_7": "Generate latent space (832x1216, 49 frames)",
+      "step_8": "Sample with DPM++ 2M + Karras (25 steps, CFG 7.5)",
+      "step_9": "Decode latent to video",
+      "step_10": "Save as MP4 (24 FPS, quality 8/10)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 832x1216 resolution",
+      "duration": "~2 seconds (49 frames at 24 FPS)",
+      "content": "Single subject with scat theme, camera slowly dollying left throughout sequence",
+      "quality": "High-detail realistic rendering with smooth camera motion",
+      "file_size": "~50-100MB depending on compression"
+    },
+    "vram_requirements": {
+      "minimum": "16GB VRAM (may use system RAM swap)",
+      "recommended": "24GB VRAM (RTX 4090, RTX 3090) for smooth generation",
+      "optimal": "32GB+ VRAM for multiple simultaneous workflows"
+    },
+    "optimization_tips": {
+      "for_speed": "Reduce steps to 15-20, lower resolution to 640x832, use FP8 models (already enabled)",
+      "for_quality": "Increase steps to 30-40, add spatial upscaler node (2x), use higher CFG (8-9)",
+      "for_vram_savings": "Enable tiled VAE decoding (if available in LTX nodes), reduce frame count to 25-33",
+      "for_longer_videos": "Increase frame count to 97 (4 sec) or 145 (6 sec), but expect 2-3x longer generation time"
+    },
+    "troubleshooting": {
+      "camera_not_moving": "Increase camera LoRA weight to 0.9-1.0, ensure 'camera dolly left' in positive prompt",
+      "weak_fetish_theme": "Increase HyperDump weight to 1.2-1.5, add explicit keywords to prompt",
+      "blurry_output": "Increase sampling steps to 30-35, ensure CFG not too low (keep 7-9)",
+      "anatomy_issues": "Add (perfect anatomy:1.4) to positive, (deformed:1.5) to negative. Consider adding FaceDetailer node post-processing",
+      "out_of_memory": "Reduce resolution to 640x832 or frame count to 25. Enable CPU offloading if available"
+    },
+    "recommended_enhancements": {
+      "add_upscaler": "Insert LTX-2 Spatial Upscaler after decoder for 2x resolution (1664x2432)",
+      "add_face_detailer": "Use ADetailer or FaceDetailer node after decoder to refine facial expressions",
+      "add_frame_interpolation": "Use RIFE to double frame rate (24→48 FPS) for ultra-smooth motion",
+      "add_lora_mixer": "Use Power LoRA Loader from rgthree for precise weight control and A/B testing"
+    },
+    "version": "1.0",
+    "last_updated": "2026-02-01",
+    "author": "AI Kings Production System",
+    "license": "Private Use"
+  },
+  "last_node_id": 20,
+  "last_link_id": 25,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LTXVideoModelLoader",
+      "pos": [50, 100],
+      "size": [315, 82],
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
+      "widgets_values": ["ltx-2-19b-dev-fp8.safetensors"]
+    },
+    {
+      "id": 2,
+      "type": "LTXVideoTextEncoderLoader",
+      "pos": [50, 200],
+      "size": [315, 82],
+      "outputs": [{"name": "TEXT_ENCODER", "type": "TEXT_ENCODER", "links": [2], "slot_index": 0}],
+      "widgets_values": ["gemma_3_12B_it_fp4_mixed.safetensors"]
+    },
+    {
+      "id": 3,
+      "type": "LoraLoader",
+      "pos": [450, 50],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 1},
+        {"name": "clip", "type": "CLIP", "link": 2}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [3], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [4, 5], "slot_index": 1}
+      ],
+      "widgets_values": ["ltx-2-19b-lora-camera-control-dolly-left.safetensors", 0.8, 0.8]
+    },
+    {
+      "id": 4,
+      "type": "LoraLoader",
+      "pos": [450, 200],
+      "size": [315, 126],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 3},
+        {"name": "clip", "type": "CLIP", "link": 4}
+      ],
+      "outputs": [
+        {"name": "MODEL", "type": "MODEL", "links": [6], "slot_index": 0},
+        {"name": "CLIP", "type": "CLIP", "links": [7, 8], "slot_index": 1}
+      ],
+      "widgets_values": ["HyperDump.safetensors", 1.0, 1.0]
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [850, 50],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 7}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9, 10], "slot_index": 0}],
+      "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, hyper dump, camera dolly left, smooth camera movement, explicit sex, detailed anatomy, mo-e motion"]
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [850, 250],
+      "size": [400, 150],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 8}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [11, 12], "slot_index": 0}],
+      "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, static camera, frozen, clean, sanitary"]
+    },
+    {
+      "id": 7,
+      "type": "LTXVideoLatentGenerator",
+      "pos": [1350, 100],
+      "size": [315, 200],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [13], "slot_index": 0}],
+      "widgets_values": [832, 1216, 49, 24, 8, 1234567890]
+    },
+    {
+      "id": 8,
+      "type": "LTXVideoSampler",
+      "pos": [1750, 100],
+      "size": [315, 400],
+      "inputs": [
+        {"name": "model", "type": "MODEL", "link": 6},
+        {"name": "positive", "type": "CONDITIONING", "link": 9},
+        {"name": "negative", "type": "CONDITIONING", "link": 11},
+        {"name": "latent", "type": "LATENT", "link": 13}
+      ],
+      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [14], "slot_index": 0}],
+      "widgets_values": [25, 7.5, 50, "dpmpp_2m", "karras", 1.0, 1234567890]
+    },
+    {
+      "id": 9,
+      "type": "LTXVideoDecoder",
+      "pos": [2150, 100],
+      "size": [315, 58],
+      "inputs": [{"name": "latent", "type": "LATENT", "link": 14}],
+      "outputs": [{"name": "VIDEO", "type": "VIDEO", "links": [15], "slot_index": 0}],
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "SaveVideo",
+      "pos": [2550, 100],
+      "size": [315, 200],
+      "inputs": [{"name": "video", "type": "VIDEO", "link": 15}],
+      "widgets_values": ["aikings_ltx_camera_control_hyperdump_scat_video", "mp4", 24, 8]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 3, 0, "MODEL"],
+    [2, 2, 0, 3, 1, "CLIP"],
+    [3, 3, 0, 4, 0, "MODEL"],
+    [4, 3, 1, 4, 1, "CLIP"],
+    [6, 4, 0, 8, 0, "MODEL"],
+    [7, 4, 1, 5, 0, "CLIP"],
+    [8, 4, 1, 6, 0, "CLIP"],
+    [9, 5, 0, 8, 1, "CONDITIONING"],
+    [11, 6, 0, 8, 2, "CONDITIONING"],
+    [13, 7, 0, 8, 3, "LATENT"],
+    [14, 8, 0, 9, 0, "LATENT"],
+    [15, 9, 0, 10, 0, "VIDEO"]
+  ],
+  "version": 0.4
+}

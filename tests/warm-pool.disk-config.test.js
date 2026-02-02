@@ -23,8 +23,8 @@ describe('WarmPool disk configurability', function() {
 
     // Mock bundles: one offer with insufficient disk, one with enough
     const offers = [
-      { id: '11', rentable: true, rented: false, dph_total: 0.5, gpu_ram: 16384, disk_space: 64 },
-      { id: '42', rentable: true, rented: false, dph_total: 0.6, gpu_ram: 16384, disk_space: 200 }
+      { id: '11', rentable: true, rented: false, dph_total: 0.5, gpu_ram: 16384, disk_space: 64, inet_down: 2500 },
+      { id: '42', rentable: true, rented: false, dph_total: 0.6, gpu_ram: 16384, disk_space: 200, inet_down: 2500 }
     ];
 
     nock('https://console.vast.ai')

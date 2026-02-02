@@ -22,6 +22,7 @@
 ### 🚀 **Fully Automated Cloud GPU Management (Warm Pool)**
 - **One-Click GPU Rental** from Vast.ai marketplace via admin panel
 - **Automated NSFW Setup** - Pre-configured ComfyUI with Pony Diffusion V6 XL and fetish LoRAs
+- **Provisioning note (2026-01-31)**: Default Dropbox model links were embedded directly into the provisioning scripts for deterministic downloads. See `docs/DROPBOX_INTEGRATION.md` for details.
 - **Idle shutdown** - Auto-terminate after 15 minutes to save costs
 - **Safe mode** - Emergency shutdown for cost control
 - **Real-time monitoring** - 30-second health checks
@@ -73,6 +74,9 @@ npm start
 - **Studio**: http://localhost:3000/studio.html
 - **Admin Dashboard**: http://localhost:3000/admin/warm-pool
 - **Health Check**: http://localhost:3000/api/proxy/health
+
+### One-Click Start (PM2 + Prewarm)
+We provide a `one-click-start.ps1` script that starts the server under PM2, waits for the HTTP health check, and triggers the warm-pool prewarm which attempts to rent a Vast.ai instance. See `docs/ONE-CLICK-START.md` for details and troubleshooting steps.
 
 ## 🏗️ Architecture
 
@@ -147,7 +151,10 @@ CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
 COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
-SCRIPTS_BASE_URL=https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/
+# Enforce provisioning to use only the allowed script(s)
+PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+PROVISION_STRICT=true
+SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
 ```
 
 ## 📊 API Endpoints
@@ -218,7 +225,7 @@ If the automated setup doesn't work, you can manually configure the GPU:
 1. **SSH into the instance** using the Vast.ai web interface
 2. **Run the provisioning script**:
    ```bash
-   wget https://raw.githubusercontent.com/YOUR_USERNAME/ai-kings/main/scripts/fetish-king-nsfw-provision.sh
+  wget https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
    chmod +x fetish-king-nsfw-provision.sh
    ./fetish-king-nsfw-provision.sh
    ```
@@ -228,6 +235,14 @@ If the automated setup doesn't work, you can manually configure the GPU:
 - **Instance not accessible**: Wait 5-10 minutes for provisioning to complete
 - **Provisioning failed**: Check Vast.ai logs or SSH in to debug
 - **Models not downloading**: Verify HuggingFace/Civitai tokens are set
+
+### Provisioning Options (Vendor Image vs Manual Driver Install)
+
+- **Option A — Vendor CUDA Image (recommended)**: Use a cloud marketplace image labeled with the correct CUDA runtime for your GPU (e.g., "Ubuntu + NVIDIA CUDA 12.x"). This image already contains tested NVIDIA drivers and usually has Docker + container runtimes configured. Fastest and least error-prone.
+
+- **Option B — Manual Driver + NVIDIA Container Toolkit**: Use a clean Ubuntu image and let the provisioner install NVIDIA drivers and `nvidia-container-toolkit`. This offers more control but can require a reboot and may fail on providers that enforce Secure Boot or restrict kernel module installs. To enable this behavior set `INSTALL_NVIDIA_DRIVERS=true` in your environment before running the provisioning script.
+
+If you are unsure, start with Option A. If your provider does not offer a CUDA-enabled image for your chosen GPU, then use Option B.
 
 ### Instance Health Recovery
 

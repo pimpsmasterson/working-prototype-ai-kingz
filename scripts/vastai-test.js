@@ -98,7 +98,7 @@ pip install -r requirements.txt &&
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 &&
 
 # Start ComfyUI in background
-nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 &
+setsid nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 < /dev/null &
                     `.trim(),
                     env: {
                         'PYTHONPATH': '/root/ComfyUI'
@@ -342,7 +342,7 @@ pip install -r requirements.txt &&
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 &&
 
 # Start ComfyUI in background
-nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 &
+setsid nohup python main.py --listen 0.0.0.0 --port 8188 > comfyui.log 2>&1 < /dev/null &
                     `.trim(),
                     env: {
                         'PYTHONPATH': '/root/ComfyUI'

@@ -1,4 +1,53 @@
 {
+  "metadata": {
+    "title": "NSFW Ultimate Video Workflow",
+    "description": "Universal NSFW video generator with AnimateDiff and advanced post-processing. Includes frame interpolation and upscaling for cinematic quality output.",
+    "model_requirements": {
+      "checkpoint": "pmXL_v1.safetensors (PornMaster XL model)",
+      "text_encoder": "Built-in CLIP (CLIPSetLastLayer -2)",
+      "loras": [],
+      "vae": "Built-in VAE from checkpoint"
+    },
+    "quality_settings": {
+      "resolution": "512x768 final (2048x3072 after 4x upscaling)",
+      "steps": "25",
+      "cfg": "7.0",
+      "sampler": "DPM++ 2M SDE (Karras)",
+      "estimated_time": "5-8 minutes on RTX 4090"
+    },
+    "lora_stack_guide": {},
+    "prompting_tips": {
+      "positive_structure": "score_9, score_8_up, score_7_up, source_anime, rating_explicit, [subject] [action], smooth motion, cinematic lighting, high quality, nsfw, masterpiece, best quality, dynamic camera",
+      "positive_boosters": ["(smooth motion:1.3)", "(cinematic lighting:1.2)", "(dynamic camera:1.4)"],
+      "negative_essentials": ["score_6", "score_5", "score_4", "source_pony", "source_furry", "static", "frozen", "choppy", "blurry", "low quality", "worst quality", "watermark", "deformed", "bad anatomy"]
+    },
+    "workflow_flow": {
+      "step_1": "Load PornMaster XL checkpoint",
+      "step_2": "Set CLIP last layer to -2",
+      "step_3": "Load AnimateDiff motion module",
+      "step_4": "Encode positive and negative prompts",
+      "step_5": "Create empty latent (512x768, 24 frames)",
+      "step_6": "KSampler with AnimateDiff motion (25 steps)",
+      "step_7": "VAE decode to frames",
+      "step_8": "RIFE frame interpolation (24→48 frames)",
+      "step_9": "4x UltraSharp upscaling",
+      "step_10": "Combine into MP4 video (24 FPS)"
+    },
+    "expected_output": {
+      "format": "MP4 video, 2048x3072 resolution, 48 frames, 24 FPS",
+      "quality": "High-quality cinematic NSFW video with smooth 2x interpolated motion and sharp 4x upscaled detail"
+    },
+    "vram_requirements": {
+      "minimum": "16GB",
+      "recommended": "24GB"
+    },
+    "troubleshooting": {
+      "OOM during upscaling": "Reduce base resolution to 384x576, use tiled upscaling",
+      "Low quality motion": "Increase base frame count to 32-48 before interpolation",
+      "Artifacts in upscale": "Use 4x-UltraSharp.pth, denoise 0.2-0.3",
+      "Weak NSFW content": "Add explicit scene details: (nsfw:1.3), (rating_explicit:1.2)"
+    }
+  },
   "last_node_id": 99,
   "last_link_id": 100,
   "nodes": [
