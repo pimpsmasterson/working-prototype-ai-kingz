@@ -1,7 +1,7 @@
 # 🤖 AI KINGS - AI-Powered Adult Content Generation Platform
 
-[![Tests](https://github.com/YOUR_USERNAME/ai-kings/workflows/Tests/badge.svg)](https://github.com/YOUR_USERNAME/ai-kings/actions)
-[![Coverage](https://img.shields.io/badge/coverage-89.64%25_statements_75.62%25_branches-brightgreen)](https://github.com/YOUR_USERNAME/ai-kings)
+[![Tests](https://github.com/pimpsmasterson/working-prototype-ai-kingz/workflows/Tests/badge.svg)](https://github.com/pimpsmasterson/working-prototype-ai-kingz/actions)
+[![Coverage](https://img.shields.io/badge/coverage-41.96%25_statements_32.85%25_branches-brightgreen)](https://github.com/pimpsmasterson/working-prototype-ai-kingz)
 
 **fetishking.com** - Professional AI-powered platform for creating custom adult content with advanced character systems and cloud GPU management.
 
@@ -22,7 +22,7 @@
 ### 🚀 **Fully Automated Cloud GPU Management (Warm Pool)**
 - **One-Click GPU Rental** from Vast.ai marketplace via admin panel
 - **Automated NSFW Setup** - Pre-configured ComfyUI with Pony Diffusion V6 XL and fetish LoRAs
-- **Provisioning note (2026-01-31)**: Default Dropbox model links were embedded directly into the provisioning scripts for deterministic downloads. See `docs/DROPBOX_INTEGRATION.md` for details.
+- **Provisioning note (2026-02-03)**: Default Dropbox model links were embedded directly into the provisioning scripts for deterministic downloads. See `docs/DROPBOX_INTEGRATION.md` for details.
 - **Idle shutdown** - Auto-terminate after 15 minutes to save costs
 - **Safe mode** - Emergency shutdown for cost control
 - **Real-time monitoring** - 30-second health checks
@@ -53,8 +53,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/ai-kings.git
-cd ai-kings
+git clone https://github.com/pimpsmasterson/working-prototype-ai-kingz.git
+cd working-prototype-ai-kingz
 
 # Install dependencies
 npm install
@@ -115,10 +115,10 @@ npm test -- tests/warm-pool.test.js
 ```
 
 ### Test Coverage
-- **Statements**: 89.64%
-- **Branches**: 75.62%
-- **Functions**: 92.72%
-- **Lines**: 91.74%
+- **Statements**: 41.96%
+- **Branches**: 32.85%
+- **Functions**: 45.01%
+- **Lines**: 42.27%
 
 ## 🚀 Deployment
 
@@ -219,22 +219,26 @@ The platform features fully automated GPU provisioning for NSFW content generati
 4. **Workflow Setup**: Deploys NSFW-optimized generation workflows
 5. **Ready State**: GPU is fully configured for fetish content generation
 
+**Note (2026-02-03)**: SSH permission fixes in provisioning scripts have been disabled to prevent hangs during setup. Provisioning should now complete without timeouts.
+
 ### Manual Setup (if automated provisioning fails)
 If the automated setup doesn't work, you can manually configure the GPU:
 
 1. **SSH into the instance** using the Vast.ai web interface
 2. **Run the provisioning script**:
    ```bash
-  wget https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+   wget https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
    chmod +x fetish-king-nsfw-provision.sh
    ./fetish-king-nsfw-provision.sh
    ```
+   **Note**: SSH permission fixes are disabled in the script to prevent hangs. If you encounter permission issues, you may need to manually adjust permissions after provisioning.
 3. **Restart ComfyUI** if needed
 
 ### Troubleshooting
 - **Instance not accessible**: Wait 5-10 minutes for provisioning to complete
 - **Provisioning failed**: Check Vast.ai logs or SSH in to debug
 - **Models not downloading**: Verify HuggingFace/Civitai tokens are set
+- **Provisioning hangs**: SSH permission fixes have been disabled to prevent timeouts. If hangs occur, check the provision script logs for errors.
 
 ### Provisioning Options (Vendor Image vs Manual Driver Install)
 
