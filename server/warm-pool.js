@@ -854,9 +854,26 @@ async function prewarm() {
                     });
 
                     if (!r.ok) {
-                        console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
                         const errorText = await r.text();
+                        
+                        // Handle rate limiting (429) - this is expected behavior
+                        if (r.status === 429) {
+                            console.warn(`WarmPool: Vast.ai API rate limited (429) on bundle search attempt ${i}. This is normal - backing off before retry.`);
+                            const backoffDelay = 2000 * i; // Increasing backoff
+                            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                            continue; // Try again after waiting
+                        }
+                        
+                        console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
                         console.error(`WarmPool: Error response:`, errorText);
+                        
+                        // Rate limiting handled above, now check for other transient errors
+                        if (r.status >= 500 || r.status === 408) {
+                            console.warn(`WarmPool: Server error detected, will retry after brief pause`);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * i));
+                            continue;
+                        }
+                        
                         continue;
                     }
 
@@ -1181,8 +1198,7 @@ async function prewarm() {
             ...(configuredImage && configuredImage !== 'auto' ? { image: configuredImage } : {}),
             runtype: 'ssh',
             target_state: 'running',
-            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'`,}]}]}
-```
+            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'`,
             ssh_key: vastaiSsh.getKey(),
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
@@ -1334,13 +1350,24 @@ async function checkInstance() {
 
         // Use fetchWithRetry for automatic retry on transient errors and rate limiting
         // Timeout: 10s per attempt, max 3 retries with exponential backoff (1s, 2s, 4s)
-        const r = await fetchWithRetry(
-            `${VAST_BASE}/instances/${contractId}/`,
-            { headers: { 'Authorization': `Bearer ${VASTAI_API_KEY}` } },
-            10000, // 10-second timeout per attempt
-            3,     // 3 retries max
-            1000   // 1-second initial delay
-        );
+        let r;
+        try {
+            r = await fetchWithRetry(
+                `${VAST_BASE}/instances/${contractId}/`,
+                { headers: { 'Authorization': `Bearer ${VASTAI_API_KEY}` } },
+                10000, // 10-second timeout per attempt
+                3,     // 3 retries max
+                1000   // 1-second initial delay
+            );
+        } catch (retryErr) {
+            // Check if it's a rate limit error that was retried
+            if (retryErr.message && retryErr.message.includes('429')) {
+                console.warn(`WarmPool: Vast.ai API rate limited (429) after retries. This is normal - will retry next cycle.`);
+                state.instance.lastError = `Rate limited (429) after retries at ${new Date().toISOString()}`;
+                return state.instance;
+            }
+            throw retryErr;
+        }
 
         if (!r.ok) {
             const txt = await r.text();
@@ -1351,11 +1378,11 @@ async function checkInstance() {
                 save();
                 return null;
             }
-            // CRITICAL: If rate limited (429), DON'T kill the instance - just log and skip this check
+            // CRITICAL: If rate limited (429), DON'T kill the instance - just log and skip this check gracefully
             if (r.status === 429) {
-                console.warn(`WarmPool: Vast.ai API rate limited (429). Skipping this health check cycle.`);
+                console.warn(`WarmPool: Vast.ai API rate limited (429). This is normal behavior - will retry next poll cycle.`);
                 state.instance.lastError = `Rate limited (429) at ${new Date().toISOString()}`;
-                return; // Don't throw - instance is still running
+                return state.instance; // Don't throw - instance is still running, just keep state
             }
             throw new Error(`instances status error ${r.status} ${txt}`);
         }
