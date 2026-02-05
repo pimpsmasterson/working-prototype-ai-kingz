@@ -745,6 +745,13 @@ async function prewarm() {
                 return false;
             }
 
+            // Exclude NVIDIA P4000 and similar older workstation GPUs (user request)
+            if (o.gpu_name && /p4000/i.test(o.gpu_name)) {
+                reasons.push('GPU excluded: P4000 series');
+                console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
+                return false;
+            }
+
             // Exclude Ukraine region
             if (o.geolocation && (o.geolocation.includes('Ukraine') || o.geolocation.includes('UA'))) {
                 reasons.push('region excluded: Ukraine');
@@ -903,6 +910,43 @@ async function prewarm() {
 
                     // Apply client-side filtering
                     let offers = allOffers.filter(filterOffer);
+
+                    // Diagnostic: if no offers matched, compute a summary of rejection reasons and show top near-misses
+                    if (!offers.length) {
+                        const reasonsCount = {};
+                        const samples = [];
+                        for (const o of allOffers) {
+                            const reasons = [];
+                            if (!o.rentable) { reasons.push('not rentable'); }
+                            if (o.rented) { reasons.push('already rented'); }
+                            const minVRAM = parseInt(process.env.VASTAI_MIN_GPU_RAM_MB || '16000');
+                            const numGpus = o.num_gpus || 1;
+                            const totalVram = (o.gpu_ram || 0) * numGpus;
+                            if (totalVram < minVRAM) reasons.push(`vram:${totalVram}MB`);
+                            if (typeof o.disk_space === 'number' && o.disk_space < requiredDiskGb) reasons.push(`disk:${o.disk_space}GB`);
+                            const maxPrice = parseFloat(process.env.WARM_POOL_MAX_DPH || '3.00');
+                            if (typeof o.dph_total === 'number' && o.dph_total > maxPrice) reasons.push(`price:$${o.dph_total}`);
+                            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '2000');
+                            if (typeof o.inet_down === 'number' && o.inet_down < minInetDown) reasons.push(`inet_down:${o.inet_down}Mbps`);
+                            const isVerifiedBoolean = o.verified === true;
+                            const isVerifiedString = o.verification === 'verified';
+                            if (!isVerifiedBoolean && !isVerifiedString) reasons.push(`not_verified`);
+
+                            if (reasons.length === 0) {
+                                // This offer would have passed the checks - unexpected
+                                samples.push({ id: o.id, gpu: o.gpu_name, reason: 'no_reasons' });
+                            } else {
+                                samples.push({ id: o.id, gpu: o.gpu_name, reason: reasons.join(',') });
+                                for (const r of reasons) reasonsCount[r] = (reasonsCount[r] || 0) + 1;
+                            }
+                            if (samples.length >= 50) break; // limit output
+                        }
+
+                        const sortedReasons = Object.entries(reasonsCount).sort((a,b)=>b[1]-a[1]);
+                        console.log('WarmPool: ❌ No offers matched strict criteria. Rejection reason summary (top):');
+                        for (const [r,c] of sortedReasons.slice(0,10)) console.log(`   - ${r}: ${c}`);
+                        console.log('WarmPool: Sample rejected offers (up to 50):', samples.slice(0,20));
+                    }
 
                     // Sort results: Primary by value (price per Gbps), secondarily by bandwidth (Mbps DESC)
                     // This balances cost vs speed - allows higher price for significantly faster network
