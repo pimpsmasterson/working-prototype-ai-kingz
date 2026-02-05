@@ -893,11 +893,11 @@ detect_cuda_version() {
         local cuda_raw=$(nvidia-smi --query-gpu=cuda_version --format=csv,noheader,nounits 2>/dev/null | head -n1 | tr -d '\r')
         local gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1 | tr -d '\r')
         
-        log "   🔎 GPU: $gpu_name | CUDA: $cuda_raw"
+        log_err "   🔎 GPU: $gpu_name | CUDA: $cuda_raw"
         
         # Check for RTX 50-series / Blackwell
         if [[ "$gpu_name" =~ 5090|5080|5070|5060|RTX\ 50|Blackwell ]]; then
-            log "   ⚡ RTX 50-series detected - using CUDA 13.0"
+            log_err "   ⚡ RTX 50-series detected - using CUDA 13.0"
             echo "cu130"
             return 0
         fi
@@ -916,7 +916,7 @@ detect_cuda_version() {
                 ;;
         esac
     else
-        log "   ⚠️  No NVIDIA GPU detected"
+        log "   ⚠️  No NVIDIA GPU detected" >&2
         echo "cpu"
     fi
 }

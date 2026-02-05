@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Push scripts/provision-reliable.sh to the GitHub Gist used by COMFYUI_PROVISION_SCRIPT.
- * Uses GITHUB_TOKEN from .env. Gist ID is from .env.example / docs (pimpsmasterson/c3f61f20067d498b6699d1bdbddea395).
+ * Uses GITHUB_TOKEN from .env. Gist ID 9fb9d7c60d3822c2ffd3ad4b000cc864 (canonical).
  * No random files: reads only scripts/provision-reliable.sh and updates the existing gist.
  */
 const path = require('path');
@@ -10,11 +10,9 @@ const fetch = require('node-fetch');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const GIST_ID = 'c3f61f20067d498b6699d1bdbddea395';
+const GIST_ID = '9fb9d7c60d3822c2ffd3ad4b000cc864';
 const PROVISION_PATH = path.join(__dirname, 'provision-reliable.sh');
 const CHECK_CF_PATH = path.join(__dirname, 'check-cloudflare.sh');
-const IMAGE_PROVISION_PATH = path.join(__dirname, 'provision-image-only.sh');
-const VIDEO_PROVISION_PATH = path.join(__dirname, 'provision-video-only.sh');
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 
 async function main() {
@@ -34,22 +32,12 @@ async function main() {
   if (fs.existsSync(CHECK_CF_PATH)) {
     checkCfContent = fs.readFileSync(CHECK_CF_PATH, 'utf8');
   }
-  let imageContent = '';
-  if (fs.existsSync(IMAGE_PROVISION_PATH)) {
-    imageContent = fs.readFileSync(IMAGE_PROVISION_PATH, 'utf8');
-  }
-  let videoContent = '';
-  if (fs.existsSync(VIDEO_PROVISION_PATH)) {
-    videoContent = fs.readFileSync(VIDEO_PROVISION_PATH, 'utf8');
-  }
 
   const payload = {
-    description: 'AI Kings ComfyUI provisioners v3.1 (reliable + image-only + video-only + check-cloudflare)',
+    description: 'AI Kings ComfyUI reliable provisioner v3.1 (provision-reliable.sh + check-cloudflare.sh)',
     files: {
       'provision-reliable.sh': { content },
-      'check-cloudflare.sh': { content: checkCfContent },
-      'provision-image-only.sh': { content: imageContent },
-      'provision-video-only.sh': { content: videoContent }
+      'check-cloudflare.sh': { content: checkCfContent }
     }
   };
 

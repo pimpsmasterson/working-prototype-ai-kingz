@@ -1,0 +1,21 @@
+========================================
+  AI KINGS - HOW TO OPEN COMFYUI
+========================================
+
+DO THIS ONCE (first time only):
+-------------------------------
+1. Double-click:  SETUP-KEY.bat
+2. Wait until it says "DONE!"
+3. Close the window
+
+
+DO THIS EVERY TIME you want ComfyUI:
+------------------------------------
+1. Double-click:  OPEN-COMFY.bat
+2. Wait 5 seconds - your browser will open
+3. Keep the black window OPEN while using ComfyUI
+4. When done, close the black window
+
+
+THAT'S IT.
+========================================

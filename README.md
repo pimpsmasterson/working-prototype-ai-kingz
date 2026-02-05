@@ -150,11 +150,11 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
-COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/provision-reliable.sh
+COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/gistfile1.txt
 # Enforce provisioning to use only the allowed script(s)
-PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/provision-reliable.sh
+PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/
 PROVISION_STRICT=true
-SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
+SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw
 ```
 
 ## 📊 API Endpoints

@@ -17,6 +17,9 @@ PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - IMAGE WORKFLOW PROVISIONER ${VERS
 
 set -euo pipefail
 
+# Allow provisioning to continue even when some non-critical assets fail to download.
+# Set PROVISION_ALLOW_MISSING_ASSETS=false in the environment to restore strict behavior.
+PROVISION_ALLOW_MISSING_ASSETS=${PROVISION_ALLOW_MISSING_ASSETS:-true}
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -350,8 +353,8 @@ attempt_download() {
         
         aria2c "$url" -d "$dir" -o "$filename" \
             -x${connections} -s${connections} \
-            --timeout=300 --max-tries=5 --retry-wait=10 \
-            --lowest-speed-limit=20480 \
+            --timeout=300 --max-tries=8 --retry-wait=30 \
+            --lowest-speed-limit=1024 \
             --continue=true --allow-overwrite=true \
             --console-log-level=error 2>&1 | tee -a "$LOG_FILE"
         
@@ -416,7 +419,16 @@ download_batch() {
     done
     
     log "   📊 Complete: $((total-failed))/$total successful"
-    return $((failed > 0 ? 1 : 0))
+    if (( failed > 0 )); then
+        if [[ "${PROVISION_ALLOW_MISSING_ASSETS,,}" == "true" || "${PROVISION_ALLOW_MISSING_ASSETS,,}" == "1" ]]; then
+            log "   ⚠️  Some downloads failed but PROVISION_ALLOW_MISSING_ASSETS=true so continuing provision (non-fatal)"
+            return 0
+        else
+            log "   ❌ Some downloads failed and PROVISION_ALLOW_MISSING_ASSETS is not enabled - aborting"
+            return 1
+        fi
+    fi
+    return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-# AI Kings One-Click Start Script (v3.0)
+# AI Kings One-Click Start Script (v3.1)
 # This script provides a complete one-click startup with:
 # - Environment validation
 # - Clean state reset
@@ -6,9 +6,15 @@
 # - Automated prewarm
 # - SSH log collection
 
+# Ensure we run from project root (where .env and scripts live)
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptDir
+
 Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║   👑 AI KINGS ONE-CLICK START v3.0                           ║" -ForegroundColor Cyan
+Write-Host "║   👑 AI KINGS ONE-CLICK START v3.1                           ║" -ForegroundColor Cyan
 Write-Host "╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Working directory: $(Get-Location)" -ForegroundColor DarkGray
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -43,19 +49,22 @@ if (-not (Test-Path ".env")) {
     exit 1
 }
 
-# Load .env file into PowerShell environment
-Get-Content ".env" | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
+# Load .env file into PowerShell environment (trim quotes from values)
+Get-Content ".env" -ErrorAction SilentlyContinue | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
     $parts = $_ -split '=', 2
     $key = $parts[0].Trim()
     $value = $parts[1].Trim()
-    Set-Item -Path "env:$key" -Value $value
+    # Remove surrounding quotes if present
+    if ($value.Length -ge 2 -and $value[0] -eq '"' -and $value[-1] -eq '"') { $value = $value.Substring(1, $value.Length - 2) }
+    if ($value.Length -ge 2 -and $value[0] -eq "'" -and $value[-1] -eq "'") { $value = $value.Substring(1, $value.Length - 2) }
+    Set-Item -Path "env:$key" -Value $value -Force
 }
 
-# Verify required environment variables
+# Verify required environment variables (use $env:VAR - same source as prewarm headers)
 $requiredVars = @('VASTAI_API_KEY', 'ADMIN_API_KEY', 'HUGGINGFACE_HUB_TOKEN', 'CIVITAI_TOKEN')
 $missingVars = @()
 foreach ($var in $requiredVars) {
-    $val = [Environment]::GetEnvironmentVariable($var)
+    $val = (Get-Item -Path "env:$var" -ErrorAction SilentlyContinue).Value
     if ([string]::IsNullOrWhiteSpace($val)) {
         $missingVars += $var
     }
@@ -434,6 +443,24 @@ if (-not $healthy) {
 # STEP 7: Trigger Prewarm
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host "[7/8] Triggering prewarm..." -ForegroundColor Yellow
+
+# CRITICAL: Re-ensure ADMIN_API_KEY is set (PM2 inherits env from this session)
+if ([string]::IsNullOrWhiteSpace($env:ADMIN_API_KEY)) {
+    Write-Host "   Re-loading .env to ensure ADMIN_API_KEY..." -ForegroundColor Yellow
+    Get-Content ".env" -ErrorAction SilentlyContinue | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
+        $parts = $_ -split '=', 2
+        $key = $parts[0].Trim()
+        $value = $parts[1].Trim()
+        if ($value.Length -ge 2 -and $value[0] -eq '"' -and $value[-1] -eq '"') { $value = $value.Substring(1, $value.Length - 2) }
+        if ($value.Length -ge 2 -and $value[0] -eq "'" -and $value[-1] -eq "'") { $value = $value.Substring(1, $value.Length - 2) }
+        Set-Item -Path "env:$key" -Value $value -Force
+    }
+}
+if ([string]::IsNullOrWhiteSpace($env:ADMIN_API_KEY)) {
+    Write-Host "   ❌ ADMIN_API_KEY is empty - prewarm will fail (403). Set it in .env" -ForegroundColor Red
+    exit 1
+}
+Write-Host "   Admin key: $($env:ADMIN_API_KEY.Substring(0, [Math]::Min(8, $env:ADMIN_API_KEY.Length)))..." -ForegroundColor DarkGray
 
 # Ensure desiredSize is set to 1 for the warm pool
 $setDesiredSizeCmd = @"

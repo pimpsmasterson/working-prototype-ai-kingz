@@ -455,7 +455,7 @@ Location: `${COMFYUI_DIR}/models/` (RIFE subdirectory)
 
 | Model | Size | Source | Purpose | Status |
 |-------|------|--------|---------|--------|
-| `rife426.pth` | ~200MB | GitHub | RIFE v4.26 interpolation | Optional (404 errors) |
+| `rife426.pth` | ~200MB | HuggingFace (zip) | RIFE v4.26 interpolation | Extracted from RIFEv4.26_0921.zip |
 
 ---
 

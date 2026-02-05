@@ -1,4 +1,18 @@
-# Current Status Report - 2026-01-26 15:32 UTC
+# Current Status Report - 2026-02-05
+
+## Provision Script Status: v3.1
+
+| Item | Status |
+|------|--------|
+| **Version** | v3.1 |
+| **Gist** | https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/ |
+| **RIFE** | ✅ HuggingFace zip (RIFEv4.26_0921.zip → rife426.pth) |
+| **example_pose.png** | ✅ HuggingFace out_ballerina.png, optional skip on fail |
+| **Paths** | ✅ All /workspace/ replaced with ${WORKSPACE} |
+| **Unbound vars** | ✅ Fixed err_log/errfile in download failure block |
+| **Pushed to Gist** | Yes (git push 2026-02-05) |
+
+---
 
 ## Server Status: ONLINE
 - **Proxy Server**: Running via PM2 (PID: 108956)
@@ -36,7 +50,7 @@ However, HTTP requests to port 8188 **timeout** (curl exit code 28).
 ### Configuration
 ```
 COMFYUI_ARGS: --listen 0.0.0.0 --disable-auto-launch --port 18188 --enable-cors-header
-PROVISIONING_SCRIPT: https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/
+PROVISIONING_SCRIPT: https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/gistfile1.txt
 ```
 
 ### Port Mapping (PORTAL_CONFIG)

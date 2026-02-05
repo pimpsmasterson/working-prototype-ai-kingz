@@ -2,8 +2,8 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $provisionPath = Join-Path $projectRoot "scripts\provision-dropbox-only.sh"
-$gistClone = Join-Path $env:TEMP "gist-c3f61f20067d498b6699d1bdbddea395"
-$gistId = "c3f61f20067d498b6699d1bdbddea395"
+$gistClone = Join-Path $env:TEMP "gist-9fb9d7c60d3822c2ffd3ad4b000cc864"
+$gistId = "9fb9d7c60d3822c2ffd3ad4b000cc864"
 
 if (-not (Test-Path $gistClone)) {
     Write-Host "ERROR: Gist clone not found at $gistClone" -ForegroundColor Red

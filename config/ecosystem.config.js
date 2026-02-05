@@ -1,4 +1,6 @@
-require('dotenv').config();
+const path = require('path');
+// Load .env from project root (explicit path - cwd may vary when PM2 loads this)
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 module.exports = {
   apps: [{
@@ -17,7 +19,10 @@ module.exports = {
       PORT: process.env.PORT || '3000',
       WARM_POOL_SAFE_MODE: process.env.WARM_POOL_SAFE_MODE || '0',
       WARM_POOL_IDLE_MINUTES: process.env.WARM_POOL_IDLE_MINUTES || '15',
-      COMFYUI_TUNNEL_URL: process.env.COMFYUI_TUNNEL_URL || 'http://localhost:8188'
+      WARM_POOL_DISK_GB: process.env.WARM_POOL_DISK_GB || '600',
+      COMFYUI_TUNNEL_URL: process.env.COMFYUI_TUNNEL_URL || 'http://localhost:8188',
+      VASTAI_MIN_INET_DOWN: process.env.VASTAI_MIN_INET_DOWN || '500',
+      VASTAI_MIN_GPU_RAM_MB: process.env.VASTAI_MIN_GPU_RAM_MB || '12288'
     },
     env_production: {
       NODE_ENV: 'production'

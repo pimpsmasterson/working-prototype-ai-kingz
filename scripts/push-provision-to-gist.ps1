@@ -4,8 +4,8 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $provisionPath = Join-Path $projectRoot "scripts\provision-reliable.sh"
-$gistClone = Join-Path $env:TEMP "gist-c3f61f20067d498b6699d1bdbddea395"
-$gistId = "c3f61f20067d498b6699d1bdbddea395"
+$gistClone = Join-Path $env:TEMP "gist-9fb9d7c60d3822c2ffd3ad4b000cc864"
+$gistId = "9fb9d7c60d3822c2ffd3ad4b000cc864"
 
 # Try API first (no proxy issues)
 $envPath = Join-Path $projectRoot ".env"
@@ -20,7 +20,7 @@ if ($token -and (Test-Path $provisionPath)) {
     Write-Host "Pushing via GitHub API..." -ForegroundColor Cyan
     & node (Join-Path $projectRoot "scripts\push-provision-to-gist.js")
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "Done. Update .env COMFYUI_PROVISION_SCRIPT / COMFYUI_IMAGE_PROVISION_SCRIPT / COMFYUI_VIDEO_PROVISION_SCRIPT with the Raw URLs printed above, then: pm2 restart vastai-proxy --update-env" -ForegroundColor Green
+        Write-Host "Done. Update .env COMFYUI_PROVISION_SCRIPT with the Raw URL printed above, then: pm2 restart vastai-proxy --update-env" -ForegroundColor Green
         exit 0
     }
     Write-Host "API push failed, falling back to git push from Gist clone." -ForegroundColor Yellow
