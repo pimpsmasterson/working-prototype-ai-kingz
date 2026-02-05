@@ -61,7 +61,7 @@ async function main() {
 
   const data = await res.json();
   console.log('Gist updated successfully.');
-  console.log('Raw URL (use in COMFYUI_PROVISION_SCRIPT):', data.files['provision-reliable.sh']?.raw_url || 'https://gist.githubusercontent.com/pimpsmasterson/' + GIST_ID + '/raw');
+  console.log('Raw URL (use in COMFYUI_PROVISION_SCRIPT):', data.files['provision-reliable.sh']?.raw_url || 'https://gist.githubusercontent.com/pimpsmasterson/' + GIST_ID + '/raw/provision-reliable.sh');
 }
 
 main().catch((err) => {

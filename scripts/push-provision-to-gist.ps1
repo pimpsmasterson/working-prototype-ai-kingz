@@ -15,7 +15,7 @@ if (Test-Path $envPath) {
         Set-Item -Path "env:$($p[0].Trim())" -Value $p[1].Trim() -ErrorAction SilentlyContinue
     }
 }
-$token = $env:GITHUB_TOKEN ?? $env:GH_TOKEN ?? $env:NEED_KEY
+$token = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } elseif ($env:GH_TOKEN) { $env:GH_TOKEN } else { $env:NEED_KEY }
 if ($token -and (Test-Path $provisionPath)) {
     Write-Host "Pushing via GitHub API..." -ForegroundColor Cyan
     & node (Join-Path $projectRoot "scripts\push-provision-to-gist.js")
@@ -57,6 +57,7 @@ try {
     Write-Host "Pushed. Add to .env:" -ForegroundColor Green
     Write-Host "COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/$gistId/raw/$commitHash/provision-reliable.sh" -ForegroundColor White
     Write-Host "Then: pm2 restart vastai-proxy --update-env" -ForegroundColor Cyan
-} finally {
+}
+finally {
     Pop-Location
 }

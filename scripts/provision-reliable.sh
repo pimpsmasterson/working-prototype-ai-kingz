@@ -1658,12 +1658,13 @@ smart_download_parallel() {
     local success_count=0
     local current_file=0
     local queued=0
+    local last_progress_summary=""
 
     # Per-file timeout: 30 minutes (1800 seconds)
     # CRITICAL: This is a hard limit. After 30 min, download is KILLED (SIGKILL)
     # This prevents infinite hangs from Dropbox throttling or network issues
     # Increased to 30 min to handle large files (6-8GB) on slower connections
-    local download_timeout=1800
+    local download_timeout=3600
     local timeout_kill_after=30  # Give 30s grace period for cleanup before SIGKILL
 
     log ""
@@ -1763,11 +1764,24 @@ smart_download_parallel() {
             queued=$((queued + 1))
             current_file=$((current_file + 1))
 
+            # Extract filename for logging
+            local fname=""
+            local IFS='|'
+            local parts=()
+            read -ra parts <<< "$entry"
+            if [[ ${#parts[@]} -gt 0 ]]; then
+                fname="${parts[$(( ${#parts[@]} - 1 ))]}"
+                if [[ -z "$fname" && ${#parts[@]} -gt 1 ]]; then
+                     fname=$(basename "${parts[0]%%?*}")
+                fi
+            fi
+            [[ -z "$fname" ]] && fname="Unknown File $current_file"
+
             # Launch download in background
             download_worker "$entry" "$dir" "$current_file" "$total_count" "$download_timeout" "$timeout_kill_after" &
             local pid=$!
             pids+=($pid)
-            pid_files[$pid]="File $current_file"
+            pid_files[$pid]="$fname"
 
             log "🚀 Launched download #$current_file (PID: $pid) - Active jobs: ${#pids[@]}/$max_p"
         done
@@ -1798,18 +1812,34 @@ smart_download_parallel() {
         done
         pids=("${new_pids[@]}")
 
-        # Progress update
+        # Progress update - only log if status changed to avoid log spam
         local completed=$((success_count + failed_count))
-        if [[ $completed -gt 0 ]]; then
-            local percent=$((completed * 100 / total_count))
-            log ""
-            log "📊 Progress: $completed/$total_count complete ($percent%) | ✅ Success: $success_count | ❌ Failed: $failed_count | 🔄 Active: ${#pids[@]}"
-            [[ $fallback_count -gt 0 ]] && log "   🔄 Fallback used: $fallback_count times"
-            log ""
+        local active_count=${#pids[@]}
+        local current_summary="$completed|$success_count|$failed_count|$active_count"
+        
+        if [[ "$current_summary" != "$last_progress_summary" ]]; then
+            last_progress_summary="$current_summary"
+            if [[ $total_count -gt 0 ]]; then
+                local percent=$((completed * 100 / total_count))
+                log ""
+                log "📊 Progress: $completed/$total_count complete ($percent%) | ✅ Success: $success_count | ❌ Failed: $failed_count | 🔄 Active: $active_count"
+                
+                # List names of active files for transparency
+                if [[ $active_count -gt 0 ]]; then
+                    local names=""
+                    for p in "${!pid_files[@]}"; do
+                        names="${names}${pid_files[$p]}, "
+                    done
+                    log "   🔄 Active downloads: ${names%, }"
+                fi
+                
+                [[ $fallback_count -gt 0 ]] && log "   🔄 Fallback used: $fallback_count times"
+                log ""
+            fi
         fi
 
         # Brief sleep to avoid busy-waiting
-        [[ ${#pids[@]} -gt 0 ]] && sleep 2
+        [[ ${#pids[@]} -gt 0 ]] && sleep 5 # Increased to 5s to further reduce polling log noise
     done
 
     # Final summary

@@ -96,31 +96,8 @@ Write-Host "   🔪 Killing all related processes..." -ForegroundColor Red
 # NOTE: Avoid killing all Node.js processes (this can kill the PM2 daemon). Instead, rely on targeted port-based cleanup further below.
 # (If you really need to remove a stray Node process not bound to our ports, inspect it manually.)
 
-# Kill Python processes (HTTP server, etc.) — try graceful first, force if still present
-$pythonProcesses = Get-Process python -ErrorAction SilentlyContinue
-if ($pythonProcesses) {
-    Write-Host "   Stopping $($pythonProcesses.Count) Python process(es) (graceful)..." -ForegroundColor Gray
-    $pythonProcesses | Stop-Process -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-    $remainingPy = Get-Process python -ErrorAction SilentlyContinue
-    if ($remainingPy) {
-        Write-Host "   Forcibly stopping remaining Python process(es)..." -ForegroundColor Gray
-        $remainingPy | Stop-Process -Force -ErrorAction SilentlyContinue
-    }
-}
-
-# Kill SSH processes that might be hanging — try graceful first
-$sshProcesses = Get-Process ssh -ErrorAction SilentlyContinue
-if ($sshProcesses) {
-    Write-Host "   Stopping $($sshProcesses.Count) SSH process(es) (graceful)..." -ForegroundColor Gray
-    $sshProcesses | Stop-Process -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 2
-    $remainingSsh = Get-Process ssh -ErrorAction SilentlyContinue
-    if ($remainingSsh) {
-        Write-Host "   Forcibly stopping remaining SSH process(es)..." -ForegroundColor Gray
-        $remainingSsh | Stop-Process -Force -ErrorAction SilentlyContinue
-    }
-}
+# Port-based cleanup will handle any local ComfyUI or proxy instances.
+# Global process killing of 'python' or 'ssh' is skipped to avoid disrupting the IDE's background services.
 
 # Kill any processes using our ports
 $usedPorts = @(3000, 8080, 8188)
