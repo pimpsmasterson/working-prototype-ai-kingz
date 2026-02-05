@@ -6,19 +6,23 @@ const path = require('path');
 const vastai = require('../lib/vastai-ssh');
 
 const PUBLIC_KEY = process.env.PUBLIC_KEY || null;
-const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-const sshDir = path.join(home, '.ssh');
-const pubPath = path.join(sshDir, 'id_rsa_vast.pub');
 
-if (!fs.existsSync(sshDir)) {
-  fs.mkdirSync(sshDir, { recursive: true, mode: 0o700 });
+// Let library determine the correct key path and generate key if necessary
+let keyPath;
+try {
+  keyPath = process.env.VASTAI_SSH_KEY_PATH || vastai.getKey();
+} catch (err) {
+  console.error('Failed to determine or generate SSH key path:', err.message);
+  process.exit(3);
 }
+
+const pubPath = keyPath + '.pub';
 
 if (PUBLIC_KEY) {
   fs.writeFileSync(pubPath, PUBLIC_KEY.trim() + '\n', { mode: 0o600, encoding: 'utf8' });
   console.log('Wrote public key to', pubPath);
 } else if (!fs.existsSync(pubPath)) {
-  console.error('No public key provided and', pubPath, 'not found. Set PUBLIC_KEY env var or create the file.');
+  console.error('No public key provided and', pubPath, 'not found. Set PUBLIC_KEY env var, set VASTAI_SSH_KEY_PATH, or create the file.');
   process.exit(1);
 } else {
   console.log('Using existing public key at', pubPath);
@@ -31,6 +35,10 @@ vastai.registerKey(apiKey).then(ok => {
     console.log('SSH key registered (or already present)');
     process.exit(0);
   } else {
+    if (!apiKey) {
+      console.warn('No VASTAI_API_KEY provided; public key written locally at', pubPath);
+      process.exit(0);
+    }
     console.error('Failed to register SSH key');
     process.exit(2);
   }

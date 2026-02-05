@@ -1,0 +1,1404 @@
+{
+  "found": [
+    {
+      "category": "checkpoints",
+      "name": "pmXL_v1.safetensors",
+      "expectedSize": "6.5GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/pmXL_v1.safetensors",
+          "size": 7105349430,
+          "sizeMB": "6776.2MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/pmXL_v1.safetensors",
+          "size": 7105349430,
+          "sizeMB": "6776.2MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "dreamshaper_8.safetensors",
+      "expectedSize": "2GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/dreamshaper_8.safetensors",
+          "size": 2132625894,
+          "sizeMB": "2033.8MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/dreamshaper_8.safetensors",
+          "size": 2132625894,
+          "sizeMB": "2033.8MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "revAnimated_v122.safetensors",
+      "expectedSize": "2GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/revAnimated_v122.safetensors",
+          "size": 151110697,
+          "sizeMB": "144.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/revAnimated_v122.safetensors",
+          "size": 151110697,
+          "sizeMB": "144.1MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "pony_realism_v2.2.safetensors",
+      "expectedSize": "6.5GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/pony_realism_v2.2.safetensors",
+          "size": 7105348856,
+          "sizeMB": "6776.2MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/pony_realism_v2.2.safetensors",
+          "size": 7105348856,
+          "sizeMB": "6776.2MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "wai_illustrious_sdxl.safetensors",
+      "expectedSize": "~6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/wai_illustrious_sdxl.safetensors",
+          "size": 6938040682,
+          "sizeMB": "6616.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/wai_illustrious_sdxl.safetensors",
+          "size": 6938040682,
+          "sizeMB": "6616.6MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "Rajii-Artist-Style-V2-Illustrious.safetensors",
+      "expectedSize": "~6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/Rajii-Artist-Style-V2-Illustrious.safetensors",
+          "size": 57930464,
+          "sizeMB": "55.2MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/Rajii-Artist-Style-V2-Illustrious.safetensors",
+          "size": 57930464,
+          "sizeMB": "55.2MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "pornmasterPro_noobV6.safetensors",
+      "expectedSize": "~6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/pornmasterPro_noobV6.safetensors",
+          "size": 7105349488,
+          "sizeMB": "6776.2MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/pornmasterPro_noobV6.safetensors",
+          "size": 7105349488,
+          "sizeMB": "6776.2MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "expressiveh_hentai.safetensors",
+      "expectedSize": "~2GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/expressiveh_hentai.safetensors",
+          "size": 719020768,
+          "sizeMB": "685.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/expressiveh_hentai.safetensors",
+          "size": 719020768,
+          "sizeMB": "685.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/expressiveh_hentai.safetensors",
+          "size": 719020768,
+          "sizeMB": "685.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/expressiveh_hentai.safetensors",
+          "size": 719020768,
+          "sizeMB": "685.7MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "fondled.safetensors",
+      "expectedSize": "~2GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/fondled.safetensors",
+          "size": 359306788,
+          "sizeMB": "342.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/fondled.safetensors",
+          "size": 359306788,
+          "sizeMB": "342.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/fondled.safetensors",
+          "size": 359306788,
+          "sizeMB": "342.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/fondled.safetensors",
+          "size": 359306788,
+          "sizeMB": "342.7MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "twerk.safetensors",
+      "expectedSize": "~2GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/twerk.safetensors",
+          "size": 51344600,
+          "sizeMB": "49.0MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/twerk.safetensors",
+          "size": 51344600,
+          "sizeMB": "49.0MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/twerk.safetensors",
+          "size": 51344600,
+          "sizeMB": "49.0MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/twerk.safetensors",
+          "size": 51344600,
+          "sizeMB": "49.0MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "sd_xl_base_1.0.safetensors",
+      "expectedSize": "6.9GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/sd_xl_base_1.0.safetensors",
+          "size": 6938078334,
+          "sizeMB": "6616.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors",
+          "size": 6938078334,
+          "sizeMB": "6616.7MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "sd_xl_refiner_1.0.safetensors",
+      "expectedSize": "6.1GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/sd_xl_refiner_1.0.safetensors",
+          "size": 6075981930,
+          "sizeMB": "5794.5MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/sd_xl_refiner_1.0.safetensors",
+          "size": 6075981930,
+          "sizeMB": "5794.5MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "DR34MJOB_I2V_14b_LowNoise.safetensors",
+      "expectedSize": "~14GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/DR34MJOB_I2V_14b_LowNoise.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/DR34MJOB_I2V_14b_LowNoise.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "wan_dr34ml4y_all_in_one.safetensors",
+      "expectedSize": "~10GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/wan_dr34ml4y_all_in_one.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan_dr34ml4y_all_in_one.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan_dr34ml4y_all_in_one.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/wan_dr34ml4y_all_in_one.safetensors",
+          "size": 306807976,
+          "sizeMB": "292.6MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "wan_dr34mjob.safetensors",
+      "expectedSize": "~10GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/wan_dr34mjob.safetensors",
+          "size": 179688448,
+          "sizeMB": "171.4MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan_dr34mjob.safetensors",
+          "size": 179688448,
+          "sizeMB": "171.4MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan_dr34mjob.safetensors",
+          "size": 179688448,
+          "sizeMB": "171.4MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/wan_dr34mjob.safetensors",
+          "size": 179688448,
+          "sizeMB": "171.4MB"
+        }
+      ]
+    },
+    {
+      "category": "checkpoints",
+      "name": "ltx-2-19b-distilled.safetensors",
+      "expectedSize": "~19GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/ltx-2-19b-distilled.safetensors",
+          "size": 43285058186,
+          "sizeMB": "41279.8MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "pony_realism_v2.1.safetensors",
+      "expectedSize": "~150MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/pony_realism_v2.1.safetensors",
+          "size": 7105348824,
+          "sizeMB": "6776.2MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/pony_realism_v2.1.safetensors",
+          "size": 7105348824,
+          "sizeMB": "6776.2MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "ltx-2-19b-lora-camera-control-dolly-left.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-lora-camera-control-dolly-left.safetensors",
+          "size": 327309208,
+          "sizeMB": "312.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/ltx-2-19b-lora-camera-control-dolly-left.safetensors",
+          "size": 327309208,
+          "sizeMB": "312.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "defecation_v1.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/defecation_v1.safetensors",
+          "size": 9568840,
+          "sizeMB": "9.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/defecation_v1.safetensors",
+          "size": 9568840,
+          "sizeMB": "9.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "cunnilingus_gesture.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/cunnilingus_gesture.safetensors",
+          "size": 64120224,
+          "sizeMB": "61.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "archive_lora.rar",
+      "expectedSize": "Variable",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/archive_lora.rar",
+          "size": 171920328,
+          "sizeMB": "164.0MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "empty_eyes_drooling.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/empty_eyes_drooling.safetensors",
+          "size": 127349696,
+          "sizeMB": "121.5MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "glowing_eyes.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/glowing_eyes.safetensors",
+          "size": 57229652,
+          "sizeMB": "54.6MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "quadruple_amputee.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/quadruple_amputee.safetensors",
+          "size": 197121336,
+          "sizeMB": "188.0MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "ugly_bastard.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/ugly_bastard.safetensors",
+          "size": 133327148,
+          "sizeMB": "127.2MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "sex_machine.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/sex_machine.safetensors",
+          "size": 199243780,
+          "sizeMB": "190.0MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "stasis_tank.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/stasis_tank.safetensors",
+          "size": 199213932,
+          "sizeMB": "190.0MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "Soiling-V1.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/Soiling-V1.safetensors",
+          "size": 18996728,
+          "sizeMB": "18.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "turtleheading-V1.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/turtleheading-V1.safetensors",
+          "size": 19002448,
+          "sizeMB": "18.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "poop_squatV2.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/poop_squatV2.safetensors",
+          "size": 19023200,
+          "sizeMB": "18.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "Poop_SquatV3.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/Poop_SquatV3.safetensors",
+          "size": 19030224,
+          "sizeMB": "18.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "HyperDump.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/HyperDump.safetensors",
+          "size": 37878071,
+          "sizeMB": "36.1MB"
+        }
+      ]
+    },
+    {
+      "category": "loras",
+      "name": "HyperDumpPlus.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/HyperDumpPlus.safetensors",
+          "size": 37878068,
+          "sizeMB": "36.1MB"
+        }
+      ]
+    },
+    {
+      "category": "vaes",
+      "name": "sdxl_vae.safetensors",
+      "expectedSize": "~320MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/checkpoints/sdxl_vae.safetensors",
+          "size": 334641164,
+          "sizeMB": "319.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/vae/sdxl_vae.safetensors",
+          "size": 334641164,
+          "sizeMB": "319.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/vae/sdxl_vae.safetensors",
+          "size": 334641164,
+          "sizeMB": "319.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/checkpoints/sdxl_vae.safetensors",
+          "size": 334641164,
+          "sizeMB": "319.1MB"
+        }
+      ]
+    },
+    {
+      "category": "vaes",
+      "name": "wan2.2_vae.safetensors",
+      "expectedSize": "~320MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/vae/wan2.2_vae.safetensors",
+          "size": 1409400960,
+          "sizeMB": "1344.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/vae/wan2.2_vae.safetensors",
+          "size": 1409400960,
+          "sizeMB": "1344.1MB"
+        }
+      ]
+    },
+    {
+      "category": "vaes",
+      "name": "lumina_ae.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/vae/lumina_ae.safetensors",
+          "size": 335304388,
+          "sizeMB": "319.8MB"
+        }
+      ]
+    },
+    {
+      "category": "upscalers",
+      "name": "4x-UltraSharp.pth",
+      "expectedSize": "~67MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/upscale_models/4x-UltraSharp.pth",
+          "size": 66961958,
+          "sizeMB": "63.9MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/upscale_models/4x-UltraSharp.pth",
+          "size": 66961958,
+          "sizeMB": "63.9MB"
+        }
+      ]
+    },
+    {
+      "category": "upscalers",
+      "name": "RealESRGAN_x4plus.pth",
+      "expectedSize": "~64MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/upscale_models/RealESRGAN_x4plus.pth",
+          "size": 67040989,
+          "sizeMB": "63.9MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/upscale_models/RealESRGAN_x4plus.pth",
+          "size": 67040989,
+          "sizeMB": "63.9MB"
+        }
+      ]
+    },
+    {
+      "category": "upscalers",
+      "name": "ltx-2-spatial-upscaler-x2-1.0.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-spatial-upscaler-x2-1.0.safetensors",
+          "size": 995765578,
+          "sizeMB": "949.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors",
+          "size": 995765578,
+          "sizeMB": "949.6MB"
+        }
+      ]
+    },
+    {
+      "category": "controlnet",
+      "name": "OpenPoseXL2.safetensors",
+      "expectedSize": "~2.5GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/controlnet/OpenPoseXL2.safetensors",
+          "size": 5004167829,
+          "sizeMB": "4772.3MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/controlnet/OpenPoseXL2.safetensors",
+          "size": 5004167829,
+          "sizeMB": "4772.3MB"
+        }
+      ]
+    },
+    {
+      "category": "detection",
+      "name": "face_yolov8m.pt",
+      "expectedSize": "~52MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/ultralytics/bbox/face_yolov8m.pt",
+          "size": 52026019,
+          "sizeMB": "49.6MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/ultralytics/bbox/face_yolov8m.pt",
+          "size": 52026019,
+          "sizeMB": "49.6MB"
+        }
+      ]
+    },
+    {
+      "category": "detection",
+      "name": "hand_yolov8n.pt",
+      "expectedSize": "~6MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/ultralytics/bbox/hand_yolov8n.pt",
+          "size": 6237883,
+          "sizeMB": "5.9MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/ultralytics/bbox/hand_yolov8n.pt",
+          "size": 6237883,
+          "sizeMB": "5.9MB"
+        }
+      ]
+    },
+    {
+      "category": "detection",
+      "name": "sam_vit_b_01ec64.pth",
+      "expectedSize": "~375MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/sams/sam_vit_b_01ec64.pth",
+          "size": 375042383,
+          "sizeMB": "357.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/sams/sam_vit_b_01ec64.pth",
+          "size": 375042383,
+          "sizeMB": "357.7MB"
+        }
+      ]
+    },
+    {
+      "category": "text_encoders",
+      "name": "gemma_3_12B_it_fp4_mixed.safetensors",
+      "expectedSize": "~6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors",
+          "size": 9447702218,
+          "sizeMB": "9010.0MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/clip/gemma_3_12B_it_fp4_mixed.safetensors",
+          "size": 9447702218,
+          "sizeMB": "9010.0MB"
+        }
+      ]
+    },
+    {
+      "category": "text_encoders",
+      "name": "clip_l.safetensors",
+      "expectedSize": "~250MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/clip_l.safetensors",
+          "size": 246144152,
+          "sizeMB": "234.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/clip/clip_l.safetensors",
+          "size": 246144152,
+          "sizeMB": "234.7MB"
+        }
+      ]
+    },
+    {
+      "category": "text_encoders",
+      "name": "t5xxl_fp16.safetensors",
+      "expectedSize": "~9GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/t5xxl_fp16.safetensors",
+          "size": 9787841024,
+          "sizeMB": "9334.4MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/clip/t5xxl_fp16.safetensors",
+          "size": 9787841024,
+          "sizeMB": "9334.4MB"
+        }
+      ]
+    },
+    {
+      "category": "animatediff",
+      "name": "mm_sd_v15_v2.ckpt",
+      "expectedSize": "~1.6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/animatediff_models/mm_sd_v15_v2.ckpt",
+          "size": 1817888431,
+          "sizeMB": "1733.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/animatediff_models/mm_sd_v15_v2.ckpt",
+          "size": 1817888431,
+          "sizeMB": "1733.7MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.1_t2v_1.3B_fp16.safetensors",
+      "expectedSize": "~2.6GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors",
+          "size": 2838303560,
+          "sizeMB": "2706.8MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors",
+          "size": 2838303560,
+          "sizeMB": "2706.8MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+      "expectedSize": "~14GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+          "size": 14293923632,
+          "sizeMB": "13631.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors",
+          "size": 14293923632,
+          "sizeMB": "13631.7MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+      "expectedSize": "~14GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+          "size": 14293923632,
+          "sizeMB": "13631.7MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors",
+          "size": 14293923632,
+          "sizeMB": "13631.7MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_ti2v_5B_fp16.safetensors",
+      "expectedSize": "~10GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors",
+          "size": 9999658848,
+          "sizeMB": "9536.4MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors",
+          "size": 9999658848,
+          "sizeMB": "9536.4MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        }
+      ]
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+      "expectedSize": "~500MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+          "size": 1226977424,
+          "sizeMB": "1170.1MB"
+        }
+      ]
+    },
+    {
+      "category": "video_ltx",
+      "name": "ltx-2-19b-dev-fp8.safetensors",
+      "expectedSize": "~19GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-dev-fp8.safetensors",
+          "size": 27078716018,
+          "sizeMB": "25824.3MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/ltx-2-19b-dev-fp8.safetensors",
+          "size": 27078716018,
+          "sizeMB": "25824.3MB"
+        }
+      ]
+    },
+    {
+      "category": "video_ltx",
+      "name": "ltx-2-19b-distilled-lora-384.safetensors",
+      "expectedSize": "~100MB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-distilled-lora-384.safetensors",
+          "size": 7674558424,
+          "sizeMB": "7319.0MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/loras/ltx-2-19b-distilled-lora-384.safetensors",
+          "size": 7674558424,
+          "sizeMB": "7319.0MB"
+        }
+      ]
+    },
+    {
+      "category": "flux",
+      "name": "flux1-krea-dev_fp8_scaled.safetensors",
+      "expectedSize": "~12GB",
+      "foundPaths": [
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors",
+          "size": 11904639672,
+          "sizeMB": "11353.1MB"
+        },
+        {
+          "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors",
+          "size": 11904639672,
+          "sizeMB": "11353.1MB"
+        }
+      ]
+    }
+  ],
+  "missing": [
+    {
+      "category": "loras",
+      "name": "expressiveh_hentai.safetensors",
+      "expectedSize": "~100MB"
+    },
+    {
+      "category": "loras",
+      "name": "fondled.safetensors",
+      "expectedSize": "~100MB"
+    },
+    {
+      "category": "loras",
+      "name": "wan_dr34ml4y_all_in_one.safetensors",
+      "expectedSize": "~500MB"
+    },
+    {
+      "category": "loras",
+      "name": "wan_dr34mjob.safetensors",
+      "expectedSize": "~500MB"
+    },
+    {
+      "category": "loras",
+      "name": "twerk.safetensors",
+      "expectedSize": "~100MB"
+    },
+    {
+      "category": "vaes",
+      "name": "ponyRealism_v21MainVAE.safetensors",
+      "expectedSize": "~320MB"
+    },
+    {
+      "category": "vaes",
+      "name": "wan2.1_vae.safetensors",
+      "expectedSize": "~320MB"
+    },
+    {
+      "category": "rife",
+      "name": "rife426.pth",
+      "expectedSize": "~200MB"
+    },
+    {
+      "category": "rife",
+      "name": "Variable",
+      "expectedSize": "Purpose"
+    },
+    {
+      "category": "rife",
+      "name": "CIVITAI_TOKEN",
+      "expectedSize": "Civitai API downloads"
+    },
+    {
+      "category": "rife",
+      "name": "HUGGINGFACE_HUB_TOKEN",
+      "expectedSize": "HuggingFace downloads"
+    },
+    {
+      "category": "rife",
+      "name": "VASTAI_API_KEY",
+      "expectedSize": "Vast.ai automation"
+    },
+    {
+      "category": "rife",
+      "name": "ADMIN_API_KEY",
+      "expectedSize": "Local server admin"
+    },
+    {
+      "category": "rife",
+      "name": "Variable",
+      "expectedSize": "Default"
+    },
+    {
+      "category": "rife",
+      "name": "WORKSPACE",
+      "expectedSize": "`/workspace`"
+    },
+    {
+      "category": "rife",
+      "name": "MIN_DISK_GB",
+      "expectedSize": "`200`"
+    },
+    {
+      "category": "rife",
+      "name": "MAX_PAR_HF",
+      "expectedSize": "`4`"
+    },
+    {
+      "category": "rife",
+      "name": "MAX_PAR_CIVITAI",
+      "expectedSize": "`1`"
+    },
+    {
+      "category": "rife",
+      "name": "PIP_ROOT_USER_ACTION",
+      "expectedSize": "`ignore`"
+    },
+    {
+      "category": "rife",
+      "name": "Category",
+      "expectedSize": "Count"
+    },
+    {
+      "category": "rife",
+      "name": "**Checkpoints**",
+      "expectedSize": "16"
+    },
+    {
+      "category": "rife",
+      "name": "**LoRAs**",
+      "expectedSize": "25+"
+    },
+    {
+      "category": "rife",
+      "name": "**Video Models (Wan)**",
+      "expectedSize": "5"
+    },
+    {
+      "category": "rife",
+      "name": "**Video Models (LTX)**",
+      "expectedSize": "1"
+    },
+    {
+      "category": "rife",
+      "name": "**FLUX Models**",
+      "expectedSize": "1"
+    },
+    {
+      "category": "rife",
+      "name": "**VAEs**",
+      "expectedSize": "5"
+    },
+    {
+      "category": "rife",
+      "name": "**Text Encoders**",
+      "expectedSize": "4"
+    },
+    {
+      "category": "rife",
+      "name": "**AnimateDiff**",
+      "expectedSize": "2"
+    },
+    {
+      "category": "rife",
+      "name": "**Upscalers**",
+      "expectedSize": "3"
+    },
+    {
+      "category": "rife",
+      "name": "**ControlNet**",
+      "expectedSize": "1"
+    },
+    {
+      "category": "rife",
+      "name": "**Detection Models**",
+      "expectedSize": "3"
+    },
+    {
+      "category": "rife",
+      "name": "**RIFE**",
+      "expectedSize": "1"
+    },
+    {
+      "category": "rife",
+      "name": "**System Packages**",
+      "expectedSize": "20+"
+    },
+    {
+      "category": "rife",
+      "name": "**Python Packages**",
+      "expectedSize": "20+"
+    },
+    {
+      "category": "rife",
+      "name": "**ComfyUI + Extensions**",
+      "expectedSize": "16"
+    },
+    {
+      "category": "rife",
+      "name": "**TOTAL**",
+      "expectedSize": "**100+**"
+    },
+    {
+      "category": "rife",
+      "name": "ps aux",
+      "expectedSize": "grep main.py"
+    },
+    {
+      "category": "text_encoders",
+      "name": "umt5_xxl_fp8_e4m3fn.safetensors",
+      "expectedSize": "~3GB"
+    },
+    {
+      "category": "animatediff",
+      "name": "mm_sdxl_v10_beta.ckpt",
+      "expectedSize": "~1.8GB"
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_remix_fp8.safetensors",
+      "expectedSize": "~14GB"
+    },
+    {
+      "category": "video_wan",
+      "name": "umt5_xxl_fp8_e4m3fn.safetensors",
+      "expectedSize": "~3GB"
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.1_vae.safetensors",
+      "expectedSize": "~320MB"
+    },
+    {
+      "category": "video_wan",
+      "name": "wan2.2_vae.safetensors",
+      "expectedSize": "~320MB"
+    },
+    {
+      "category": "video_ltx",
+      "name": "ltx-2-19b-lora-camera-control-dolly-left.safetensors",
+      "expectedSize": "~100MB"
+    },
+    {
+      "category": "flux",
+      "name": "clip_l.safetensors",
+      "expectedSize": "~250MB"
+    },
+    {
+      "category": "flux",
+      "name": "t5xxl_fp16.safetensors",
+      "expectedSize": "~9GB"
+    }
+  ],
+  "extra": [
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/vae/ae.1.safetensors",
+      "size": 335304388,
+      "sizeMB": "319.8MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/vae/ae.2.safetensors",
+      "size": 335304388,
+      "sizeMB": "319.8MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/vae/ae.safetensors",
+      "size": 335304388,
+      "sizeMB": "319.8MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/text_encoders/gemma_3_12B_it_fp4_mixed.2.safetensors",
+      "size": 9447702218,
+      "sizeMB": "9010.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/text_encoders/gemma_3_12B_it_fp4_mixed.1.safetensors",
+      "size": 9447702218,
+      "sizeMB": "9010.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/clip/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "size": 6735906897,
+      "sizeMB": "6423.9MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/sd_xl_base_1.0.1.safetensors",
+      "size": 6938078334,
+      "sizeMB": "6616.7MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/flux1-krea-dev_fp8_scaled.2.safetensors",
+      "size": 11904639672,
+      "sizeMB": "11353.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/flux1-krea-dev_fp8_scaled.1.safetensors",
+      "size": 11904639672,
+      "sizeMB": "11353.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/sd_xl_refiner_1.0.1.safetensors",
+      "size": 6075981930,
+      "sizeMB": "5794.5MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.2_ti2v_5B_fp16.2.safetensors",
+      "size": 9999658848,
+      "sizeMB": "9536.4MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/diffusion_models/wan2.2_ti2v_5B_fp16.1.safetensors",
+      "size": 9999658848,
+      "sizeMB": "9536.4MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.1.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.2.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.1.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.2.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.1.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.2.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.1.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.2.safetensors",
+      "size": 1226977424,
+      "sizeMB": "1170.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/clip_l.1.safetensors",
+      "size": 246144152,
+      "sizeMB": "234.7MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/clip_l.2.safetensors",
+      "size": 246144152,
+      "sizeMB": "234.7MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-distilled-lora-384.1.safetensors",
+      "size": 7674558424,
+      "sizeMB": "7319.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-distilled-lora-384.2.safetensors",
+      "size": 7674558424,
+      "sizeMB": "7319.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-lora-camera-control-dolly-left.1.safetensors",
+      "size": 327309208,
+      "sizeMB": "312.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-lora-camera-control-dolly-left.2.safetensors",
+      "size": 327309208,
+      "sizeMB": "312.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-spatial-upscaler-x2-1.0.1.safetensors",
+      "size": 995765578,
+      "sizeMB": "949.6MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-spatial-upscaler-x2-1.0.2.safetensors",
+      "size": 995765578,
+      "sizeMB": "949.6MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-dev-fp8.2.safetensors",
+      "size": 27078716018,
+      "sizeMB": "25824.3MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/ltx-2-19b-dev-fp8.1.safetensors",
+      "size": 27078716018,
+      "sizeMB": "25824.3MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/t5xxl_fp16.2.safetensors",
+      "size": 9787841024,
+      "sizeMB": "9334.4MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/other/t5xxl_fp16.1.safetensors",
+      "size": 9787841024,
+      "sizeMB": "9334.4MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/custom_nodes/efficiency-nodes-comfyui/py/sd15_resizer.pt",
+      "size": 12628977,
+      "sizeMB": "12.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/custom_nodes/efficiency-nodes-comfyui/py/sd15_resizer.pt",
+      "size": 12628977,
+      "sizeMB": "12.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/custom_nodes/efficiency-nodes-comfyui/py/sdxl_resizer.pt",
+      "size": 12628977,
+      "sizeMB": "12.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/custom_nodes/efficiency-nodes-comfyui/py/sdxl_resizer.pt",
+      "size": 12628977,
+      "sizeMB": "12.0MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/models/vae/wan_2.1_vae.safetensors",
+      "size": 253815318,
+      "sizeMB": "242.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/models/vae/wan_2.1_vae.safetensors",
+      "size": 253815318,
+      "sizeMB": "242.1MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/multitalk/encoded_silence.safetensors",
+      "size": 1658968,
+      "sizeMB": "1.6MB"
+    },
+    {
+      "path": "/workspace/pornmaster100/ComfyUI/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/multitalk/encoded_silence.safetensors",
+      "size": 1658968,
+      "sizeMB": "1.6MB"
+    }
+  ]
+}

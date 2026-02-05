@@ -61,7 +61,7 @@
       "type": "LTXVideoTextEncoderLoader",
       "pos": [50, 200],
       "size": [315, 58],
-      "outputs": [{"name": "TEXT_ENCODER", "type": "TEXT_ENCODER", "links": [2], "slot_index": 0}],
+      "outputs": [{"name": "TEXT_ENCODER", "type": "TEXT_ENCODER", "links": [2, 4], "slot_index": 0}],
       "widgets_values": ["gemma_3_12B_it_fp4_mixed.safetensors"]
     },
     {
@@ -70,7 +70,7 @@
       "pos": [450, 50],
       "size": [400, 150],
       "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [3, 4], "slot_index": 0}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [3], "slot_index": 0}],
       "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, mo-e motion"]
     },
     {
@@ -78,8 +78,8 @@
       "type": "CLIPTextEncode",
       "pos": [450, 250],
       "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5, 6], "slot_index": 0}],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}],
       "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, clean"]
     },
     {
@@ -98,7 +98,7 @@
       "inputs": [
         {"name": "model", "type": "MODEL", "link": 1},
         {"name": "positive", "type": "CONDITIONING", "link": 3},
-        {"name": "negative", "type": "CONDITIONING", "link": 4},
+        {"name": "negative", "type": "CONDITIONING", "link": 6},
         {"name": "latent", "type": "LATENT", "link": 7}
       ],
       "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
@@ -125,9 +125,8 @@
   "links": [
     [1, 1, 0, 6, 0, "MODEL"],
     [2, 2, 0, 3, 0, "CLIP"],
+    [4, 2, 0, 4, 0, "CLIP"],
     [3, 3, 0, 6, 1, "CONDITIONING"],
-    [4, 3, 0, 6, 2, "CONDITIONING"],
-    [5, 4, 0, 6, 1, "CONDITIONING"],
     [6, 4, 0, 6, 2, "CONDITIONING"],
     [7, 5, 0, 6, 3, "LATENT"],
     [8, 6, 0, 7, 0, "LATENT"],

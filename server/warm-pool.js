@@ -1176,6 +1176,14 @@ async function prewarm() {
         if (process.env.CIVITAI_TOKEN) {
             envVars.CIVITAI_TOKEN = process.env.CIVITAI_TOKEN;
         }
+        // Pass through Dropbox token and folder for Dropbox-based provisioning
+        if (process.env.DROPBOX_TOKEN) {
+            envVars.DROPBOX_TOKEN = process.env.DROPBOX_TOKEN;
+        }
+        if (process.env.DROPBOX_FOLDER) {
+            envVars.DROPBOX_FOLDER = process.env.DROPBOX_FOLDER;
+            envVars.DROPBOX_PATH = process.env.DROPBOX_FOLDER; // Also set DROPBOX_PATH for compatibility
+        }
 
         // Pass through SCRIPTS_BASE_URL for modular provisioning system
         if (process.env.SCRIPTS_BASE_URL) {

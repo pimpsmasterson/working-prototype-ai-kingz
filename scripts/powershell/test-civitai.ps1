@@ -62,7 +62,7 @@ try {
 
 # 3. Test provision script download
 Write-Host "`n[3] Testing provision script download..." -ForegroundColor Yellow
-$provisionScriptUrl = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/"
+$provisionScriptUrl = "https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/"
 
 try {
     $scriptContent = Invoke-RestMethod -Uri $provisionScriptUrl -TimeoutSec 10

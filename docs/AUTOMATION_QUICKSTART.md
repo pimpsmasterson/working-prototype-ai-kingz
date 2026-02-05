@@ -25,7 +25,7 @@ Edit `scripts/powershell/start-proxy.ps1` and uncomment these lines:
 ```powershell
 $env:HUGGINGFACE_HUB_TOKEN = "hf_YOUR_TOKEN_HERE"  # Get from: https://huggingface.co/settings/tokens
 $env:CIVITAI_TOKEN = "YOUR_CIVITAI_TOKEN"          # Get from: https://civitai.com/user/account
-$env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/"
+$env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/"
 ```
 
 ### Step 3: Start the Proxy

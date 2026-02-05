@@ -1,0 +1,111 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if [[ -d $path ]]; then
+            printf "   ✅ %s exists\n" "${dir}"
+            # Still install requirements if missing
+            if [[ -e $requirements ]]; then
+                printf "   🔧 Installing/updating dependencies for %s...\n" "${dir}"
+                pip install --no-cache-dir -r "$requirements" || printf "   ⚠️  Some dependencies failed for %s\n" "${dir}"
+            fi
+        else
+            printf "   📥 Cloning %s...\n" "${dir}"
+            git clone --depth 1 "${repo}" "${path}" --recursive
+            if [[ -e $requirements ]]; then
+                printf "   🔧 Installing dependencies for %s...\n" "${dir}"
+                pip install --no-cache-dir -r "$requirements" || printf "   ⚠️  Some dependencies failed for %s\n" "${dir}"
+            fi
+        fi
+    done
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # CRITICAL DEPENDENCY OVERRIDES
+    # ═══════════════════════════════════════════════════════════════════════
+    printf "   🔧 Installing high-performance video dependencies (einops, huggingface-hub, etc.)...\n"
+    pip install --no-cache-dir -q einops accelerate transformers opencv-python-headless sageattention huggingface-hub || printf "   ⚠️  Some optional dependencies failed\n"
+} 
+
+function provisioning_download() {
+    local url="$1"
+    local dir="$2"
+    local filename="$3"
+    local filepath="${dir}/${filename}"
+
+    # Skip if exists and has significant size (avoid re-downloading error pages)
+    if [[ -f "$filepath" ]]; then
+        local size=$(stat -c%s "$filepath")
+        if [[ $size -gt 1000000 ]]; then
+            printf "   ✅ %s exists and is valid size (%'d bytes)\n" "$filename" "$size"
+            return 0
+        else
+            printf "   ⚠️  %s exists but is suspiciously small (%'d bytes). Redownloading...\n" "$filename" "$size"
+            rm -f "$filepath"
+        fi
+    fi
+
+    mkdir -p "$dir"
+    local download_url="$url"
+
+    # Append Civitai token
+    if [[ -n "$CIVITAI_TOKEN" && "$url" =~ civitai\.com ]]; then
+        if [[ "$url" == *"?"* ]]; then
+            download_url="${url}&token=${CIVITAI_TOKEN}"
+        else
+            download_url="${url}?token=${CIVITAI_TOKEN}"
+        fi
+    fi
+
+    printf "   ⬇️  Downloading %s...\n" "$filename"
+
+    # Download with resume support (-c), retry logic, and appropriate auth
+    if [[ -n "$HUGGINGFACE_HUB_TOKEN" && "$url" =~ huggingface\.co ]]; then
+        wget --header="Authorization: Bearer $HUGGINGFACE_HUB_TOKEN" \
+             -c --show-progress --progress=bar:force:noscroll \
+             --timeout=300 --tries=5 --retry-connrefused \
+             -O "$filepath" "$download_url" || {
+            printf "   ❌ Failed: %s\n" "$filename"
+            return 1
+        }
+    else
+        wget -c --show-progress --progress=bar:force:noscroll \
+             --timeout=300 --tries=5 --retry-connrefused \
+             -O "$filepath" "$download_url" || {
+            printf "   ❌ Failed: %s\n" "$filename"
+            return 1
+        }
+    fi
+
+    # Final validation - if file is < 100KB or is text/html, it's likely an error page
+    local final_size=$(stat -c%s "$filepath")
+    local mime_type=$(file -b --mime-type "$filepath")
+
+    if [[ $final_size -lt 100000 || "$mime_type" == "text/html" ]]; then
+        printf "   ❌ Corrupt Download: %s (too small or HTML error page: %'d bytes, %s)\n" "$filename" "$final_size" "$mime_type"
+        rm -f "$filepath"
+        return 1
+    fi
+
+    printf "   ✅ Downloaded: %s (%'d bytes, %s)\n" "$filename" "$final_size" "$mime_type"
+    return 0
+}
+
+function provisioning_get_files_sequential() {
+    local dir="$1"
+    shift
+    local arr=("$@")
+
+    if [[ ${#arr[@]} -eq 0 ]]; then return; fi
+
+    printf "\n📁 Downloading to %s...\n" "$dir"
+
+    for entry in "${arr[@]}"; do
+        if [[ "$entry" == *"|"* ]]; then
+            local url="${entry%%|*}"
+            local filename="${entry##*|}"
+        else
+            local url="$entry"
+            local filename="${url##*/}"
+            filename="${filename%%\?*}"
+        fi
+        provisioning_download "$url" "$dir" "$filename"
+    done
+}

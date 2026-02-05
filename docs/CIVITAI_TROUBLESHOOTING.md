@@ -216,7 +216,7 @@ wget "https://civitai.com/api/download/models/290640?token=$CIVITAI_TOKEN" \
 ## Recommended Fixes (Priority Order)
 
 ### 1. ✅ Fix Provision Script (Highest Priority)
-Update the gist at `https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/` to use query parameters instead of Bearer headers for Civitai.
+Update the gist at `https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/` to use query parameters instead of Bearer headers for Civitai.
 
 ### 2. ✅ Explicitly Export Tokens in onstart
 Modify [server/warm-pool.js](server/warm-pool.js#L720) to export environment variables.

@@ -165,7 +165,7 @@
       "outputs": [
         {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
         {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [10], "slot_index": 2}
+        {"name": "VAE", "type": "VAE", "links": [19], "slot_index": 2}
       ],
       "widgets_values": ["sd_xl_base_1.0.safetensors"]
     },
@@ -175,7 +175,7 @@
       "pos": [50, 250],
       "size": [315, 58],
       "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3, 4], "slot_index": 0}],
+      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0}],
       "widgets_values": [-2]
     },
     {
@@ -204,7 +204,7 @@
       ],
       "outputs": [
         {"name": "MODEL", "type": "MODEL", "links": [8], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [9, 10], "slot_index": 1}
+        {"name": "CLIP", "type": "CLIP", "links": [7], "slot_index": 1}
       ],
       "widgets_values": ["HyperDump.safetensors", 0.8, 0.8]
     },
@@ -215,11 +215,11 @@
       "size": [315, 126],
       "inputs": [
         {"name": "model", "type": "MODEL", "link": 8},
-        {"name": "clip", "type": "CLIP", "link": 9}
+        {"name": "clip", "type": "CLIP", "link": 7}
       ],
       "outputs": [
         {"name": "MODEL", "type": "MODEL", "links": [11], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [12, 13], "slot_index": 1}
+        {"name": "CLIP", "type": "CLIP", "links": [10, 12], "slot_index": 1}
       ],
       "widgets_values": ["cunnilingus_gesture.safetensors", 0.6, 0.6]
     },
@@ -237,7 +237,7 @@
       "type": "CLIPTextEncode",
       "pos": [750, 200],
       "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 13}],
+      "inputs": [{"name": "clip", "type": "CLIP", "link": 10}],
       "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [15], "slot_index": 0}],
       "widgets_values": ["score_6, score_5, score_4, low quality, blurry, censored, watermark, ugly, cartoon, anime, clean"]
     },
@@ -270,7 +270,7 @@
       "size": [210, 46],
       "inputs": [
         {"name": "samples", "type": "LATENT", "link": 17},
-        {"name": "vae", "type": "VAE", "link": 10}
+        {"name": "vae", "type": "VAE", "link": 19}
       ],
       "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [18], "slot_index": 0}]
     },
@@ -287,22 +287,18 @@
     [1, 1, 0, 2, 0, "MODEL"],
     [100, 1, 1, 99, 0, "CLIP"],
     [2, 99, 0, 2, 0, "CLIP"],
-    [3, 99, 0, 3, 0, "CLIP"],
-    [4, 99, 0, 4, 0, "CLIP"],
     [5, 2, 0, 3, 0, "MODEL"],
     [6, 2, 1, 3, 1, "CLIP"],
     [7, 3, 1, 4, 1, "CLIP"],
     [8, 3, 0, 4, 0, "MODEL"],
-    [9, 3, 1, 5, 0, "CLIP"],
     [10, 4, 1, 6, 0, "CLIP"],
     [11, 4, 0, 8, 0, "MODEL"],
     [12, 4, 1, 5, 0, "CLIP"],
-    [13, 4, 1, 6, 0, "CLIP"],
     [14, 5, 0, 8, 1, "CONDITIONING"],
     [15, 6, 0, 8, 2, "CONDITIONING"],
     [16, 7, 0, 8, 3, "LATENT"],
     [17, 8, 0, 9, 0, "LATENT"],
-    [10, 1, 2, 9, 1, "VAE"],
+    [19, 1, 2, 9, 1, "VAE"],
     [18, 9, 0, 10, 0, "IMAGE"]
   ],
   "version": 0.4

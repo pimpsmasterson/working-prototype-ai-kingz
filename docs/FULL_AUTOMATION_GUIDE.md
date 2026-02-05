@@ -31,7 +31,7 @@ This setup enables **fully automated** GPU instance creation with NSFW models pr
 
 2. **Get the raw URL** (example):
    ```
-   https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw/
+   https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/
    ```
 
 3. **Update environment variable:**

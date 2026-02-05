@@ -173,6 +173,18 @@ class StudioAppPro {
 
         // Sidebar navigation
         this.setupSidebarNavigation();
+
+        // ComfyUI Access Button
+        const comfyBtn = document.getElementById('btn-open-comfyui');
+        if (comfyBtn) {
+            comfyBtn.addEventListener('click', () => {
+                if (this.currentTunnelUrl) {
+                    window.open(this.currentTunnelUrl, '_blank');
+                } else {
+                    this.showInfo('ComfyUI tunnel URL not yet available');
+                }
+            });
+        }
     }
 
     setupSidebarNavigation() {
@@ -945,18 +957,65 @@ class StudioAppPro {
         }
     }
 
-    updateCloudStatus() {
+    async updateCloudStatus() {
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const comfyBtn = document.getElementById('btn-open-comfyui');
 
         if (!statusDot || !statusText) return;
 
-        if (this.cloudConfig && this.cloudConfig.service === 'vastai') {
-            statusDot.className = 'status-dot connected';
-            statusText.textContent = 'Vast.ai';
+        if (this.cloudConfig?.service === 'vastai') {
+            statusDot.className = 'status-dot connecting';
+            statusText.textContent = 'Connecting...';
+
+            try {
+                // Check proxy health and tunnel status
+                const response = await fetch(this.getApiUrl('/api/proxy/gpu-status'));
+                if (response.ok) {
+                    const status = await response.json();
+
+                    // Check for tunnel URL
+                    if (status.instance && status.instance.hasConnectionUrl) {
+                        // We need the actual URL, so fetch warm-pool details
+                        try {
+                            const poolRes = await fetch(this.getApiUrl('/api/proxy/warm-pool'));
+                            if (poolRes.ok) {
+                                const poolData = await poolRes.json();
+                                if (poolData.instance && poolData.instance.tunnelUrl) {
+                                    this.currentTunnelUrl = poolData.instance.tunnelUrl;
+                                    if (comfyBtn) {
+                                        comfyBtn.style.display = 'flex';
+                                        comfyBtn.title = 'Open ComfyUI (' + poolData.instance.tunnelUrl + ')';
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to fetch pool details for tunnel URL', e);
+                        }
+                    }
+
+                    if (status.canGenerate) {
+                        statusDot.className = 'status-dot online';
+                        statusText.textContent = 'System Online';
+                    } else if (status.status === 'prewarming') {
+                        statusDot.className = 'status-dot warning';
+                        statusText.textContent = 'Prewarming...';
+                    } else {
+                        statusDot.className = 'status-dot warning';
+                        statusText.textContent = 'Warming Up...';
+                    }
+                } else {
+                    statusDot.className = 'status-dot offline';
+                    statusText.textContent = 'Proxy Offline';
+                }
+            } catch (error) {
+                console.error('Status check failed:', error);
+                statusDot.className = 'status-dot offline';
+                statusText.textContent = 'Offline';
+            }
         } else {
-            statusDot.className = 'status-dot error';
-            statusText.textContent = 'Local';
+            statusDot.className = 'status-dot local';
+            statusText.textContent = 'Local Mode';
         }
     }
 

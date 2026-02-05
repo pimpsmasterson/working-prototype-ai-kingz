@@ -40,8 +40,8 @@ This guide provides step-by-step instructions to properly set up and run the AI 
    HUGGINGFACE_HUB_TOKEN=your_hf_token_here
    CIVITAI_TOKEN=your_civitai_token_here
    AUDIT_SALT=ai_kings_audit_salt_2026_random_entropy_7x9k2p4q
-   COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
-   SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+   COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
+   SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
    WARM_POOL_SAFE_MODE=0
    WARM_POOL_IDLE_MINUTES=15
    WARM_POOL_DISK_GB=600
@@ -63,8 +63,8 @@ $env:ADMIN_API_KEY='secure_admin_key_change_me'
 $env:HUGGINGFACE_HUB_TOKEN='your_hf_token_here'
 $env:CIVITAI_TOKEN='your_civitai_token_here'
 $env:AUDIT_SALT='ai_kings_audit_salt_2026_random_entropy_7x9k2p4q'
-$env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'
-$env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'
+$env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'
+$env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'
 $env:WARM_POOL_SAFE_MODE='0'
 $env:WARM_POOL_IDLE_MINUTES='15'
 $env:WARM_POOL_DISK_GB='600'
@@ -165,12 +165,12 @@ Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
 **This MUST be run in a single PowerShell session. Environment variables don't persist across windows!**
 
 ```powershell
-cd 'c:\Users\samsc\OneDrive\Desktop\working protoype'; $env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; $env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; $env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; $env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; $env:AUDIT_SALT='YOUR_AUDIT_SALT'; $env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; $env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; $env:PROVISION_ALLOWED_SCRIPTS='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; $env:PROVISION_STRICT='true'; $env:WARM_POOL_SAFE_MODE='0'; $env:WARM_POOL_IDLE_MINUTES='15'; $env:PORT='3000'; $env:COMFYUI_TUNNEL_URL='http://localhost:8188'; node server/vastai-proxy.js
+cd 'c:\Users\samsc\OneDrive\Desktop\working protoype'; $env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; $env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; $env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; $env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; $env:AUDIT_SALT='YOUR_AUDIT_SALT'; $env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; $env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; $env:PROVISION_ALLOWED_SCRIPTS='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; $env:PROVISION_STRICT='true'; $env:WARM_POOL_SAFE_MODE='0'; $env:WARM_POOL_IDLE_MINUTES='15'; $env:PORT='3000'; $env:COMFYUI_TUNNEL_URL='http://localhost:8188'; node server/vastai-proxy.js
 ```
 
 **Alternative: Start in separate window (recommended)**
 ```powershell
-Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd 'c:\Users\samsc\OneDrive\Desktop\working protoype'; `$env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; `$env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; `$env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; `$env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; `$env:AUDIT_SALT='YOUR_AUDIT_SALT'; `$env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; `$env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; `$env:WARM_POOL_SAFE_MODE='0'; `$env:WARM_POOL_IDLE_MINUTES='15'; `$env:PORT='3000'; `$env:COMFYUI_TUNNEL_URL='http://localhost:8188'; node server/vastai-proxy.js"
+Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd 'c:\Users\samsc\OneDrive\Desktop\working protoype'; `$env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; `$env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; `$env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; `$env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; `$env:AUDIT_SALT='YOUR_AUDIT_SALT'; `$env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; `$env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; `$env:WARM_POOL_SAFE_MODE='0'; `$env:WARM_POOL_IDLE_MINUTES='15'; `$env:PORT='3000'; `$env:COMFYUI_TUNNEL_URL='http://localhost:8188'; node server/vastai-proxy.js"
 ```
 
 ### Verify server is listening (wait 5-8 seconds)
@@ -470,7 +470,7 @@ This is normal. Check status with the status command above. Provisioning continu
 
 ```powershell
 # Kill existing, start server, wait, check status
-Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; $env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; $env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; $env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; $env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; $env:AUDIT_SALT='YOUR_AUDIT_SALT'; $env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; $env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw'; $env:WARM_POOL_SAFE_MODE='0'; $env:WARM_POOL_IDLE_MINUTES='15'; $env:PORT='3000'; $env:COMFYUI_TUNNEL_URL='http://localhost:8188'; Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; npm start" -WindowStyle Normal; Start-Sleep -Seconds 8; netstat -ano | findstr ":3000" | findstr "LISTENING"
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force; $env:VASTAI_API_KEY='YOUR_VASTAI_API_KEY'; $env:ADMIN_API_KEY='YOUR_ADMIN_KEY'; $env:HUGGINGFACE_HUB_TOKEN='YOUR_HF_TOKEN'; $env:CIVITAI_TOKEN='YOUR_CIVITAI_TOKEN'; $env:AUDIT_SALT='YOUR_AUDIT_SALT'; $env:COMFYUI_PROVISION_SCRIPT='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; $env:SCRIPTS_BASE_URL='https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw'; $env:WARM_POOL_SAFE_MODE='0'; $env:WARM_POOL_IDLE_MINUTES='15'; $env:PORT='3000'; $env:COMFYUI_TUNNEL_URL='http://localhost:8188'; Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PWD'; npm start" -WindowStyle Normal; Start-Sleep -Seconds 8; netstat -ano | findstr ":3000" | findstr "LISTENING"
 ```
 
 ## Environment Variables Reference

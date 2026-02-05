@@ -42,12 +42,12 @@ tokenManager.startPeriodicValidation(600000);
 
 // Listen for token failures
 tokenManager.on('token-invalid', ({ service, error }) => {
-  console.error(`❌ ${service} token validation FAILED: ${error}`);
-  console.error(`   Please update ${service.toUpperCase()}_TOKEN in your .env file`);
+    console.error(`❌ ${service} token validation FAILED: ${error}`);
+    console.error(`   Please update ${service.toUpperCase()}_TOKEN in your .env file`);
 });
 
 tokenManager.on('token-validated', ({ service }) => {
-  console.log(`✅ ${service} token validated successfully`);
+    console.log(`✅ ${service} token validated successfully`);
 });
 
 // Validate required environment variables
@@ -262,12 +262,12 @@ function requireAdmin(req, res, next) {
         return res.status(403).json({ error: 'forbidden - admin authentication not configured on server' });
     }
     if (!key || key !== process.env.ADMIN_API_KEY) {
-        try { logAuthAttempt(req, false); } catch (e) {}
+        try { logAuthAttempt(req, false); } catch (e) { }
         return res.status(403).json({ error: 'forbidden - invalid admin key' });
     }
-    try { logAuthAttempt(req, true); } catch (e) {}
+    try { logAuthAttempt(req, true); } catch (e) { }
     next();
-} 
+}
 
 // Log admin auth attempts: wrap requireAdmin-like checks where needed
 function logAuthAttempt(req, success) {
@@ -630,6 +630,112 @@ app.get('/api/proxy/admin/config', (req, res) => {
         WARM_POOL_IDLE_MINUTES: process.env.WARM_POOL_IDLE_MINUTES || '15',
         PORT: process.env.PORT || '3000'
     });
+});
+
+// ============================================================================
+// CLOUDFLARE TUNNEL URL REPORTING
+// ============================================================================
+// Provisioned instances report their tunnel URL here for zero-config public access
+// This enables users to access ComfyUI without SSH or port forwarding
+
+app.post('/api/proxy/admin/report-tunnel', express.json(), async (req, res) => {
+    // Admin auth - provisioning script sends x-admin-key header
+    const key = req.headers['x-admin-key'] || req.headers['x-admin-api-key'] || req.query.adminKey;
+    if (!key || key !== process.env.ADMIN_API_KEY) {
+        console.log('WarmPool: Tunnel report rejected - invalid admin key');
+        return res.status(403).json({ error: 'forbidden - invalid admin key' });
+    }
+
+    try {
+        const { contractId, tunnelUrl } = req.body || {};
+
+        // Validate required fields
+        if (!contractId) {
+            return res.status(400).json({ error: 'Missing contractId in request body' });
+        }
+        if (!tunnelUrl) {
+            return res.status(400).json({ error: 'Missing tunnelUrl in request body' });
+        }
+
+        // Validate tunnel URL format (must be trycloudflare.com)
+        const tunnelUrlPattern = /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/;
+        if (!tunnelUrlPattern.test(tunnelUrl)) {
+            console.log(`WarmPool: Invalid tunnel URL format: ${tunnelUrl}`);
+            return res.status(400).json({
+                error: 'Invalid tunnel URL format',
+                expected: 'https://<subdomain>.trycloudflare.com',
+                received: tunnelUrl
+            });
+        }
+
+        console.log(`WarmPool: 📡 Received tunnel URL report from ${contractId}: ${tunnelUrl}`);
+
+        // Get current pool status
+        const pool = warmPool.getStatus();
+
+        if (!pool.instance) {
+            console.log('WarmPool: No instance in pool, but storing tunnel URL anyway');
+            // Still accept it - instance might have been added between prewarm and report
+        }
+
+        // Check if this is the expected instance
+        const instanceContractId = pool.instance?.contractId;
+        const contractIdStr = String(contractId);
+        const instanceContractIdStr = instanceContractId ? String(instanceContractId) : null;
+
+        if (instanceContractIdStr && instanceContractIdStr !== contractIdStr) {
+            console.log(`WarmPool: ⚠️  Tunnel URL from ${contractIdStr} but instance is ${instanceContractIdStr}`);
+            // Accept anyway - might be from a newer instance
+        }
+
+        // Optionally validate tunnel is reachable (non-blocking)
+        let tunnelReachable = false;
+        try {
+            const { fetchWithTimeout } = require('../lib/fetch-with-timeout');
+            const response = await fetchWithTimeout(`${tunnelUrl}/system_stats`, {}, 10000);
+            tunnelReachable = response.ok;
+            console.log(`WarmPool: Tunnel reachability check: ${tunnelReachable ? '✅ reachable' : '⚠️  not yet reachable'}`);
+        } catch (err) {
+            console.log(`WarmPool: Tunnel not yet reachable (expected during startup): ${err.message}`);
+            // Don't fail - tunnel might take a moment to become reachable
+        }
+
+        // Update warm-pool state with tunnel URL
+        if (typeof warmPool.setTunnelUrl === 'function') {
+            await warmPool.setTunnelUrl(contractIdStr, tunnelUrl);
+        } else if (pool.instance) {
+            // Fallback: update state directly if no helper function
+            pool.instance.tunnelUrl = tunnelUrl;
+            pool.instance.connectionUrl = tunnelUrl;
+            if (typeof warmPool.save === 'function') {
+                warmPool.save();
+            }
+        }
+
+        // Audit the tunnel URL report
+        try {
+            audit.logAdminEvent({
+                adminKey: key,
+                ip: req.ip || (req.connection && req.connection.remoteAddress),
+                route: req.originalUrl,
+                action: 'report_tunnel',
+                details: { contractId: contractIdStr, tunnelUrl, reachable: tunnelReachable },
+                outcome: 'ok'
+            });
+        } catch (e) { console.error('audit log error:', e); }
+
+        console.log(`WarmPool: ✅ Tunnel URL registered for ${contractIdStr}: ${tunnelUrl}`);
+
+        res.json({
+            success: true,
+            message: 'Tunnel URL registered successfully',
+            tunnelUrl,
+            reachable: tunnelReachable
+        });
+    } catch (err) {
+        console.error('WarmPool: Error processing tunnel URL report:', err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ============================================================================
@@ -1412,49 +1518,49 @@ app.post('/api/proxy/admin/set-tokens', (req, res) => {
 
 // Validate all tokens (tests actual API connectivity)
 app.post('/api/proxy/admin/validate-tokens', requireAdmin, async (req, res) => {
-  try {
-    console.log('[TokenManager] Admin requested token validation');
-    const results = await tokenManager.validateAll(false); // Force validation, bypass cache
-    res.json({ success: true, validation: results });
-  } catch (err) {
-    console.error('[TokenManager] Validation error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
+    try {
+        console.log('[TokenManager] Admin requested token validation');
+        const results = await tokenManager.validateAll(false); // Force validation, bypass cache
+        res.json({ success: true, validation: results });
+    } catch (err) {
+        console.error('[TokenManager] Validation error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Update token at runtime (without restart) and validate
 app.post('/api/proxy/admin/update-token', requireAdmin, async (req, res) => {
-  try {
-    const { service, token } = req.body;
-    if (!service || !token) {
-      return res.status(400).json({ error: 'service and token required' });
+    try {
+        const { service, token } = req.body;
+        if (!service || !token) {
+            return res.status(400).json({ error: 'service and token required' });
+        }
+
+        // Map service name to environment variable
+        const envVarMap = {
+            vastai: 'VASTAI_API_KEY',
+            huggingface: 'HUGGINGFACE_HUB_TOKEN',
+            civitai: 'CIVITAI_TOKEN'
+        };
+
+        const envVar = envVarMap[service.toLowerCase()];
+        if (!envVar) {
+            return res.status(400).json({ error: `Unknown service: ${service}` });
+        }
+
+        // Update environment variable
+        process.env[envVar] = token;
+        console.log(`[TokenManager] Updated ${service} token at runtime`);
+
+        // Clear cache and validate new token
+        tokenManager.clearCache();
+        const result = await tokenManager.validateAll(false);
+
+        res.json({ success: true, validation: result });
+    } catch (err) {
+        console.error('[TokenManager] Token update error:', err.message);
+        res.status(500).json({ error: err.message });
     }
-
-    // Map service name to environment variable
-    const envVarMap = {
-      vastai: 'VASTAI_API_KEY',
-      huggingface: 'HUGGINGFACE_HUB_TOKEN',
-      civitai: 'CIVITAI_TOKEN'
-    };
-
-    const envVar = envVarMap[service.toLowerCase()];
-    if (!envVar) {
-      return res.status(400).json({ error: `Unknown service: ${service}` });
-    }
-
-    // Update environment variable
-    process.env[envVar] = token;
-    console.log(`[TokenManager] Updated ${service} token at runtime`);
-
-    // Clear cache and validate new token
-    tokenManager.clearCache();
-    const result = await tokenManager.validateAll(false);
-
-    res.json({ success: true, validation: result });
-  } catch (err) {
-    console.error('[TokenManager] Token update error:', err.message);
-    res.status(500).json({ error: err.message });
-  }
 });
 
 // ============================================================================
@@ -1655,33 +1761,33 @@ if (require.main === module) {
             console.log('[DEBUG] Server bound to:', addr);
             try { checkPm2EnvConsistency(); } catch (e) { /* non-fatal */ }
             // Keep process alive
-            setInterval(() => {}, 1 << 30);
+            setInterval(() => { }, 1 << 30);
         });
 
-// Check PM2 environment for mismatched ADMIN_API_KEY (non-fatal advisory)
-function checkPm2EnvConsistency() {
-    try {
-        pm2.connect((err) => {
-            if (err) { console.warn('PM2 check skipped (pm2 not available):', err.message); return; }
-            pm2.list((err, list) => {
-                if (err) { pm2.disconnect(); return; }
-                for (const proc of list) {
-                    try {
-                        if (proc && (proc.name === 'vastai-proxy' || (proc.pm2_env && proc.pm2_env.pm_exec_path && proc.pm2_env.pm_exec_path.indexOf('server/vastai-proxy.js') !== -1))) {
-                            const pm2EnvAdmin = proc.pm2_env && proc.pm2_env.env && proc.pm2_env.env.ADMIN_API_KEY;
-                            if (pm2EnvAdmin && pm2EnvAdmin !== process.env.ADMIN_API_KEY) {
-                                console.warn('⚠️ PM2 env ADMIN_API_KEY differs from current process ADMIN_API_KEY. If you updated .env, run: pm2 restart vastai-proxy --update-env');
-                            }
+        // Check PM2 environment for mismatched ADMIN_API_KEY (non-fatal advisory)
+        function checkPm2EnvConsistency() {
+            try {
+                pm2.connect((err) => {
+                    if (err) { console.warn('PM2 check skipped (pm2 not available):', err.message); return; }
+                    pm2.list((err, list) => {
+                        if (err) { pm2.disconnect(); return; }
+                        for (const proc of list) {
+                            try {
+                                if (proc && (proc.name === 'vastai-proxy' || (proc.pm2_env && proc.pm2_env.pm_exec_path && proc.pm2_env.pm_exec_path.indexOf('server/vastai-proxy.js') !== -1))) {
+                                    const pm2EnvAdmin = proc.pm2_env && proc.pm2_env.env && proc.pm2_env.env.ADMIN_API_KEY;
+                                    if (pm2EnvAdmin && pm2EnvAdmin !== process.env.ADMIN_API_KEY) {
+                                        console.warn('⚠️ PM2 env ADMIN_API_KEY differs from current process ADMIN_API_KEY. If you updated .env, run: pm2 restart vastai-proxy --update-env');
+                                    }
+                                }
+                            } catch (e) { /* ignore per-process */ }
                         }
-                    } catch (e) { /* ignore per-process */ }
-                }
-                pm2.disconnect();
-            });
-        });
-    } catch (e) {
-        console.warn('PM2 env consistency check failed:', e && e.message ? e.message : e);
-    }
-}
+                        pm2.disconnect();
+                    });
+                });
+            } catch (e) {
+                console.warn('PM2 env consistency check failed:', e && e.message ? e.message : e);
+            }
+        }
         console.log('[DEBUG] startProxy() called, server object:', !!server);
     } catch (err) {
         console.error('❌ Failed to start server:', err);

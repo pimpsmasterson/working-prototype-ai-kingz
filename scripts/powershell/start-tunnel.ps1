@@ -27,9 +27,10 @@ try {
     Write-Host ""
     
     # Create the tunnel (this will block and keep running)
-    ssh -i "$env:USERPROFILE\.ssh\id_rsa_vast" -p $sshPort -N -L 8188:localhost:8188 root@$sshHost
+    ssh -i "$env:USERPROFILE\.ssh\id_rsa_vast" -p $sshPort -o StrictHostKeyChecking=no -o UserKnownHostsFile=nul -N -L 8188:localhost:8188 root@$sshHost
     
-} catch {
+}
+catch {
     Write-Host "Error: $_" -ForegroundColor Red
     Write-Host "Make sure VASTAI_API_KEY environment variable is set!" -ForegroundColor Yellow
     exit 1

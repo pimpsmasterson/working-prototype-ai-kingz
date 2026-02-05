@@ -127,7 +127,7 @@
       ],
       "outputs": [
         {"name": "MODEL", "type": "MODEL", "links": [3], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [4, 5], "slot_index": 1}
+        {"name": "CLIP", "type": "CLIP", "links": [4], "slot_index": 1}
       ],
       "widgets_values": ["ltx-2-19b-lora-camera-control-dolly-left.safetensors", 0.8, 0.8]
     },
@@ -152,7 +152,7 @@
       "pos": [850, 50],
       "size": [400, 150],
       "inputs": [{"name": "clip", "type": "CLIP", "link": 7}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9, 10], "slot_index": 0}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9], "slot_index": 0}],
       "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, nsfw, scat, defecation, hyper dump, camera dolly left, smooth camera movement, explicit sex, detailed anatomy, mo-e motion"]
     },
     {
@@ -161,7 +161,7 @@
       "pos": [850, 250],
       "size": [400, 150],
       "inputs": [{"name": "clip", "type": "CLIP", "link": 8}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [11, 12], "slot_index": 0}],
+      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [11], "slot_index": 0}],
       "widgets_values": ["score_6, score_5, low quality, worst quality, watermark, static camera, frozen, clean, sanitary"]
     },
     {

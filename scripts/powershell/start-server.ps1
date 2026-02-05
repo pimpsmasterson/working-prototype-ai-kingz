@@ -10,11 +10,11 @@ if (-not $env:AUDIT_SALT) { $env:AUDIT_SALT = "REPLACE_WITH_SECURE_SALT" }
 
 # --- PROVISIONING CONFIGURATION ---
 # Base URL for modular scripts (enforced to use the official gist raw URL)
-if (-not $env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
+if (-not $env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL = "https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw" }
 # The main entry point script URL (points to the modular setup.sh)
-if (-not $env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
+if (-not $env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT = "https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw" }
 # Default enforce: only allow the official gist and abort provisioning if it fails
-$env:PROVISION_ALLOWED_SCRIPTS = if ($env:PROVISION_ALLOWED_SCRIPTS) { $env:PROVISION_ALLOWED_SCRIPTS } else { "https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw" }
+$env:PROVISION_ALLOWED_SCRIPTS = if ($env:PROVISION_ALLOWED_SCRIPTS) { $env:PROVISION_ALLOWED_SCRIPTS } else { "https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw" }
 # Leave PROVISION_ALLOWED_HOSTS empty by default to skip host-level validation (set if you want explicit host checks)
 $env:PROVISION_ALLOWED_HOSTS = if ($env:PROVISION_ALLOWED_HOSTS) { $env:PROVISION_ALLOWED_HOSTS } else { "" }
 $env:PROVISION_STRICT = if ($env:PROVISION_STRICT) { $env:PROVISION_STRICT } else { "true" }

@@ -150,11 +150,11 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
-COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
 # Enforce provisioning to use only the allowed script(s)
-PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
 PROVISION_STRICT=true
-SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
 ```
 
 ## 📊 API Endpoints
@@ -227,7 +227,7 @@ If the automated setup doesn't work, you can manually configure the GPU:
 1. **SSH into the instance** using the Vast.ai web interface
 2. **Run the provisioning script**:
    ```bash
-   wget https://gist.githubusercontent.com/pimpsmasterson/5a3dc3d4b9151081f3dab111d741a1e7/raw
+   wget https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw
    chmod +x fetish-king-nsfw-provision.sh
    ./fetish-king-nsfw-provision.sh
    ```

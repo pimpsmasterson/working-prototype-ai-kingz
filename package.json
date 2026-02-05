@@ -12,7 +12,9 @@
     "test:e2e:ui": "node tests/studio-e2e-puppeteer.test.js",
     "coverage": "nyc report --reporter=html && echo 'Coverage report generated in coverage/index.html'",
     "inspect-db": "node server/db_inspect.js",
-    "create-dropbox-links": "node scripts/dropbox_create_links.js"
+    "create-dropbox-links": "node scripts/dropbox_create_links.js",
+    "vastai:register-ssh": "node scripts/register_vastai_ssh_key.js",
+    "vastai:register-windows": "powershell -ExecutionPolicy Bypass -File scripts/powershell/register-and-tunnel.ps1"
   },
   "keywords": [
     "vastai",

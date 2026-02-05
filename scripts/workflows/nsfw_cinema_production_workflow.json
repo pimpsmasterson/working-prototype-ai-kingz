@@ -117,7 +117,8 @@
         {"name": "model", "type": "MODEL", "link": 4},
         {"name": "positive", "type": "CONDITIONING", "link": 5},
         {"name": "negative", "type": "CONDITIONING", "link": 6},
-        {"name": "latent_image", "type": "LATENT", "link": 8}
+        {"name": "latent_image", "type": "LATENT", "link": 8},
+        {"name": "context_options", "type": "CONTEXT_OPTIONS", "link": 7}
       ],
       "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
       "widgets_values": ["enable", 44556677, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 0, 30, "disable"]
@@ -186,6 +187,7 @@
     [4, 2, 0, 7, 0, "MODEL"],
     [5, 3, 0, 7, 1, "CONDITIONING"],
     [6, 4, 0, 7, 2, "CONDITIONING"],
+    [7, 5, 0, 7, 4, "CONTEXT_OPTIONS"],
     [8, 6, 0, 7, 3, "LATENT"],
     [9, 7, 0, 8, 0, "LATENT"],
     [15, 1, 2, 8, 1, "VAE"],

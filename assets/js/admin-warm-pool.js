@@ -148,22 +148,32 @@
 
   function updateGpuStatus(data) {
     if (data.instance) {
-      currentInstance.textContent = `Contract ${data.instance.contractId}`;
-      instanceStatus.textContent = data.instance.status;
-      instanceStatus.className = 'status ' + (data.instance.status === 'ready' ? 'success' : 'warning');
-      gpuSpecs.textContent = data.instance.gpuName || 'Unknown';
-      gpuCost.textContent = `Cost: $${(data.instance.dph || 0).toFixed(3)}/hr`;
+      // Tunnel URL display logic
+      const tunnelDisplay = document.getElementById('tunnelDisplay');
+      const tunnelUrlText = document.getElementById('tunnelUrlText');
+      const btnOpenComfy = document.getElementById('btnOpenComfy');
+      const btnCopyTunnel = document.getElementById('btnCopyTunnel');
 
-      if (data.instance.status === 'loading') {
-        setupProgress.textContent = 'Provisioning ComfyUI and models...';
-        progressFill.style.width = '50%';
-      } else if (data.instance.status === 'ready') {
-        setupProgress.textContent = 'Ready for NSFW generation!';
-        progressFill.style.width = '100%';
+      if (data.instance.tunnelUrl) {
+        tunnelDisplay.style.display = 'block';
+        tunnelUrlText.textContent = data.instance.tunnelUrl;
+
+        // Update Open button
+        btnOpenComfy.onclick = () => window.open(data.instance.tunnelUrl, '_blank');
+
+        // Update Copy button
+        btnCopyTunnel.onclick = () => {
+          navigator.clipboard.writeText(data.instance.tunnelUrl).then(() => {
+            const originalText = btnCopyTunnel.textContent;
+            btnCopyTunnel.textContent = '✅ Copied!';
+            setTimeout(() => btnCopyTunnel.textContent = originalText, 2000);
+          });
+        };
       } else {
-        setupProgress.textContent = data.instance.status;
-        progressFill.style.width = '25%';
+        tunnelDisplay.style.display = 'none';
+        tunnelUrlText.textContent = 'Waiting...';
       }
+
     } else {
       currentInstance.textContent = 'None';
       instanceStatus.textContent = 'No active instance';
@@ -172,6 +182,7 @@
       gpuCost.textContent = 'Cost: $0/hr';
       setupProgress.textContent = 'Not started';
       progressFill.style.width = '0%';
+      document.getElementById('tunnelDisplay').style.display = 'none';
     }
   }
 
