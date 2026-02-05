@@ -501,9 +501,11 @@ async function prewarm() {
             if (!o.rentable) { reasons.push('not rentable'); return false; }
             if (o.rented) { reasons.push('already rented'); return false; }
 
-            // Exclude Ukraine region
-            if (o.geolocation && (o.geolocation.includes('Ukraine') || o.geolocation.includes('UA'))) {
-                reasons.push('region excluded: Ukraine');
+            // Exclude Ukraine and China regions
+            const loc = (o.geolocation || '').toLowerCase();
+            if (loc.includes('ukraine') || loc.includes('ua') ||
+                loc.includes('china') || loc.includes('cn')) {
+                reasons.push(`region excluded: ${o.geolocation || 'unknown'}`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
@@ -706,8 +708,13 @@ async function prewarm() {
             console.warn('WarmPool: ⚠️ Using DEFAULT Vast.ai script (fallback from failed custom script)');
             provisionScript = defaultProvisionScript;
         } else if (customProvisionScript) {
+            // CRITICAL: gistfile1.txt 404s - gist has provision-reliable.sh, not gistfile1.txt
+            if (customProvisionScript.includes('gistfile1.txt')) {
+                console.error('WarmPool: ❌ COMFYUI_PROVISION_SCRIPT uses gistfile1.txt which 404s! Use .../raw/provision-reliable.sh instead. Falling back to Vast default.');
+                provisionScript = defaultProvisionScript;
+            }
             // Validate custom script URL before using it (check for 404 gist issues)
-            try {
+            else try {
                 const testResp = await fetch(customProvisionScript, { method: 'HEAD', timeout: 10000 });
                 if (testResp.ok) {
                     provisionScript = customProvisionScript;
@@ -725,11 +732,12 @@ async function prewarm() {
         console.log('WarmPool: 🔧 Selected provision script:', provisionScript);
 
         // Build environment variables - include HF and Civitai tokens if set
+        // PORTAL_CONFIG: simplified to avoid "remote port forwarding failed" (fewer forwards = fewer failures)
         const envVars = {
             COMFYUI_ARGS: "--listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header",
             COMFYUI_API_BASE: "http://localhost:8188",
             PROVISIONING_SCRIPT: provisionScript,
-            PORTAL_CONFIG: "localhost:1111:11111:/:Instance Portal|localhost:8188:18188:/:ComfyUI|localhost:8288:18288:/docs:API Wrapper|localhost:8188:18188:/:ComfyUI|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing",
+            PORTAL_CONFIG: "localhost:8188:18188:/:ComfyUI|localhost:1111:11111:/:Instance Portal",
             OPEN_BUTTON_PORT: "1111",
             JUPYTER_DIR: "/",
             DATA_DIRECTORY: "/workspace/",
@@ -759,8 +767,9 @@ async function prewarm() {
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
             disk: requiredDiskGb,
-            // Request direct port access for ComfyUI (port 8188) and other services
-            direct_port_count: 100
+            // Direct SSH avoids proxy port forwarding; fewer ports reduces "remote port forwarding failed" errors
+            ssh_direct: true,
+            direct_port_count: 20
         };
 
         // Ensure account-level SSH key exists so per-instance access works

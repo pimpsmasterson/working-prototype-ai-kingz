@@ -11,7 +11,7 @@ if (-not $env:AUDIT_SALT) { $env:AUDIT_SALT = "REPLACE_WITH_SECURE_SALT" }
 # --- PROVISIONING CONFIGURATION ---
 # Base URL for modular scripts (e.g. GitHub raw URL)
 if (-not $env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL = "https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw" }
-$env:COMFYUI_PROVISION_SCRIPT = if ($env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT } else { "https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/gistfile1.txt" }
+$env:COMFYUI_PROVISION_SCRIPT = if ($env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT } else { "https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/provision-reliable.sh" }
 
 $env:WARM_POOL_SAFE_MODE = "0"
 $env:WARM_POOL_IDLE_MINUTES = "15"

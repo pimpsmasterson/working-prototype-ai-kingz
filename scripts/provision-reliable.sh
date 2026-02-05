@@ -1208,9 +1208,10 @@ install_models() {
     # log "⚡ [14/14] Downloading FLUX CLIP..."
     # smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${FLUX_CLIP_MODELS[@]}"
 
-    log "🖼️  [BONUS] Downloading example pose image..."
-    download_file "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/out_ballerina.png" \
-        "${COMFYUI_DIR}/user/default" "example_pose.png" || log "   ⚠️  Optional example_pose.png failed - continuing"
+    # OPTIONAL: example_pose.png - never abort provisioning; wrap in subshell so failure cannot crash
+    log "🖼️  [BONUS] Downloading example pose image (optional)..."
+    ( download_file "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/out_ballerina.png" \
+        "${COMFYUI_DIR}/user/default" "example_pose.png" ) || log "   ⚠️  Optional example_pose.png failed - continuing (non-fatal)"
 
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
@@ -2988,6 +2989,102 @@ start_comfyui() {
   start_reverse_tunnel || true
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLOUDFLARE TUNNEL (Zero-Config Public Access)
+# Quick Tunnel gives you a trycloudflare.com URL - no SSH or port forwarding needed.
+# ═══════════════════════════════════════════════════════════════════════════════
+install_cloudflared() {
+    log_section "📡 INSTALLING CLOUDFLARE TUNNEL"
+    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+    local CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+
+    if [[ -x "$CLOUDFLARED_BIN" ]]; then
+        log "   ✅ Cloudflared already installed"
+        return 0
+    fi
+
+    log "   📥 Downloading cloudflared..."
+    for attempt in 1 2 3; do
+        if curl -fsSL --connect-timeout 30 --max-time 120 "$CLOUDFLARED_URL" -o "$CLOUDFLARED_BIN" 2>/dev/null; then
+            chmod +x "$CLOUDFLARED_BIN"
+            if "$CLOUDFLARED_BIN" --version >/dev/null 2>&1; then
+                log "   ✅ Cloudflared installed"
+                return 0
+            fi
+        fi
+        log "   ⚠️  Attempt $attempt failed, retrying..."
+        sleep 5
+    done
+    log "   ❌ Failed to install cloudflared"
+    return 1
+}
+
+start_cloudflare_tunnel() {
+    log_section "🌐 STARTING CLOUDFLARE TUNNEL (Public URL)"
+    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+    local TUNNEL_LOG="${WORKSPACE}/cloudflared.log"
+    local TUNNEL_PID_FILE="${WORKSPACE}/cloudflared.pid"
+
+    [[ "${DISABLE_CLOUDFLARED:-0}" == "1" ]] && log "   ℹ️  DISABLE_CLOUDFLARED=1 — skipping" && return 1
+    [[ ! -x "$CLOUDFLARED_BIN" ]] && log "   ⚠️  Cloudflared not installed" && return 1
+
+    # Kill existing tunnel
+    if [[ -f "$TUNNEL_PID_FILE" ]]; then
+        local old_pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
+        [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null && kill "$old_pid" 2>/dev/null || true
+        sleep 2
+        rm -f "$TUNNEL_PID_FILE"
+    fi
+
+    # Wait for ComfyUI (first start can take 2-5 min)
+    log "   ⏳ Waiting for ComfyUI on port 8188 (up to 5 min)..."
+    for i in $(seq 1 60); do
+        curl -s --connect-timeout 3 "http://localhost:8188/system_stats" >/dev/null 2>&1 && {
+            log "   ✅ ComfyUI ready (after $((i * 5))s)"
+            break
+        }
+        [[ $((i % 6)) -eq 0 ]] && log "   ⏳ Still waiting... ${i}/60"
+        sleep 5
+    done
+
+    log "   🚀 Starting Cloudflare Quick Tunnel..."
+    setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
+    echo $! > "$TUNNEL_PID_FILE"
+
+    # Wait for trycloudflare.com URL (up to 90s)
+    local TUNNEL_URL=""
+    for i in $(seq 1 90); do
+        TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1 || true)
+        [[ -n "$TUNNEL_URL" ]] && break
+        grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null && {
+            log "   ⚠️  Cloudflare rate limit (429) - use SSH tunnel fallback"
+            break
+        }
+        sleep 1
+    done
+
+    if [[ -n "$TUNNEL_URL" ]]; then
+        echo "$TUNNEL_URL" > "${WORKSPACE}/.comfyui_tunnel_url"
+        echo "$TUNNEL_URL" > "${WORKSPACE}/COMFYUI_URL.txt"
+        log ""
+        log "   ╔════════════════════════════════════════════════════════════════╗"
+        log "   ║  🌐 COMFYUI PUBLIC URL — Open in browser:                       ║"
+        log "   ║                                                                ║"
+        log "   ║  $TUNNEL_URL"
+        log "   ║                                                                ║"
+        log "   ║  No SSH needed! Use this URL even if you see                    ║"
+        log "   ║  'remote port forwarding failed' (Vast.ai SSH noise - ignore).  ║"
+        log "   ║  URL also saved to: ${WORKSPACE}/COMFYUI_URL.txt"
+        log "   ╚════════════════════════════════════════════════════════════════╝"
+        log ""
+        return 0
+    else
+        log "   ⚠️  Tunnel URL not found - check ${TUNNEL_LOG}"
+        tail -20 "$TUNNEL_LOG" 2>/dev/null || true
+        return 1
+    fi
+}
+
 # Start a reverse SSH tunnel to expose ComfyUI when remote host info is provided.
 # Supports either REVERSE_SSH_DEST (user@host[:port]) or REVERSE_SSH_USER/REVERSE_SSH_HOST vars.
 start_reverse_tunnel() {
@@ -3151,7 +3248,16 @@ main() {
     # Normalize workflow outputs so all generated assets go to a unified folder
     update_workflow_outputs
     start_comfyui
+
+    # Cloudflare Quick Tunnel: gives trycloudflare.com URL for simple browser access
+    ( install_cloudflared || log "   ⚠️  Cloudflared install failed - use SSH tunnel" )
+    ( start_cloudflare_tunnel || log "   ⚠️  Cloudflare tunnel failed - use SSH or direct IP:8188" )
+
     log "--- Provisioning Complete ---"
+    log ""
+    log "   ℹ️  If you see 'remote port forwarding failed' above: that's from Vast.ai's"
+    log "      SSH proxy, not our script. Provisioning completed. Use the Cloudflare"
+    log "      URL above or direct IP:8188 (with direct_port) to reach ComfyUI."
 }
 
 main "$@"
