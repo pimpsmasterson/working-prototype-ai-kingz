@@ -13,6 +13,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const GIST_ID = 'c3f61f20067d498b6699d1bdbddea395';
 const PROVISION_PATH = path.join(__dirname, 'provision-reliable.sh');
 const CHECK_CF_PATH = path.join(__dirname, 'check-cloudflare.sh');
+const IMAGE_PROVISION_PATH = path.join(__dirname, 'provision-image-only.sh');
+const VIDEO_PROVISION_PATH = path.join(__dirname, 'provision-video-only.sh');
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 
 async function main() {
@@ -32,12 +34,22 @@ async function main() {
   if (fs.existsSync(CHECK_CF_PATH)) {
     checkCfContent = fs.readFileSync(CHECK_CF_PATH, 'utf8');
   }
+  let imageContent = '';
+  if (fs.existsSync(IMAGE_PROVISION_PATH)) {
+    imageContent = fs.readFileSync(IMAGE_PROVISION_PATH, 'utf8');
+  }
+  let videoContent = '';
+  if (fs.existsSync(VIDEO_PROVISION_PATH)) {
+    videoContent = fs.readFileSync(VIDEO_PROVISION_PATH, 'utf8');
+  }
 
   const payload = {
-    description: 'AI Kings ComfyUI reliable provisioner v3.1 (provision-reliable.sh + check-cloudflare.sh)',
+    description: 'AI Kings ComfyUI provisioners v3.1 (reliable + image-only + video-only + check-cloudflare)',
     files: {
       'provision-reliable.sh': { content },
-      'check-cloudflare.sh': { content: checkCfContent }
+      'check-cloudflare.sh': { content: checkCfContent },
+      'provision-image-only.sh': { content: imageContent },
+      'provision-video-only.sh': { content: videoContent }
     }
   };
 

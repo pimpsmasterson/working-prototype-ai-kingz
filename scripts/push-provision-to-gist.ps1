@@ -20,7 +20,7 @@ if ($token -and (Test-Path $provisionPath)) {
     Write-Host "Pushing via GitHub API..." -ForegroundColor Cyan
     & node (Join-Path $projectRoot "scripts\push-provision-to-gist.js")
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "Done. Update .env COMFYUI_PROVISION_SCRIPT with the Raw URL printed above, then: pm2 restart vastai-proxy --update-env" -ForegroundColor Green
+        Write-Host "Done. Update .env COMFYUI_PROVISION_SCRIPT / COMFYUI_IMAGE_PROVISION_SCRIPT / COMFYUI_VIDEO_PROVISION_SCRIPT with the Raw URLs printed above, then: pm2 restart vastai-proxy --update-env" -ForegroundColor Green
         exit 0
     }
     Write-Host "API push failed, falling back to git push from Gist clone." -ForegroundColor Yellow
