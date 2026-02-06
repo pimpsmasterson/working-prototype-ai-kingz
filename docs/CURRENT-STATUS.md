@@ -1,18 +1,18 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1.5 — Current State
+## Provisioner v3.1.6 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.5 — Port 8188 conflict resolution, comprehensive ComfyUI diagnostics, process monitoring |
-| **Gist** | ✅ v3.1.5 live at `.../raw/provision-reliable.sh` (commit f135ead) |
-| **GitHub** | ✅ v3.1.5 pushed (commit 807496b) |
+| **Provision script** | v3.1.6 — Real-time ComfyUI process monitoring, PID verification, enhanced diagnostics |
+| **Gist** | ✅ v3.1.6 live at `.../raw/provision-reliable.sh` (unpinned URL) |
+| **GitHub** | ✅ v3.1.6 pushed |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
-| **Last rent** | Instance 30996277 — ComfyUI startup timeout (v3.1.2); v3.1.5 adds diagnostics |
-| **Current issue** | ComfyUI not responding after 10 min wait — v3.1.5 will diagnose root cause |
+| **Last rent** | Instance 30996277 — ComfyUI startup timeout (v3.1.2); v3.1.6 adds real-time monitoring |
+| **Current issue** | Ready for new instance rental with v3.1.6 |
 
 ---
 
@@ -207,7 +207,7 @@
 ### Instance 30996277 (v3.1.2) — ComfyUI Startup Timeout
 - **Status**: Provision completed, all models downloaded, ComfyUI started but not responding after 10+ min
 - **Symptoms**: Port 8188 not listening, process may have crashed
-- **Next**: v3.1.5 will diagnose root cause automatically
+- **Next**: v3.1.6 will diagnose root cause automatically with real-time process monitoring
 
 ### AI Failures (Lessons Learned)
 1. **Assumed ComfyUI would start** — Didn't add process monitoring or diagnostics initially
@@ -217,7 +217,7 @@
 
 ---
 
-## Next Steps if v3.1.5 Fails
+## Next Steps if v3.1.6 Fails
 
 1. **Check comfyui.log** — `tail -100 /workspace/comfyui.log` on instance. Look for: `ModuleNotFoundError`, `ImportError`, CUDA mismatch, OOM.
 2. **ComfyUI crashed?** — If log shows traceback, fix dependency or skip problematic node. Consider reducing NODES list for initial boot.

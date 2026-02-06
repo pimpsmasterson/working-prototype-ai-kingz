@@ -698,6 +698,19 @@ async function prewarm() {
         const customProvisionScript = process.env.COMFYUI_PROVISION_SCRIPT;
         const defaultProvisionScript = "https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/pytorch/derivatives/comfyui/provisioning_scripts/default.sh";
 
+        // SECURITY: Whitelist of allowed script URLs to prevent malicious code execution
+        const allowedScriptPatterns = [
+            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/9fb9d7c60d3822c2ffd3ad4b000cc864\/raw\/provision-reliable\.sh(\?.*)?$/,
+            /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
+            /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/  // Allow other GitHub raw URLs for flexibility
+        ];
+
+        // Validate URL against whitelist
+        const isUrlAllowed = (url) => {
+            if (!url || typeof url !== 'string') return false;
+            return allowedScriptPatterns.some(pattern => pattern.test(url));
+        };
+
         // Increment provision attempt counter
         state.provisionAttempt = (state.provisionAttempt || 0) + 1;
         console.log(`WarmPool: 📦 Provisioning attempt #${state.provisionAttempt} (fallback mode: ${state.useDefaultScript})`);
@@ -708,8 +721,26 @@ async function prewarm() {
             console.warn('WarmPool: ⚠️ Using DEFAULT Vast.ai script (fallback from failed custom script)');
             provisionScript = defaultProvisionScript;
         } else if (customProvisionScript) {
+            // SECURITY: Validate URL against whitelist before proceeding
+            if (!isUrlAllowed(customProvisionScript)) {
+                console.error(`WarmPool: 🔒 SECURITY REJECTION - Script URL not in whitelist: ${customProvisionScript}`);
+                console.error('WarmPool: ❌ Only whitelisted Gist/GitHub URLs are allowed. Falling back to Vast default.');
+                // Audit log security violation
+                try {
+                    audit.logUsageEvent({
+                        event_type: 'security_rejection',
+                        details: {
+                            reason: 'script_url_not_whitelisted',
+                            attempted_url: customProvisionScript,
+                            action: 'fallback_to_default'
+                        },
+                        source: 'warm-pool-security'
+                    });
+                } catch (e) { /* audit may not be available */ }
+                provisionScript = defaultProvisionScript;
+            }
             // CRITICAL: gistfile1.txt 404s - gist has provision-reliable.sh, not gistfile1.txt
-            if (customProvisionScript.includes('gistfile1.txt')) {
+            else if (customProvisionScript.includes('gistfile1.txt')) {
                 console.error('WarmPool: ❌ COMFYUI_PROVISION_SCRIPT uses gistfile1.txt which 404s! Use .../raw/provision-reliable.sh instead. Falling back to Vast default.');
                 provisionScript = defaultProvisionScript;
             }
@@ -718,7 +749,7 @@ async function prewarm() {
                 const testResp = await fetch(customProvisionScript, { method: 'HEAD', timeout: 10000 });
                 if (testResp.ok) {
                     provisionScript = customProvisionScript;
-                    console.log('WarmPool: ✅ Using custom provision script:', customProvisionScript);
+                    console.log('WarmPool: ✅ Using custom provision script (whitelist validated):', customProvisionScript);
                 } else {
                     console.warn(`WarmPool: ⚠️ Custom provision script returned ${testResp.status}, falling back to default`);
                     provisionScript = defaultProvisionScript;
@@ -729,7 +760,40 @@ async function prewarm() {
             }
         }
 
-        console.log('WarmPool: 🔧 Selected provision script:', provisionScript);
+        // SECURITY: Final validation - ensure we never execute a non-whitelisted script
+        if (!isUrlAllowed(provisionScript)) {
+            console.error(`WarmPool: 🔒 CRITICAL SECURITY ERROR - Final script URL failed whitelist check: ${provisionScript}`);
+            console.error('WarmPool: ❌ Aborting to prevent potential malicious code execution. Using Vast default.');
+            // Audit log critical security violation
+            try {
+                audit.logUsageEvent({
+                    event_type: 'security_critical_error',
+                    details: {
+                        reason: 'final_script_url_failed_whitelist',
+                        attempted_url: provisionScript,
+                        action: 'forced_default_script'
+                    },
+                    source: 'warm-pool-security'
+                });
+            } catch (e) { /* audit may not be available */ }
+            provisionScript = defaultProvisionScript;
+        }
+
+        // Audit log successful script selection (for security monitoring)
+        try {
+            audit.logUsageEvent({
+                event_type: 'provision_script_selected',
+                details: {
+                    script_url: provisionScript,
+                    is_whitelisted: isUrlAllowed(provisionScript),
+                    is_custom: provisionScript !== defaultProvisionScript,
+                    attempt_number: state.provisionAttempt
+                },
+                source: 'warm-pool-security'
+            });
+        } catch (e) { /* audit may not be available */ }
+
+        console.log('WarmPool: 🔧 Selected provision script (security validated):', provisionScript);
 
         // Build environment variables - include HF and Civitai tokens if set
         // PORTAL_CONFIG: simplified to avoid "remote port forwarding failed" (fewer forwards = fewer failures)
@@ -762,7 +826,7 @@ async function prewarm() {
             ...(configuredImage && configuredImage !== 'auto' ? { image: configuredImage } : {}),
             runtype: 'ssh',
             target_state: 'running',
-            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'`,
+            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; echo "WarmPool: Downloading provision script from whitelisted URL: ${provisionScript}"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && echo "WarmPool: Script downloaded, executing..." && bash -x /tmp/provision.sh'`,
             ssh_key: vastaiSsh.getKey(),
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
