@@ -34,7 +34,7 @@ async function main() {
   }
 
   const payload = {
-    description: 'AI Kings ComfyUI reliable provisioner v3.1 (provision-reliable.sh + check-cloudflare.sh)',
+    description: 'AI Kings ComfyUI reliable provisioner v3.1 — Cloudflare tunnel + ComfyUI-Copilot + mm_sdxl fix',
     files: {
       'provision-reliable.sh': { content },
       'check-cloudflare.sh': { content: checkCfContent }

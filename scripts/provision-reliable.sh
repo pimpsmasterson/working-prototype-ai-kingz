@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.0                            ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1                            ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -209,7 +209,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.0 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -270,6 +270,7 @@ APT_PACKAGES=(
 # ═══════════════════════════════════════════════════════════════════════════════
 NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
+    "https://github.com/AIDC-AI/ComfyUI-Copilot"
     "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"
     "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
     "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation"
@@ -401,7 +402,7 @@ WAN_VAE_MODELS=(
 
 
 ANIMATEDIFF_MODELS=(
-    "https://huggingface.co/camenduru/AnimateDiff-sdxl-beta/resolve/main/mm_sdxl_v10_beta.ckpt|mm_sdxl_v10_beta.ckpt"
+    "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sdxl_v10_beta.ckpt|mm_sdxl_v10_beta.ckpt"
     "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt|mm_sd_v15_v2.ckpt"
 )
 
@@ -736,6 +737,7 @@ install_nodes() {
     done
 
     # Post-install: Ensure core dependencies are present
+    # piexif required by ComfyUI-Impact-Pack (FaceDetailer) - workflows break without it
     log "   🔧 Ensuring core dependencies..."
     "$VENV_PYTHON" -m pip install --no-cache-dir -q \
         einops>=0.6.0 \
@@ -743,7 +745,8 @@ install_nodes() {
         transformers>=4.36.0 \
         opencv-python-headless>=4.8.0 \
         sageattention \
-        huggingface-hub 2>/dev/null || true
+        huggingface-hub \
+        piexif 2>/dev/null || true
 
     log "✅ Custom nodes installation complete"
 }
@@ -1229,17 +1232,18 @@ retry_failed_downloads() {
         return 0
     fi
 
-    # Count failed downloads
-    local failed_count=$(wc -l < "${WORKSPACE}/provision_errors.log")
+    # Count failed downloads (only lines with FAILED:, not aria2 diagnostic output)
+    local failed_count=$(grep -c 'FAILED:' "${WORKSPACE}/provision_errors.log" 2>/dev/null || echo 0)
     log ""
     log "⚠️  Found $failed_count failed download(s)"
     log ""
 
-    # Show failed files
+    # Show failed files (only lines with FAILED: — skip aria2 diagnostic output)
     log "Failed downloads:"
     while IFS= read -r line; do
-        # Extract filename from error log
-        local filename=$(echo "$line" | grep -oP 'FAILED: \K[^\s]+' || echo "unknown")
+        local filename
+        filename=$(echo "$line" | grep -oP 'FAILED: \K[^\s]+' 2>/dev/null || true)
+        [[ -n "$filename" ]] || continue
         log "   ❌ $filename"
     done < "${WORKSPACE}/provision_errors.log"
 
@@ -3066,6 +3070,38 @@ start_cloudflare_tunnel() {
     if [[ -n "$TUNNEL_URL" ]]; then
         echo "$TUNNEL_URL" > "${WORKSPACE}/.comfyui_tunnel_url"
         echo "$TUNNEL_URL" > "${WORKSPACE}/COMFYUI_URL.txt"
+        # Verify tunnel reachability (catches 502 / origin unreachable early)
+        log "   🔗 Verifying tunnel reachability..."
+        if curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/system_stats" >/dev/null 2>&1; then
+            log "   ✅ Tunnel verified — URL reachable"
+        else
+            log "   ⚠️  Tunnel URL not yet reachable (ComfyUI may still be loading). Try again in 30s."
+        fi
+        # Helper: run "bash /workspace/restart-cloudflare-tunnel.sh" if URL stops working
+        cat > "${WORKSPACE}/restart-cloudflare-tunnel.sh" <<-'RESTART_TUNNEL_EOF'
+#!/bin/bash
+# Restart Cloudflare Quick Tunnel when URL stops working (instance/ComfyUI restart)
+WORKSPACE="${WORKSPACE:-/workspace}"
+CF="/usr/local/bin/cloudflared"
+LOG="${WORKSPACE}/cloudflared.log"
+PID_FILE="${WORKSPACE}/cloudflared.pid"
+[[ -x "$CF" ]] || { echo "cloudflared not found"; exit 1; }
+[[ -f "$PID_FILE" ]] && kill $(cat "$PID_FILE") 2>/dev/null; sleep 2; rm -f "$PID_FILE"
+echo "Waiting for ComfyUI on 8188..."
+for i in $(seq 1 24); do
+  curl -s --connect-timeout 2 http://localhost:8188/system_stats >/dev/null 2>&1 && break
+  sleep 5
+done
+setsid nohup "$CF" tunnel --url http://localhost:8188 > "$LOG" 2>&1 < /dev/null &
+echo $! > "$PID_FILE"
+for i in $(seq 1 90); do
+  URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" 2>/dev/null | head -1 || true)
+  [[ -n "$URL" ]] && { echo "$URL" > "${WORKSPACE}/COMFYUI_URL.txt"; echo "New URL: $URL"; exit 0; }
+  sleep 1
+done
+echo "Timeout waiting for tunnel URL - check $LOG"; exit 1
+	RESTART_TUNNEL_EOF
+        chmod +x "${WORKSPACE}/restart-cloudflare-tunnel.sh"
         log ""
         log "   ╔════════════════════════════════════════════════════════════════╗"
         log "   ║  🌐 COMFYUI PUBLIC URL — Open in browser:                       ║"
@@ -3075,6 +3111,7 @@ start_cloudflare_tunnel() {
         log "   ║  No SSH needed! Use this URL even if you see                    ║"
         log "   ║  'remote port forwarding failed' (Vast.ai SSH noise - ignore).  ║"
         log "   ║  URL also saved to: ${WORKSPACE}/COMFYUI_URL.txt"
+        log "   ║  If URL stops working (502/restart): bash ${WORKSPACE}/restart-cloudflare-tunnel.sh"
         log "   ╚════════════════════════════════════════════════════════════════╝"
         log ""
         return 0
