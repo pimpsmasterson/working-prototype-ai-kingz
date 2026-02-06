@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.6                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.7                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -213,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.6 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.7 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -622,6 +622,7 @@ install_essential_deps() {
     log "   ✅ Removed conflicting xformers (if present)"
 
     # Install core dependencies first
+    # CRITICAL: SQLAlchemy 2.0+ required for ComfyUI (uses mapped_column)
     "$VENV_PYTHON" -m pip install --no-cache-dir \
         transformers==4.36.0 \
         accelerate \
@@ -630,7 +631,8 @@ install_essential_deps() {
         opencv-python-headless \
         insightface \
         onnxruntime-gpu \
-        sentencepiece
+        sentencepiece \
+        "sqlalchemy>=2.0.0"
 
     # Reinstall PyTorch to ensure correct version after accelerate (which may install CPU version)
     "$VENV_PYTHON" -m pip install --no-cache-dir \
@@ -3122,6 +3124,10 @@ start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFYUI_DIR}"
     activate_venv
+    
+    # CRITICAL: Ensure SQLAlchemy 2.0+ is installed (ComfyUI requires mapped_column)
+    log "   🔧 Ensuring SQLAlchemy 2.0+ is installed..."
+    "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || true
     
     # CRITICAL: Free port 8188 before starting
     free_port_8188 || {
