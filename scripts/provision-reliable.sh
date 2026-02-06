@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.7                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.8                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -213,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.7 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.8 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -239,14 +239,19 @@ fi
 
 # 2.5 DISK SPACE CHECK (Ironclad)
 # Minimum disk in GB required for provisioning (configurable via env MIN_DISK_GB)
+# Allow 5GB buffer for filesystem overhead and rounding differences
 MIN_DISK_GB=${MIN_DISK_GB:-200}
+DISK_BUFFER_GB=5
 AVAILABLE_KB=$(df "$WORKSPACE" | awk 'NR==2 {print $4}')
-if (( AVAILABLE_KB < MIN_DISK_GB * 1024 * 1024 )); then
-  log "❌ FATAL ERROR: Insufficient disk space in $WORKSPACE."
-  log "   Need: ${MIN_DISK_GB}GB, Have: $((AVAILABLE_KB / 1024 / 1024))GB"
+AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
+REQUIRED_KB=$(( (MIN_DISK_GB - DISK_BUFFER_GB) * 1024 * 1024 ))
+if (( AVAILABLE_KB < REQUIRED_KB )); then
+    log "❌ FATAL ERROR: Insufficient disk space in $WORKSPACE."
+    log "   Need: ${MIN_DISK_GB}GB (with ${DISK_BUFFER_GB}GB buffer), Have: ${AVAILABLE_GB}GB"
     log "   Cannot proceed with provisioning - exiting early"
     exit 1
 fi
+log "   ✅ Disk space check passed: ${AVAILABLE_GB}GB available (required: ${MIN_DISK_GB}GB)"
 
 COMFYUI_DIR=${WORKSPACE}/ComfyUI
 # Finalize the log file to the chosen workspace
