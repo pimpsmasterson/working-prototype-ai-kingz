@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.3                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.4                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -213,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.3 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.4 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -2983,29 +2983,53 @@ start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFYUI_DIR}"
     activate_venv
-  # Prefer creating a systemd service for reliable supervision
-  generate_comfyui_service
-  systemctl daemon-reload || true
-  systemctl enable --now comfyui.service || {
-    log "   ⚠️  systemd service failed to start; falling back to background start"
-    # Start detached so cleanup/traps won't kill the process
-    setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
-    local comfyui_pid=$!
-    echo "$comfyui_pid" > "${WORKSPACE}/comfyui.pid"
-    log "✅ ComfyUI started on port 8188 (PID: $comfyui_pid)"
-    log "   Log: ${WORKSPACE}/comfyui.log"
-    log "   PID file: ${WORKSPACE}/comfyui.pid"
-    log "   To stop: kill \$(cat ${WORKSPACE}/comfyui.pid)"
-    # Attempt to create a reverse SSH tunnel (if configured)
-    start_reverse_tunnel || true
-    return
-  }
+    
+    # Prefer creating a systemd service for reliable supervision
+    generate_comfyui_service
+    systemctl daemon-reload || true
+    systemctl enable --now comfyui.service || {
+        log "   ⚠️  systemd service failed to start; falling back to background start"
+        # Start detached so cleanup/traps won't kill the process
+        setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
+        local comfyui_pid=$!
+        echo "$comfyui_pid" > "${WORKSPACE}/comfyui.pid"
+        log "✅ ComfyUI started on port 8188 (PID: $comfyui_pid)"
+        log "   Log: ${WORKSPACE}/comfyui.log"
+        log "   PID file: ${WORKSPACE}/comfyui.pid"
+        log "   To stop: kill \$(cat ${WORKSPACE}/comfyui.pid)"
+        
+        # Verify process is actually running (wait 3s for startup)
+        sleep 3
+        if ! kill -0 "$comfyui_pid" 2>/dev/null; then
+            log "   ❌ ComfyUI process died immediately after start!"
+            log "   📋 Checking comfyui.log for errors..."
+            if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
+                log "   Last 30 lines of comfyui.log:"
+                tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
+                # Check for common errors
+                if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                    log "   🔍 Found: Missing Python module — check custom node requirements"
+                fi
+                if grep -qE "CUDA|cuda|GPU|gpu" "${WORKSPACE}/comfyui.log" 2>/dev/null | grep -qE "error|Error|ERROR|failed|Failed"; then
+                    log "   🔍 Found: CUDA/GPU error — check PyTorch CUDA compatibility"
+                fi
+                if grep -qE "Address already in use|port.*8188" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                    log "   🔍 Found: Port 8188 already in use"
+                fi
+            fi
+            return 1
+        fi
+        
+        # Attempt to create a reverse SSH tunnel (if configured)
+        start_reverse_tunnel || true
+        return 0
+    }
 
-  # If systemd started the unit, report status
-  log "✅ ComfyUI systemd service enabled and started (port 8188)"
-  log "   Check logs with: journalctl -u comfyui.service -f"
-  # If a reverse SSH tunnel destination is configured, attempt to start it
-  start_reverse_tunnel || true
+    # If systemd started the unit, report status
+    log "✅ ComfyUI systemd service enabled and started (port 8188)"
+    log "   Check logs with: journalctl -u comfyui.service -f"
+    # If a reverse SSH tunnel destination is configured, attempt to start it
+    start_reverse_tunnel || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -3058,47 +3082,153 @@ start_cloudflare_tunnel() {
     # Wait for ComfyUI (first start can take 3-8 min with many custom nodes)
     # Use / (root) — universal in ComfyUI; /system_stats may not exist in some setups
     local comfy_ready=0
+    local comfyui_pid=""
+    [[ -f "${WORKSPACE}/comfyui.pid" ]] && comfyui_pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
+    
     log "   ⏳ Waiting for ComfyUI on port 8188 (up to 10 min)..."
     for i in $(seq 1 120); do
-        if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
-            log "   ✅ ComfyUI ready (after $((i * 5))s)"
-            comfy_ready=1
+        # Check if process is still alive (if PID file exists)
+        if [[ -n "$comfyui_pid" ]] && ! kill -0 "$comfyui_pid" 2>/dev/null; then
+            log "   ❌ ComfyUI process (PID $comfyui_pid) died!"
+            log "   📋 Last 30 lines of comfyui.log:"
+            [[ -f "${WORKSPACE}/comfyui.log" ]] && tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
+            # Check for common errors
+            if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
+                if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                    log "   🔍 ERROR: Missing Python module — install missing dependencies"
+                fi
+                if grep -qE "CUDA.*error|cuda.*Error|GPU.*failed" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                    log "   🔍 ERROR: CUDA/GPU issue — check PyTorch installation"
+                fi
+            fi
+            log "   🚀 Starting tunnel anyway — restart ComfyUI manually, then use tunnel URL"
             break
         fi
-        [[ $((i % 6)) -eq 0 ]] && log "   ⏳ Still waiting... ${i}/120"
+        
+        # Check if port is listening (faster than HTTP)
+        if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 "; then
+            # Port is listening, try HTTP
+            if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
+                log "   ✅ ComfyUI ready (after $((i * 5))s)"
+                comfy_ready=1
+                break
+            fi
+        elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "; then
+            # Port is listening, try HTTP
+            if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
+                log "   ✅ ComfyUI ready (after $((i * 5))s)"
+                comfy_ready=1
+                break
+            fi
+        fi
+        
+        # Progress updates every 30s (6 iterations)
+        [[ $((i % 6)) -eq 0 ]] && {
+            log "   ⏳ Still waiting... ${i}/120 ($((i * 5))s elapsed)"
+            # Show process status
+            if [[ -n "$comfyui_pid" ]] && kill -0 "$comfyui_pid" 2>/dev/null; then
+                log "      ✓ Process alive (PID: $comfyui_pid)"
+            else
+                log "      ✗ Process not found — check comfyui.log"
+            fi
+        }
         sleep 5
     done
+    
     if [[ "$comfy_ready" -eq 0 ]]; then
-        log "   ⚠️  ComfyUI not responding after 10 min — check ${WORKSPACE}/comfyui.log"
-        [[ -f "${WORKSPACE}/comfyui.log" ]] && log "   Last 10 lines:" && tail -10 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
-        log "   🚀 Starting tunnel anyway — URL will work when ComfyUI is up. Run: bash ${WORKSPACE}/restart-cloudflare-tunnel.sh"
+        log "   ⚠️  ComfyUI not responding after 10 min"
+        log "   📋 Diagnostics:"
+        # Check process
+        if [[ -n "$comfyui_pid" ]] && kill -0 "$comfyui_pid" 2>/dev/null; then
+            log "      ✓ Process running (PID: $comfyui_pid)"
+        else
+            log "      ✗ Process not running"
+        fi
+        # Check port
+        if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
+           (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
+            log "      ✓ Port 8188 is listening"
+        else
+            log "      ✗ Port 8188 not listening"
+        fi
+        # Show log tail
+        [[ -f "${WORKSPACE}/comfyui.log" ]] && {
+            log "   Last 30 lines of comfyui.log:"
+            tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
+        }
+        log "   🚀 Starting tunnel anyway — URL will work when ComfyUI is up"
+        log "   💡 To restart ComfyUI: cd /workspace/ComfyUI && /venv/main/bin/python3 main.py --listen 0.0.0.0 --port 8188"
     fi
 
     log "   🚀 Starting Cloudflare Quick Tunnel..."
+    rm -f "$TUNNEL_LOG" 2>/dev/null || true  # Start fresh log
     setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
-    echo $! > "$TUNNEL_PID_FILE"
+    local tunnel_pid=$!
+    echo "$tunnel_pid" > "$TUNNEL_PID_FILE"
+    
+    # Verify tunnel process started
+    sleep 2
+    if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+        log "   ❌ Cloudflare tunnel process died immediately!"
+        [[ -f "$TUNNEL_LOG" ]] && {
+            log "   Tunnel log:"
+            cat "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /' | head -20
+        }
+        return 1
+    fi
 
     # Wait for trycloudflare.com URL (up to 90s)
     local TUNNEL_URL=""
     for i in $(seq 1 90); do
+        # Check if tunnel process is still alive
+        if ! kill -0 "$tunnel_pid" 2>/dev/null; then
+            log "   ❌ Cloudflare tunnel process died!"
+            [[ -f "$TUNNEL_LOG" ]] && {
+                log "   Last 20 lines of tunnel log:"
+                tail -20 "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /'
+            }
+            return 1
+        fi
+        
+        # Extract URL from log
         TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1 || true)
         [[ -n "$TUNNEL_URL" ]] && break
-        grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null && {
+        
+        # Check for rate limit
+        if grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null; then
             log "   ⚠️  Cloudflare rate limit (429) - use SSH tunnel fallback"
-            break
-        }
+            log "   Tunnel log excerpt:"
+            tail -10 "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /'
+            return 1
+        fi
+        
+        # Check for other errors
+        if grep -qE 'error|Error|ERROR|failed|Failed' "$TUNNEL_LOG" 2>/dev/null; then
+            local error_line=$(grep -E 'error|Error|ERROR|failed|Failed' "$TUNNEL_LOG" 2>/dev/null | tail -1)
+            [[ -n "$error_line" ]] && log "   ⚠️  Tunnel error: $error_line"
+        fi
+        
         sleep 1
     done
 
     if [[ -n "$TUNNEL_URL" ]]; then
         echo "$TUNNEL_URL" > "${WORKSPACE}/.comfyui_tunnel_url"
         echo "$TUNNEL_URL" > "${WORKSPACE}/COMFYUI_URL.txt"
+        log "   ✅ Tunnel URL obtained: $TUNNEL_URL"
+        
         # Verify tunnel reachability (catches 502 / origin unreachable early)
         log "   🔗 Verifying tunnel reachability..."
-        if curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
-            log "   ✅ Tunnel verified — URL reachable"
+        local http_code=$(curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+        if [[ "$http_code" == "200" ]]; then
+            log "   ✅ Tunnel verified — URL reachable (HTTP 200)"
+        elif [[ "$http_code" == "502" ]]; then
+            log "   ⚠️  Tunnel URL returns 502 — ComfyUI not ready yet"
+            log "   💡 Wait 1-2 min for ComfyUI to finish loading, then refresh the URL"
+        elif [[ "$http_code" == "000" ]]; then
+            log "   ⚠️  Tunnel URL not reachable (connection failed)"
+            log "   💡 Check tunnel log: tail -f ${TUNNEL_LOG}"
         else
-            log "   ⚠️  Tunnel URL not yet reachable (ComfyUI may still be loading). Try again in 30s."
+            log "   ⚠️  Tunnel URL returned HTTP $http_code — may need to wait for ComfyUI"
         fi
         # Helper: run "bash /workspace/restart-cloudflare-tunnel.sh" if URL stops working
         cat > "${WORKSPACE}/restart-cloudflare-tunnel.sh" <<-'RESTART_TUNNEL_EOF'
