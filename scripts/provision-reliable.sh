@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.1                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.2                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -210,7 +210,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.1 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.2 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -3043,16 +3043,24 @@ start_cloudflare_tunnel() {
         rm -f "$TUNNEL_PID_FILE"
     fi
 
-    # Wait for ComfyUI (first start can take 2-5 min)
-    log "   ⏳ Waiting for ComfyUI on port 8188 (up to 5 min)..."
-    for i in $(seq 1 60); do
-        curl -s --connect-timeout 3 "http://localhost:8188/system_stats" >/dev/null 2>&1 && {
+    # Wait for ComfyUI (first start can take 3-8 min with many custom nodes)
+    # Use / (root) — universal in ComfyUI; /system_stats may not exist in some setups
+    local comfy_ready=0
+    log "   ⏳ Waiting for ComfyUI on port 8188 (up to 10 min)..."
+    for i in $(seq 1 120); do
+        if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
             log "   ✅ ComfyUI ready (after $((i * 5))s)"
+            comfy_ready=1
             break
-        }
-        [[ $((i % 6)) -eq 0 ]] && log "   ⏳ Still waiting... ${i}/60"
+        fi
+        [[ $((i % 6)) -eq 0 ]] && log "   ⏳ Still waiting... ${i}/120"
         sleep 5
     done
+    if [[ "$comfy_ready" -eq 0 ]]; then
+        log "   ⚠️  ComfyUI not responding after 10 min — check ${WORKSPACE}/comfyui.log"
+        [[ -f "${WORKSPACE}/comfyui.log" ]] && log "   Last 10 lines:" && tail -10 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
+        log "   🚀 Starting tunnel anyway — URL will work when ComfyUI is up. Run: bash ${WORKSPACE}/restart-cloudflare-tunnel.sh"
+    fi
 
     log "   🚀 Starting Cloudflare Quick Tunnel..."
     setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
@@ -3075,7 +3083,7 @@ start_cloudflare_tunnel() {
         echo "$TUNNEL_URL" > "${WORKSPACE}/COMFYUI_URL.txt"
         # Verify tunnel reachability (catches 502 / origin unreachable early)
         log "   🔗 Verifying tunnel reachability..."
-        if curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/system_stats" >/dev/null 2>&1; then
+        if curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
             log "   ✅ Tunnel verified — URL reachable"
         else
             log "   ⚠️  Tunnel URL not yet reachable (ComfyUI may still be loading). Try again in 30s."
@@ -3092,7 +3100,7 @@ PID_FILE="${WORKSPACE}/cloudflared.pid"
 [[ -f "$PID_FILE" ]] && kill $(cat "$PID_FILE") 2>/dev/null; sleep 2; rm -f "$PID_FILE"
 echo "Waiting for ComfyUI on 8188..."
 for i in $(seq 1 24); do
-  curl -s --connect-timeout 2 http://localhost:8188/system_stats >/dev/null 2>&1 && break
+  curl -s --connect-timeout 3 --max-time 5 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$' && break
   sleep 5
 done
 setsid nohup "$CF" tunnel --url http://localhost:8188 > "$LOG" 2>&1 < /dev/null &

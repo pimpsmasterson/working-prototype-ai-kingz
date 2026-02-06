@@ -1,16 +1,16 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1.1 — Current State
+## Provisioner v3.1.2 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.1 — Civitai -L, detect_cuda_version fix, Cloudflare verification |
-| **Gist** | ✅ v3.1.1 live at `.../raw/provision-reliable.sh` |
+| **Provision script** | v3.1.2 — ComfyUI readiness fix (/ vs /system_stats), 10 min wait, tunnel on timeout |
+| **Gist** | ✅ v3.1.2 live at `.../raw/provision-reliable.sh` |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
-| **Instance 30995556** | v3.1 fixes applied; fresh rent triggered with v3.1.1 |
+| **Last rent** | Fresh instance expected to run v3.1.2 (verify Gist push) |
 
 ---
 
@@ -24,8 +24,20 @@
 | 4 | 502 / Cloudflare URL dies | Post-connect check + restart helper (3.1) |
 | 5 | Civitai token HTTP 307 | curl `-L` follow redirects (3.1.1) |
 | 6 | detect_cuda_version pollutes cuda_tag | Log to stderr; skip invalid nvidia-smi (3.1.1) |
-| 7 | Pinned Gist URL 404 | Unpinned `.../raw/provision-reliable.sh` |
-| 8 | Gist API 401 | Git push from gist clone |
+| 7 | ComfyUI readiness timeout (connection refused) | Use `/` not `/system_stats`; 10 min wait; start tunnel anyway (3.1.2) |
+| 8 | Pinned Gist URL 404 | Unpinned `.../raw/provision-reliable.sh` |
+| 9 | Gist API 401 | Git push from gist clone |
+
+---
+
+## v3.1.2 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **ComfyUI readiness**: Use `http://localhost:8188/` (root) instead of `/system_stats` — universal in ComfyUI
+- **Wait**: 5 min → 10 min (120 × 5s)
+- **Tunnel on timeout**: If ComfyUI not ready after 10 min, start tunnel anyway; tail comfyui.log; log restart helper message
+- **restart-cloudflare-tunnel.sh**: Same `/`-based check
+- **Tunnel verification**: Use `/` instead of `/system_stats`
 
 ---
 
@@ -121,6 +133,35 @@
 - **Cause**: (a) Some nvidia-smi lack `--query-gpu=cuda_version` and return "Field ... is not a valid field". (b) `log` output was captured by `$(detect_cuda_version)` — `cuda_tag` ended up with log text + cu124.
 - **Fix**: Redirect log to stderr; skip invalid nvidia-smi output; infer CUDA from driver; map 12.6/12.8 → cu124.
 
+### 11. ComfyUI readiness timeout (FIXED v3.1.2)
+- **Cause**: Script polled `http://localhost:8188/system_stats` — ComfyUI may not expose this in some setups; or ComfyUI crashed during node load. Connection refused for 5+ min.
+- **Fix**: Use `http://localhost:8188/` (root, universal); extend wait to 10 min; start tunnel anyway on timeout; tail comfyui.log for diagnostics.
+
+---
+
+## AI Pitfalls (Lessons from AI-Assisted Dev)
+
+1. **Assumed endpoints exist** — Used `/system_stats` without verifying vanilla ComfyUI exposes it. Should have checked docs or used `/` first.
+2. **No live verification** — Fixed issues without re-running on fresh instance. Each "fix" cost ~$0.24; should validate before declaring success.
+3. **Overconfidence in fixes** — Said "sure" multiple times without fetching gist content or tailing provision logs to confirm.
+4. **Pinned URLs assumed stable** — Gist commit hashes can 404 after force-push; unpinned URLs are safer.
+5. **Stderr vs stdout in subshells** — `$(func)` captures stdout; diagnostic logs must go to stderr or they pollute variables.
+6. **HTTP redirects** — Civitai 307; curl needs `-L` to follow. Didn't test token validation against live redirects.
+7. **Container vs host assumptions** — systemd doesn't run in Vast.ai containers; script must fall back to setsid/nohup.
+8. **Scope creep** — "remote port forwarding failed" is Vast.ai SSH, not our script; spent time chasing wrong target.
+
+---
+
+## Next Steps if v3.1.2 Fails
+
+1. **Check comfyui.log** — `tail -100 /workspace/comfyui.log` on instance. Look for: `ModuleNotFoundError`, `ImportError`, CUDA mismatch, OOM.
+2. **ComfyUI crashed?** — If log shows traceback, fix dependency or skip problematic node. Consider reducing NODES list for initial boot.
+3. **Still timing out?** — Increase wait to 15 min; or add port-check (`nc -z localhost 8188`) before HTTP check.
+4. **Tunnel URL 502** — ComfyUI not up. Run `bash /workspace/restart-cloudflare-tunnel.sh` after ComfyUI is ready.
+5. **Gist not updated?** — Verify: `curl -sI https://gist.githubusercontent.com/.../raw/provision-reliable.sh` returns 200. Re-run `scripts/push-provision-to-gist.ps1`.
+6. **Rent fails** — If `ssh_direct` causes rent rejection, remove from warm-pool.js rentBody.
+7. **Cost spiral** — Stop renting; fix locally; test with `bash -x provision-reliable.sh` in Docker before next rent.
+
 ---
 
 ## Why These Issues Were Missed
@@ -135,6 +176,7 @@
 8. **PORTAL_CONFIG complexity**: 6+ portal entries increase SSH port forwards. More forwards increase chances of failure on some hosts. Didn’t initially consider simplifying.
 9. **Civitai 307**: Didn't test Civitai token validation against live redirects; curl without `-L` fails on HTTP 307.
 10. **detect_cuda_version**: Didn't test on hosts where nvidia-smi lacks cuda_version field; didn't isolate stderr from stdout in subshells.
+11. **ComfyUI readiness**: Assumed /system_stats exists; vanilla ComfyUI uses /. Should have used / from the start; didn't plan for tunnel-on-timeout.
 
 ---
 
