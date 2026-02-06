@@ -1,16 +1,17 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1.2 — Current State
+## Provisioner v3.1.3 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.2 — ComfyUI readiness fix (/ vs /system_stats), 10 min wait, tunnel on timeout |
-| **Gist** | ✅ v3.1.2 live at `.../raw/provision-reliable.sh` |
+| **Provision script** | v3.1.3 — git clone timeout 180s, exit code fix, Civitai token validation fix |
+| **Gist** | ✅ v3.1.3 live at `.../raw/provision-reliable.sh` |
+| **GitHub** | ✅ v3.1.3 pushed (commit aeba611) |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
-| **Last rent** | Fresh instance expected to run v3.1.2 (verify Gist push) |
+| **Last rent** | Instance 30996277 running v3.1.2 (next will use v3.1.3) |
 
 ---
 
@@ -27,6 +28,18 @@
 | 7 | ComfyUI readiness timeout (connection refused) | Use `/` not `/system_stats`; 10 min wait; start tunnel anyway (3.1.2) |
 | 8 | Pinned Gist URL 404 | Unpinned `.../raw/provision-reliable.sh` |
 | 9 | Gist API 401 | Git push from gist clone |
+| 10 | git clone hangs (rgthree-comfy) | timeout 180s on all git clones; fix exit code check (3.1.3) |
+| 11 | Civitai token validation 200000 | curl || echo 000 concatenated; separate capture (3.1.3) |
+
+---
+
+## v3.1.3 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **git clone timeout**: Add `timeout 180` to all git clone commands (ComfyUI base + custom nodes) — prevents indefinite hangs on slow submodules (e.g. rgthree-comfy)
+- **Exit code fix**: Use `PIPESTATUS[0]` to check actual git clone exit code, not grep's exit code from pipeline
+- **Timeout logging**: Log "Clone timed out (180s)" when timeout occurs before retry
+- **Civitai token validation**: Fix `200000` bug — removed `|| echo 000` from inside `$()`; capture curl output separately, only set `000` if response is empty
 
 ---
 
@@ -137,6 +150,16 @@
 - **Cause**: Script polled `http://localhost:8188/system_stats` — ComfyUI may not expose this in some setups; or ComfyUI crashed during node load. Connection refused for 5+ min.
 - **Fix**: Use `http://localhost:8188/` (root, universal); extend wait to 10 min; start tunnel anyway on timeout; tail comfyui.log for diagnostics.
 
+### 12. git clone hangs indefinitely (FIXED v3.1.3)
+- **Cause**: `git clone --recursive` on slow repos (e.g. rgthree-comfy with submodules) can hang forever; no timeout.
+- **Impact**: Provision script freezes waiting for clone; instance costs money while stuck.
+- **Fix**: Add `timeout 180` to all git clone commands; use `PIPESTATUS[0]` to check actual clone exit code (not grep's).
+
+### 13. Civitai token validation returns 200000 (FIXED v3.1.3)
+- **Cause**: `response=$(curl ... || echo "000")` — when curl returns 200 but exits 63 (max-filesize abort), both `200` and `000` are captured → `200000`.
+- **Impact**: Token validation always fails even when token is valid.
+- **Fix**: Capture curl output separately; only set `000` if response is empty (curl failed entirely).
+
 ---
 
 ## AI Pitfalls (Lessons from AI-Assisted Dev)
@@ -152,7 +175,7 @@
 
 ---
 
-## Next Steps if v3.1.2 Fails
+## Next Steps if v3.1.3 Fails
 
 1. **Check comfyui.log** — `tail -100 /workspace/comfyui.log` on instance. Look for: `ModuleNotFoundError`, `ImportError`, CUDA mismatch, OOM.
 2. **ComfyUI crashed?** — If log shows traceback, fix dependency or skip problematic node. Consider reducing NODES list for initial boot.
