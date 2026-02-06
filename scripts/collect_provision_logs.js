@@ -29,7 +29,7 @@ const config = {
   output: null,
   timeout: 3600,  // 1 hour default
   pollInterval: 30,  // 30 seconds
-  remoteLogPath: '/workspace/provision_core.log'
+  remoteLogPath: '/workspace/provision_v3.log'
 };
 
 for (let i = 0; i < args.length; i += 2) {
