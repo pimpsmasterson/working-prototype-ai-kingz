@@ -204,6 +204,18 @@ After running `provision-core.sh`:
 
 ---
 
+## Krita AI Diffusion Compatibility
+
+The main provision script (`provision-reliable.sh`) includes the custom nodes required by the Krita AI Diffusion plugin:
+
+- `comfyui_controlnet_aux` (ControlNet preprocessors)
+- `comfyui-inpaint-nodes` (Acly inpaint nodes)
+- `comfyui-tooling-nodes` (Acly tooling nodes)
+
+Krita runs locally on your PC and connects to ComfyUI on the rented instance via Cloudflare tunnel URL or SSH tunnel. See [../docs/KRITA_SETUP.md](../docs/KRITA_SETUP.md) for full setup instructions.
+
+---
+
 ## Support
 
 - **GitHub Issues**: Report bugs in the repo

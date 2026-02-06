@@ -295,6 +295,10 @@ NODES=(
     "https://github.com/city96/ComfyUI-GGUF"
     "https://github.com/VykosX/ComfyUI-TripoSR"
     "https://github.com/Lightricks/ComfyUI-LTXVideo"
+    # Krita AI Diffusion plugin required nodes
+    "https://github.com/Fannovel16/comfyui_controlnet_aux"
+    "https://github.com/Acly/comfyui-inpaint-nodes"
+    "https://github.com/Acly/comfyui-tooling-nodes"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
