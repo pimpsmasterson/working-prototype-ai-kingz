@@ -1,21 +1,35 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1 — Full Update
+## Provisioner v3.1.1 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1 — Cloudflare verification, ComfyUI-Copilot, mm_sdxl fix |
-| **Gist URL** | ✅ Use unpinned `.../raw/provision-reliable.sh` |
-| **gistfile1.txt** | ❌ 404 – gist uses `provision-reliable.sh` |
+| **Provision script** | v3.1.1 — Civitai -L, detect_cuda_version fix, Cloudflare verification |
+| **Gist** | ✅ v3.1.1 live at `.../raw/provision-reliable.sh` |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
-| **PORTAL_CONFIG** | ✅ Simplified (ComfyUI + Instance Portal only) |
-| **Cloudflare tunnel** | ✅ Post-connect verification, restart helper, COMFYUI_URL.txt |
+| **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
+| **Instance 30995556** | v3.1 fixes applied; fresh rent triggered with v3.1.1 |
 
 ---
 
-## v3.1 Changelog (Full Enumeration)
+## Failures (All Fixed)
+
+| # | Failure | Fix (v) |
+|---|---------|---------|
+| 1 | retry_failed_downloads log spam | Only log lines with `FAILED:` (3.1) |
+| 2 | mm_sdxl_v10_beta.ckpt 404 | guoyww/animatediff source (3.1) |
+| 3 | ComfyUI-Copilot not installed | AIDC-AI/ComfyUI-Copilot in NODES (3.1) |
+| 4 | 502 / Cloudflare URL dies | Post-connect check + restart helper (3.1) |
+| 5 | Civitai token HTTP 307 | curl `-L` follow redirects (3.1.1) |
+| 6 | detect_cuda_version pollutes cuda_tag | Log to stderr; skip invalid nvidia-smi (3.1.1) |
+| 7 | Pinned Gist URL 404 | Unpinned `.../raw/provision-reliable.sh` |
+| 8 | Gist API 401 | Git push from gist clone |
+
+---
+
+## v3.1 / v3.1.1 Changelog
 
 ### provision-reliable.sh
 1. **Version bump** v3.0 → v3.1
@@ -99,6 +113,14 @@
 - **Uncertainty**: `ssh_direct: true` may not be supported by Vast.ai rent API; docs mention templates.
 - **If rent fails**: Remove `ssh_direct` from rentBody.
 
+### 9. Civitai token HTTP 307 (FIXED v3.1.1)
+- **Cause**: Civitai redirects download URLs with HTTP 307; curl without `-L` returns 307 and fails.
+- **Fix**: Added `-L` to curl in `validate_civitai_token` and Civitai downloads.
+
+### 10. detect_cuda_version pollutes cuda_tag (FIXED v3.1.1)
+- **Cause**: (a) Some nvidia-smi lack `--query-gpu=cuda_version` and return "Field ... is not a valid field". (b) `log` output was captured by `$(detect_cuda_version)` — `cuda_tag` ended up with log text + cu124.
+- **Fix**: Redirect log to stderr; skip invalid nvidia-smi output; infer CUDA from driver; map 12.6/12.8 → cu124.
+
 ---
 
 ## Why These Issues Were Missed
@@ -111,6 +133,8 @@
 6. **"remote port forwarding failed"**: Treated as provisioning failure. It’s Vast.ai’s Instance Portal SSH, not our script. Provisioning completes; logs are just noisy. Should have traced the error source earlier.
 7. **China GPUs**: Geolocation filter only excluded Ukraine; China wasn’t in the original exclusion list. Added after explicit request.
 8. **PORTAL_CONFIG complexity**: 6+ portal entries increase SSH port forwards. More forwards increase chances of failure on some hosts. Didn’t initially consider simplifying.
+9. **Civitai 307**: Didn't test Civitai token validation against live redirects; curl without `-L` fails on HTTP 307.
+10. **detect_cuda_version**: Didn't test on hosts where nvidia-smi lacks cuda_version field; didn't isolate stderr from stdout in subshells.
 
 ---
 
