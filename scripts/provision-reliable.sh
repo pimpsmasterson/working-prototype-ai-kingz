@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.4                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.5                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -213,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.4 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.5 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -2979,10 +2979,155 @@ PY
       log "✅ Workflow outputs normalized (directory: ${COMFYUI_DIR}/user/default/${outputs_subdir})"
     }
 
+# Check and free port 8188 if occupied
+free_port_8188() {
+    log "   🔍 Checking port 8188 availability..."
+    local port_in_use=0
+    local pid_using_port=""
+    
+    # Try ss first (modern, faster)
+    if command -v ss >/dev/null 2>&1; then
+        pid_using_port=$(ss -tlnp 2>/dev/null | grep ":8188 " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | head -1 || true)
+    # Fallback to netstat
+    elif command -v netstat >/dev/null 2>&1; then
+        pid_using_port=$(netstat -tlnp 2>/dev/null | grep ":8188 " | awk '{print $7}' | cut -d/ -f1 | head -1 || true)
+    # Fallback to lsof
+    elif command -v lsof >/dev/null 2>&1; then
+        pid_using_port=$(lsof -ti:8188 2>/dev/null | head -1 || true)
+    fi
+    
+    if [[ -n "$pid_using_port" ]] && kill -0 "$pid_using_port" 2>/dev/null; then
+        local proc_name=$(ps -p "$pid_using_port" -o comm= 2>/dev/null || echo "unknown")
+        log "   ⚠️  Port 8188 is in use by PID $pid_using_port ($proc_name)"
+        log "   🗑️  Killing process to free port..."
+        kill "$pid_using_port" 2>/dev/null || kill -9 "$pid_using_port" 2>/dev/null || true
+        sleep 2
+        # Verify port is free
+        if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 "; then
+            log "   ❌ Port 8188 still in use after kill — may need manual intervention"
+            return 1
+        else
+            log "   ✅ Port 8188 freed"
+        fi
+    else
+        log "   ✅ Port 8188 is available"
+    fi
+    
+    # Also kill any existing ComfyUI process from previous runs
+    if [[ -f "${WORKSPACE}/comfyui.pid" ]]; then
+        local old_pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
+        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+            log "   🗑️  Killing old ComfyUI process (PID: $old_pid)"
+            kill "$old_pid" 2>/dev/null || kill -9 "$old_pid" 2>/dev/null || true
+            sleep 1
+        fi
+        rm -f "${WORKSPACE}/comfyui.pid"
+    fi
+    
+    return 0
+}
+
+# Comprehensive diagnostics when ComfyUI fails to start
+diagnose_comfyui_failure() {
+    log "   🔍 DIAGNOSTICS: Hunting for why ComfyUI isn't working..."
+    
+    # 1. Check if process exists
+    local pid=""
+    [[ -f "${WORKSPACE}/comfyui.pid" ]] && pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        log "      ✓ Process running (PID: $pid)"
+    else
+        log "      ✗ Process NOT running"
+    fi
+    
+    # 2. Check port
+    if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
+       (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
+        log "      ✓ Port 8188 is listening"
+    else
+        log "      ✗ Port 8188 NOT listening"
+    fi
+    
+    # 3. Check comfyui.log for errors
+    if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
+        local log_size=$(stat -c%s "${WORKSPACE}/comfyui.log" 2>/dev/null || echo 0)
+        if [[ $log_size -gt 0 ]]; then
+            log "      📋 comfyui.log exists ($(numfmt --to=iec-i $log_size 2>/dev/null || echo ${log_size} bytes))"
+            log "      Last 50 lines:"
+            tail -50 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/         /'
+            
+            # Pattern matching for common issues
+            if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: Missing Python module"
+                log "      💡 Fix: Install missing dependencies or check custom node requirements.txt"
+                grep -E "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -5 | sed 's/^/         /'
+            fi
+            
+            if grep -qE "CUDA.*error|cuda.*Error|CUDA.*failed|RuntimeError.*CUDA" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: CUDA/GPU error"
+                log "      💡 Fix: Check PyTorch CUDA installation — run: python3 -c 'import torch; print(torch.cuda.is_available())'"
+                grep -E "CUDA.*error|cuda.*Error|CUDA.*failed|RuntimeError.*CUDA" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -3 | sed 's/^/         /'
+            fi
+            
+            if grep -qE "Address already in use|port.*8188|OSError.*98" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: Port conflict"
+                log "      💡 Fix: Port 8188 is in use — should have been freed, but check manually"
+            fi
+            
+            if grep -qE "Permission denied|PermissionError|EACCES" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: Permission denied"
+                log "      💡 Fix: Check file permissions in ${COMFYUI_DIR}"
+            fi
+            
+            if grep -qE "No space left|ENOSPC|disk full" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: Disk full"
+                log "      💡 Fix: Free disk space — check: df -h"
+            fi
+            
+            if grep -qE "SyntaxError|IndentationError" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
+                log "      🔴 ERROR TYPE: Python syntax error"
+                log "      💡 Fix: Check custom node Python files for syntax errors"
+                grep -E "SyntaxError|IndentationError" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -3 | sed 's/^/         /'
+            fi
+        else
+            log "      ⚠️  comfyui.log is empty — process may have crashed before writing"
+        fi
+    else
+        log "      ⚠️  comfyui.log does not exist — process never started or crashed immediately"
+    fi
+    
+    # 4. Check Python/CUDA availability
+    log "      🔍 Checking Python environment..."
+    if "$VENV_PYTHON" -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available())" 2>&1 | sed 's/^/         /'; then
+        log "      ✓ PyTorch check passed"
+    else
+        log "      ✗ PyTorch check failed"
+    fi
+    
+    # 5. Check disk space
+    log "      🔍 Checking disk space..."
+    df -h "${WORKSPACE}" 2>/dev/null | tail -1 | awk '{print "         " $0}'
+    local avail_space=$(df "${WORKSPACE}" 2>/dev/null | tail -1 | awk '{print $4}' || echo "unknown")
+    log "      Available: $avail_space"
+    
+    # 6. Check if ComfyUI directory is valid
+    if [[ -f "${COMFYUI_DIR}/main.py" ]]; then
+        log "      ✓ ComfyUI main.py exists"
+    else
+        log "      ✗ ComfyUI main.py NOT found at ${COMFYUI_DIR}/main.py"
+    fi
+}
+
 start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFYUI_DIR}"
     activate_venv
+    
+    # CRITICAL: Free port 8188 before starting
+    free_port_8188 || {
+        log "   ❌ Failed to free port 8188 — cannot start ComfyUI"
+        return 1
+    }
     
     # Prefer creating a systemd service for reliable supervision
     generate_comfyui_service
@@ -3002,21 +3147,7 @@ start_comfyui() {
         sleep 3
         if ! kill -0 "$comfyui_pid" 2>/dev/null; then
             log "   ❌ ComfyUI process died immediately after start!"
-            log "   📋 Checking comfyui.log for errors..."
-            if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
-                log "   Last 30 lines of comfyui.log:"
-                tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
-                # Check for common errors
-                if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                    log "   🔍 Found: Missing Python module — check custom node requirements"
-                fi
-                if grep -qE "CUDA|cuda|GPU|gpu" "${WORKSPACE}/comfyui.log" 2>/dev/null | grep -qE "error|Error|ERROR|failed|Failed"; then
-                    log "   🔍 Found: CUDA/GPU error — check PyTorch CUDA compatibility"
-                fi
-                if grep -qE "Address already in use|port.*8188" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                    log "   🔍 Found: Port 8188 already in use"
-                fi
-            fi
+            diagnose_comfyui_failure
             return 1
         fi
         
@@ -3137,25 +3268,7 @@ start_cloudflare_tunnel() {
     
     if [[ "$comfy_ready" -eq 0 ]]; then
         log "   ⚠️  ComfyUI not responding after 10 min"
-        log "   📋 Diagnostics:"
-        # Check process
-        if [[ -n "$comfyui_pid" ]] && kill -0 "$comfyui_pid" 2>/dev/null; then
-            log "      ✓ Process running (PID: $comfyui_pid)"
-        else
-            log "      ✗ Process not running"
-        fi
-        # Check port
-        if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
-           (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
-            log "      ✓ Port 8188 is listening"
-        else
-            log "      ✗ Port 8188 not listening"
-        fi
-        # Show log tail
-        [[ -f "${WORKSPACE}/comfyui.log" ]] && {
-            log "   Last 30 lines of comfyui.log:"
-            tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
-        }
+        diagnose_comfyui_failure
         log "   🚀 Starting tunnel anyway — URL will work when ComfyUI is up"
         log "   💡 To restart ComfyUI: cd /workspace/ComfyUI && /venv/main/bin/python3 main.py --listen 0.0.0.0 --port 8188"
     fi
