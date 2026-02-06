@@ -1,17 +1,18 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1.3 — Current State
+## Provisioner v3.1.5 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.3 — git clone timeout 180s, exit code fix, Civitai token validation fix |
-| **Gist** | ✅ v3.1.3 live at `.../raw/provision-reliable.sh` |
-| **GitHub** | ✅ v3.1.3 pushed (commit aeba611) |
+| **Provision script** | v3.1.5 — Port 8188 conflict resolution, comprehensive ComfyUI diagnostics, process monitoring |
+| **Gist** | ✅ v3.1.5 live at `.../raw/provision-reliable.sh` (commit f135ead) |
+| **GitHub** | ✅ v3.1.5 pushed (commit 807496b) |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
-| **Last rent** | Instance 30996277 running v3.1.2 (next will use v3.1.3) |
+| **Last rent** | Instance 30996277 — ComfyUI startup timeout (v3.1.2); v3.1.5 adds diagnostics |
+| **Current issue** | ComfyUI not responding after 10 min wait — v3.1.5 will diagnose root cause |
 
 ---
 
@@ -30,6 +31,32 @@
 | 9 | Gist API 401 | Git push from gist clone |
 | 10 | git clone hangs (rgthree-comfy) | timeout 180s on all git clones; fix exit code check (3.1.3) |
 | 11 | Civitai token validation 200000 | curl || echo 000 concatenated; separate capture (3.1.3) |
+| 12 | ComfyUI startup timeout (no diagnostics) | Process monitoring, port checks, comprehensive error detection (3.1.4) |
+| 13 | Port 8188 conflicts (Address already in use) | free_port_8188() detects/kills processes before start (3.1.5) |
+| 14 | ComfyUI fails silently (no root cause) | diagnose_comfyui_failure() hunts for errors (3.1.5) |
+
+---
+
+## v3.1.5 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **Port 8188 conflict resolution**: `free_port_8188()` function detects processes using port 8188 (via ss/netstat/lsof), kills them, verifies port is free before starting ComfyUI
+- **Comprehensive diagnostics**: `diagnose_comfyui_failure()` function checks: process status, port listening, log analysis (50 lines), error pattern matching (ModuleNotFoundError, CUDA errors, port conflicts, permissions, disk full, syntax errors), Python/CUDA availability, disk space, ComfyUI file existence
+- **Process monitoring**: Verify ComfyUI PID is alive during wait; detect immediate crashes
+- **Port checks**: Use ss/netstat to check if port 8188 is listening (faster than HTTP)
+- **Better error messages**: Distinguish 502 (ComfyUI not ready) vs connection failed vs rate limit
+- **Actionable fixes**: Each error type includes suggested fix
+
+---
+
+## v3.1.4 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **Process monitoring**: Verify ComfyUI PID is alive during wait; detect immediate crashes
+- **Port checks**: Use ss/netstat to check if port 8188 is listening (faster than HTTP)
+- **Error detection**: Detect ModuleNotFoundError, CUDA errors, port conflicts
+- **Cloudflare tunnel diagnostics**: Verify tunnel process is alive; better error messages
+- **Better diagnostics output**: Process status, port status, HTTP response codes with meaning
 
 ---
 
@@ -175,7 +202,22 @@
 
 ---
 
-## Next Steps if v3.1.3 Fails
+## Current Status & Known Issues
+
+### Instance 30996277 (v3.1.2) — ComfyUI Startup Timeout
+- **Status**: Provision completed, all models downloaded, ComfyUI started but not responding after 10+ min
+- **Symptoms**: Port 8188 not listening, process may have crashed
+- **Next**: v3.1.5 will diagnose root cause automatically
+
+### AI Failures (Lessons Learned)
+1. **Assumed ComfyUI would start** — Didn't add process monitoring or diagnostics initially
+2. **No port conflict handling** — Assumed port 8188 was always free
+3. **Silent failures** — Waited 10 min without checking why ComfyUI wasn't responding
+4. **Minimal error output** — Only showed last 10 lines of log, no pattern matching
+
+---
+
+## Next Steps if v3.1.5 Fails
 
 1. **Check comfyui.log** — `tail -100 /workspace/comfyui.log` on instance. Look for: `ModuleNotFoundError`, `ImportError`, CUDA mismatch, OOM.
 2. **ComfyUI crashed?** — If log shows traceback, fix dependency or skip problematic node. Consider reducing NODES list for initial boot.
