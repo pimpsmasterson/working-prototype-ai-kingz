@@ -27,6 +27,11 @@
 7. **restart-cloudflare-tunnel.sh** — Write helper script at `/workspace/restart-cloudflare-tunnel.sh` for 502/recovery
 8. **Log message** — Add "If URL stops working (502/restart): bash /workspace/restart-cloudflare-tunnel.sh"
 
+### Instance 30995556 findings (v3.1.1 fixes)
+9. **Civitai token HTTP 307**: Civitai redirects download URLs; curl without `-L` returns 307. Added `-L` to follow redirects.
+10. **detect_cuda_version bug**: (a) Some nvidia-smi lack `--query-gpu=cuda_version` and return "Field ... is not a valid field"; skip to driver inference. (b) `log` output was captured by `$(detect_cuda_version)` — `cuda_tag` contained log text + cu124. Redirect log to stderr in detect_cuda_version.
+11. **CUDA 12.6/12.8**: Map to cu124 (PyTorch cu124 works with 12.4+).
+
 ### push-provision-to-gist.js
 - Gist description: `AI Kings ComfyUI reliable provisioner v3.1 — Cloudflare tunnel + ComfyUI-Copilot + mm_sdxl fix`
 

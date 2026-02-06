@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1                            ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.1                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -182,7 +182,8 @@ validate_civitai_token() {
     local test_file="/tmp/civitai_token_test.tmp"
 
     # Download first 1MB to test auth (abort after to save bandwidth)
-    local response=$(curl -s -w "%{http_code}" -o "$test_file" \
+    # -L: follow redirects (Civitai returns 307 redirects; following yields 200)
+    local response=$(curl -sL -w "%{http_code}" -o "$test_file" \
         --max-filesize 1048576 \
         --max-time 30 \
         "$test_url" 2>/dev/null || echo "000")
@@ -209,7 +210,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.1 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -475,23 +476,26 @@ activate_venv() {
 
 detect_cuda_version() {
   # Return a short CUDA tag like cu124, cu121, cu118, cu111 or "cpu"
+  # NOTE: Only echo the result to stdout — log to stderr so $(detect_cuda_version) captures only the tag
   if command -v nvidia-smi >/dev/null 2>&1; then
-    # Try to read reported CUDA version from nvidia-smi
+    # Try to read reported CUDA version (some nvidia-smi lack --query-gpu=cuda_version)
     local cuda_raw
     cuda_raw=$(nvidia-smi --query-gpu=cuda_version --format=csv,noheader,nounits 2>/dev/null | head -n1 | tr -d '\r') || true
-    if [[ -n "$cuda_raw" ]]; then
-      log "   🔎 Detected CUDA reported by nvidia-smi: $cuda_raw"
+    # Skip if empty or nvidia-smi error (e.g. "Field cuda_version is not a valid field")
+    if [[ -n "$cuda_raw" && "$cuda_raw" != *"not a valid"* && "$cuda_raw" != *"Field"* ]]; then
+      log "   🔎 Detected CUDA: $cuda_raw" 1>&2
       case "$cuda_raw" in
-        12.4*|12.4) echo "cu124"; return 0 ;;
+        12.8*|12.6*|12.4*|12.4) echo "cu124"; return 0 ;;
         12.1*|12.1) echo "cu121"; return 0 ;;
         11.8*|11.8) echo "cu118"; return 0 ;;
         11.1*|11.1) echo "cu111"; return 0 ;;
       esac
     fi
-    # If nvidia-smi didn't report cuda_version, infer from driver version
+    # Infer from driver version (driver_version works on all nvidia-smi)
     local driver
     driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -n1 | cut -d. -f1 || true)
     if [[ -n "$driver" ]]; then
+      log "   🔎 Inferred CUDA from driver $driver" 1>&2
       if (( driver >= 535 )); then
         echo "cu124"; return 0
       elif (( driver >= 525 )); then
@@ -501,8 +505,7 @@ detect_cuda_version() {
       fi
     fi
   fi
-  # Fallback: no GPU detected, return cpu tag
-  log "   ⚠️  No NVIDIA GPU detected or no cuda reported; falling back to CPU-compatible wheel (cpu)"
+  log "   ⚠️  No NVIDIA GPU detected; falling back to CPU wheel" 1>&2
   echo "cpu"
 }
 
