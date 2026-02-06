@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.5                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.6                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -213,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.5 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.6 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -3135,6 +3135,7 @@ start_comfyui() {
     systemctl enable --now comfyui.service || {
         log "   ⚠️  systemd service failed to start; falling back to background start"
         # Start detached so cleanup/traps won't kill the process
+        # Start ComfyUI in background and capture PID immediately
         setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
         local comfyui_pid=$!
         echo "$comfyui_pid" > "${WORKSPACE}/comfyui.pid"
@@ -3145,8 +3146,27 @@ start_comfyui() {
         
         # Verify process is actually running (wait 3s for startup)
         sleep 3
+        
+        # Double-check PID is correct (sometimes $! can be wrong with setsid)
         if ! kill -0 "$comfyui_pid" 2>/dev/null; then
-            log "   ❌ ComfyUI process died immediately after start!"
+            log "   ⚠️  PID $comfyui_pid not found — checking for actual ComfyUI process..."
+            # Find actual Python process running main.py
+            local actual_pid=$(ps aux | grep -E "[p]ython.*main\.py.*8188" | awk '{print $2}' | head -1 || true)
+            if [[ -n "$actual_pid" ]] && kill -0 "$actual_pid" 2>/dev/null; then
+                log "   ✅ Found ComfyUI process at PID $actual_pid (updating PID file)"
+                echo "$actual_pid" > "${WORKSPACE}/comfyui.pid"
+                comfyui_pid="$actual_pid"
+            else
+                log "   ❌ ComfyUI process died immediately after start!"
+                diagnose_comfyui_failure
+                return 1
+            fi
+        fi
+        
+        # Verify process is actually ComfyUI (not a zombie or wrong process)
+        local proc_cmd=$(ps -p "$comfyui_pid" -o cmd= 2>/dev/null || echo "")
+        if [[ "$proc_cmd" != *"main.py"* ]] && [[ "$proc_cmd" != *"python"* ]]; then
+            log "   ⚠️  PID $comfyui_pid doesn't appear to be ComfyUI (cmd: $proc_cmd)"
             diagnose_comfyui_failure
             return 1
         fi
@@ -3253,14 +3273,36 @@ start_cloudflare_tunnel() {
             fi
         fi
         
-        # Progress updates every 30s (6 iterations)
+        # Progress updates every 30s (6 iterations) with real-time diagnostics
         [[ $((i % 6)) -eq 0 ]] && {
             log "   ⏳ Still waiting... ${i}/120 ($((i * 5))s elapsed)"
             # Show process status
             if [[ -n "$comfyui_pid" ]] && kill -0 "$comfyui_pid" 2>/dev/null; then
+                local proc_cmd=$(ps -p "$comfyui_pid" -o cmd= 2>/dev/null | head -1 || echo "")
                 log "      ✓ Process alive (PID: $comfyui_pid)"
+                [[ -n "$proc_cmd" ]] && log "         Command: ${proc_cmd:0:80}..."
             else
-                log "      ✗ Process not found — check comfyui.log"
+                log "      ✗ Process NOT running (PID: ${comfyui_pid:-none})"
+                # Try to find actual ComfyUI process
+                local actual_pid=$(ps aux | grep -E "[p]ython.*main\.py.*8188" | awk '{print $2}' | head -1 || true)
+                if [[ -n "$actual_pid" ]]; then
+                    log "      ⚠️  Found different ComfyUI process at PID $actual_pid — updating PID file"
+                    echo "$actual_pid" > "${WORKSPACE}/comfyui.pid"
+                    comfyui_pid="$actual_pid"
+                else
+                    log "      ❌ No ComfyUI process found — checking log for crash..."
+                    [[ -f "${WORKSPACE}/comfyui.log" ]] && {
+                        log "      Last 10 lines of comfyui.log:"
+                        tail -10 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/         /'
+                    }
+                fi
+            fi
+            # Check port status
+            if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
+               (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
+                log "      ✓ Port 8188 is listening"
+            else
+                log "      ✗ Port 8188 NOT listening"
             fi
         }
         sleep 5
