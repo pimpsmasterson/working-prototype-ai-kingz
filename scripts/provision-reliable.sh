@@ -1,6 +1,6 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.2                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.3                          ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
@@ -183,10 +183,13 @@ validate_civitai_token() {
 
     # Download first 1MB to test auth (abort after to save bandwidth)
     # -L: follow redirects (Civitai returns 307 redirects; following yields 200)
-    local response=$(curl -sL -w "%{http_code}" -o "$test_file" \
+    # Do NOT use || echo 000 inside $() — curl can exit 63 (max-filesize) after writing 200, producing "200000"
+    local response
+    response=$(curl -sL -w "%{http_code}" -o "$test_file" \
         --max-filesize 1048576 \
         --max-time 30 \
-        "$test_url" 2>/dev/null || echo "000")
+        "$test_url" 2>/dev/null)
+    [[ -z "$response" ]] && response="000"  # curl failed entirely (network error, etc)
 
     # Clean up test file
     rm -f "$test_file"
@@ -210,7 +213,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.2 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.1.3 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -659,7 +662,10 @@ install_apt_packages() {
 install_comfyui() {
     log_section "🖥️  INSTALLING COMFYUI"
     if [[ ! -d "${COMFYUI_DIR}" ]]; then
-        git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}"
+        timeout 180 git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}" || {
+            log "❌ ComfyUI clone failed or timed out"
+            return 1
+        }
     fi
     
     cd "${COMFYUI_DIR}"
@@ -700,13 +706,19 @@ install_nodes() {
             log "   📥 Cloning $dir..."
 
             # Retry git clone up to 3 times with SSH fix between attempts
+            # Use timeout 180s to prevent indefinite hangs (slow submodules, network stalls)
             local clone_success=false
             for attempt in {1..3}; do
                 fix_ssh_permissions  # Fix SSH before each attempt
 
-                if git clone --depth 1 "$repo" "$path" --recursive 2>&1 | grep -v "Authentication refused"; then
+                timeout 180 git clone --depth 1 "$repo" "$path" --recursive 2>&1 | grep -v "Authentication refused" || true
+                local clone_exit=${PIPESTATUS[0]}
+                if [[ $clone_exit -eq 0 ]]; then
                     clone_success=true
                     break
+                fi
+                if [[ $clone_exit -eq 124 ]]; then
+                    log "   ⚠️  Clone timed out (180s) for $dir"
                 fi
 
                 log "   ⚠️  Clone attempt $attempt/3 failed for $dir, retrying..."
