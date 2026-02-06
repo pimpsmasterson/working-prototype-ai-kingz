@@ -1,18 +1,20 @@
 # Current Status Report - 2026-02-06
 
-## Provisioner v3.1.6 — Current State
+## Provisioner v3.1.7 — Current State
 
 ### Status Summary
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.6 — Real-time ComfyUI process monitoring, PID verification, enhanced diagnostics |
-| **Gist** | ✅ v3.1.6 live at `.../raw/provision-reliable.sh` (unpinned URL) |
-| **GitHub** | ✅ v3.1.6 pushed |
+| **Provision script** | v3.1.7 — SQLAlchemy 2.0+ fix, real-time ComfyUI process monitoring, PID verification, enhanced diagnostics |
+| **Gist** | ✅ v3.1.7 live at `.../raw/provision-reliable.sh` (unpinned URL) |
+| **GitHub** | ✅ v3.1.7 pushed |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
-| **Last rent** | Instance 30996277 — ComfyUI startup timeout (v3.1.2); v3.1.6 adds real-time monitoring |
-| **Current issue** | Ready for new instance rental with v3.1.6 |
+| **Last rent** | Instance 31010493 — SQLAlchemy ImportError (v3.1.6); v3.1.7 fixes dependency |
+| **Current issue** | Ready for new instance rental with v3.1.7 |
+| **Network requirement** | 2000 Mbps (2 Gbps) minimum |
+| **Disk requirement** | 200 GB minimum |
 
 ---
 
@@ -34,6 +36,32 @@
 | 12 | ComfyUI startup timeout (no diagnostics) | Process monitoring, port checks, comprehensive error detection (3.1.4) |
 | 13 | Port 8188 conflicts (Address already in use) | free_port_8188() detects/kills processes before start (3.1.5) |
 | 14 | ComfyUI fails silently (no root cause) | diagnose_comfyui_failure() hunts for errors (3.1.5) |
+| 15 | SQLAlchemy ImportError (mapped_column) | Added sqlalchemy>=2.0.0 to dependencies + pre-start upgrade check (3.1.7) |
+| 16 | Security warning (malicious script execution) | URL whitelist validation, security audit logging (3.1.7) |
+
+---
+
+## v3.1.7 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **SQLAlchemy 2.0+ requirement**: Added `sqlalchemy>=2.0.0` to essential dependencies to fix ComfyUI ImportError (`cannot import name 'mapped_column' from 'sqlalchemy.orm'`)
+- **Pre-start SQLAlchemy upgrade**: Added upgrade check in `start_comfyui()` to ensure SQLAlchemy 2.0+ before ComfyUI starts
+- **Problem identification**: Error logs showed `ImportError: cannot import name 'mapped_column'` - ComfyUI requires SQLAlchemy 2.0+ but system had 1.x
+- **Fix**: Install SQLAlchemy 2.0+ in `install_essential_deps()` and verify/upgrade before ComfyUI startup
+
+### server/warm-pool.js
+- **Security improvements**: Added URL whitelist validation for provision scripts to prevent malicious code execution
+- **Security audit logging**: Log security rejections and script selections for monitoring
+- **Whitelist patterns**: Only allow scripts from trusted Gist/GitHub URLs; reject all others
+
+---
+
+## v3.1.6 Changelog (2026-02-06)
+
+### provision-reliable.sh
+- **Real-time process monitoring**: Enhanced PID verification during ComfyUI wait loop, auto-update PID if different process found
+- **Periodic diagnostics**: Every 30s during wait: process alive check, command line verification, port status, log tail
+- **Better error detection**: Distinguish between process died vs wrong PID tracked vs port not listening
 
 ---
 
@@ -204,10 +232,12 @@
 
 ## Current Status & Known Issues
 
-### Instance 30996277 (v3.1.2) — ComfyUI Startup Timeout
-- **Status**: Provision completed, all models downloaded, ComfyUI started but not responding after 10+ min
-- **Symptoms**: Port 8188 not listening, process may have crashed
-- **Next**: v3.1.6 will diagnose root cause automatically with real-time process monitoring
+### Instance 31010493 (v3.1.6) — SQLAlchemy ImportError
+- **Status**: Provision completed, all models downloaded, ComfyUI crashed on startup
+- **Symptoms**: `ImportError: cannot import name 'mapped_column' from 'sqlalchemy.orm'`; 502 Bad Gateway from tunnel
+- **Root cause**: SQLAlchemy 1.x installed (ComfyUI requires 2.0+)
+- **Fix**: v3.1.7 adds `sqlalchemy>=2.0.0` to dependencies and pre-start upgrade check
+- **Identification**: Error logs clearly showed ImportError; `diagnose_comfyui_failure()` detected missing module
 
 ### AI Failures (Lessons Learned)
 1. **Assumed ComfyUI would start** — Didn't add process monitoring or diagnostics initially
@@ -217,7 +247,7 @@
 
 ---
 
-## Next Steps if v3.1.6 Fails
+## Next Steps if v3.1.7 Fails
 
 1. **Check comfyui.log** — `tail -100 /workspace/comfyui.log` on instance. Look for: `ModuleNotFoundError`, `ImportError`, CUDA mismatch, OOM.
 2. **ComfyUI crashed?** — If log shows traceback, fix dependency or skip problematic node. Consider reducing NODES list for initial boot.
