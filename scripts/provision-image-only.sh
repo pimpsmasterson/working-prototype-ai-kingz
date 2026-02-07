@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.4"
+VERSION="v5.5"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -680,6 +680,17 @@ start_comfyui() {
     cd "${COMFYUI_DIR}"
     activate_venv
     
+    # Kill any existing ComfyUI process first
+    if [[ -f "${WORKSPACE}/comfyui.pid" ]]; then
+        local old_pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null)
+        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+            log "   🔄 Stopping existing ComfyUI (PID: $old_pid)"
+            kill "$old_pid" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "${WORKSPACE}/comfyui.pid"
+    fi
+    
     # Create systemd service
     cat > /etc/systemd/system/comfyui.service <<EOF
 [Unit]
@@ -699,21 +710,44 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 EOF
     
+    local comfy_started=false
     if command -v systemctl >/dev/null 2>&1 && systemctl status >/dev/null 2>&1; then
         log "   🔧 Using systemd for ComfyUI"
         systemctl daemon-reload 2>/dev/null || true
-        systemctl enable --now comfyui.service 2>/dev/null || {
+        systemctl enable --now comfyui.service 2>/dev/null && comfy_started=true || {
             log "   ⚠️  systemd failed, using background process fallback"
-            setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
-            echo "$!" > "${WORKSPACE}/comfyui.pid"
         }
-    else
-        log "   ⚠️  systemd not available, starting ComfyUI in background"
-        setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
-        echo "$!" > "${WORKSPACE}/comfyui.pid"
     fi
     
-    log "✅ ComfyUI starting on port 8188"
+    if [[ "$comfy_started" != "true" ]]; then
+        log "   🔧 Starting ComfyUI in background..."
+        setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
+        echo "$!" > "${WORKSPACE}/comfyui.pid"
+        log "   📝 ComfyUI PID: $(cat ${WORKSPACE}/comfyui.pid)"
+    fi
+    
+    # WAIT for ComfyUI to actually start (up to 2 minutes)
+    log "   ⏳ Waiting for ComfyUI to start (up to 2 min)..."
+    local ready=false
+    for i in {1..24}; do
+        if curl -s --connect-timeout 3 "http://localhost:8188/system_stats" >/dev/null 2>&1; then
+            ready=true
+            log "   ✅ ComfyUI is running on port 8188!"
+            break
+        fi
+        sleep 5
+    done
+    
+    if [[ "$ready" != "true" ]]; then
+        log "   ❌ ComfyUI failed to start after 2 minutes!"
+        log "   📋 Last 30 lines of comfyui.log:"
+        tail -n 30 "${WORKSPACE}/comfyui.log" 2>/dev/null | tee -a "$LOG_FILE" || log "   (no log file found)"
+        log "   📋 Checking if process is running..."
+        ps aux | grep -E 'python.*main.py' | grep -v grep | tee -a "$LOG_FILE" || log "   (no matching process)"
+        return 1
+    fi
+    
+    log "✅ ComfyUI started successfully"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -976,4 +1010,3 @@ main() {
 
 # Run
 main "$@"
-main
