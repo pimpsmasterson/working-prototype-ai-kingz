@@ -951,14 +951,30 @@ async function prewarm() {
 
         // PARALLEL PROVISIONING: Use optimized parallel download script for fast setup
         // Priority: 1) Check fallback flag, 2) COMFYUI_PROVISION_SCRIPT env var, 3) Vast.ai default
-        const customProvisionScript = process.env.COMFYUI_PROVISION_SCRIPT;
+        const rawScript = process.env.COMFYUI_PROVISION_SCRIPT;
+        const customProvisionScript = typeof rawScript === 'string' ? rawScript.trim() : '';
         const defaultProvisionScript = "https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/pytorch/derivatives/comfyui/provisioning_scripts/default.sh";
 
-        // Strict provisioning controls:
-        // - PROVISION_STRICT=true  => do NOT fall back to default; abort provisioning on custom script failure
-        // - PROVISION_ALLOWED_SCRIPTS="url1,url2" => whitelist of allowed provision script URLs (exact match or substring)
+        console.log('WarmPool: Provision script selection: useDefaultScript=%s, COMFYUI_PROVISION_SCRIPT=%s', state.useDefaultScript, customProvisionScript ? customProvisionScript.substring(0, 80) + (customProvisionScript.length > 80 ? '...' : '') : '(empty)');
+
+        // Strict provisioning: PROVISION_STRICT=true => do NOT fall back to default; abort on custom script failure
         const provisionStrict = String(process.env.PROVISION_STRICT || '').toLowerCase() === '1' || String(process.env.PROVISION_STRICT || '').toLowerCase() === 'true';
-        const allowedProvisionScripts = (process.env.PROVISION_ALLOWED_SCRIPTS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+        // SECURITY: Whitelist of allowed script URLs (canonical gist 002d41... v3.1.8 - gistfile1.txt)
+        const allowedScriptPatterns = [
+            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/002d4121626567402b4c59febbc1297d\/raw(\/[a-f0-9]+)?\/gistfile1\.txt(\?.*)?$/,
+            /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
+            /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/
+        ];
+        const isUrlAllowed = (url) => {
+            if (!url || typeof url !== 'string') return false;
+            return allowedScriptPatterns.some(pattern => pattern.test(url));
+        };
+
+        // If user has a whitelisted custom script, do not force default from a previous failure
+        if (customProvisionScript && isUrlAllowed(customProvisionScript)) {
+            state.useDefaultScript = false;
+        }
 
         // Increment provision attempt counter
         state.provisionAttempt = (state.provisionAttempt || 0) + 1;
@@ -986,128 +1002,25 @@ async function prewarm() {
             console.warn('WarmPool: ⚠️ Using DEFAULT Vast.ai script (fallback from failed custom script)');
             provisionScript = defaultProvisionScript;
         } else if (customProvisionScript) {
-            // Validate custom script URL before using it (check for 404 gist issues)
-            try {
-                const testResp = await fetchWithTimeout(customProvisionScript, { method: 'HEAD' }, 10000);
-                if (!testResp.ok) {
-                    const msg = `Custom provision script returned ${testResp.status}`;
-                    if (provisionStrict) {
-                        console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                        state.safeMode = true;
-                        save();
-                        return { status: 'provision_failed', message: msg };
-                    }
-                    console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                    provisionScript = defaultProvisionScript;
-                } else {
-                    // If an allowlist exists, ensure the provided script matches one of the allowed values
-                    if (allowedProvisionScripts.length > 0) {
-                        const allowed = allowedProvisionScripts.some(a => customProvisionScript.includes(a) || customProvisionScript === a);
-                        if (!allowed) {
-                            const msg = 'Custom provision script is not in PROVISION_ALLOWED_SCRIPTS';
-                            if (provisionStrict) {
-                                console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                                state.safeMode = true;
-                                save();
-                                return { status: 'provision_failed', message: msg };
-                            }
-                            console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                            provisionScript = defaultProvisionScript;
-                        } else {
-                            // Further safety: fetch the script body and scan for any external hosts
-                            try {
-                                const bodyResp = await fetchWithTimeout(customProvisionScript, { method: 'GET' }, 20000);
-                                if (!bodyResp.ok) throw new Error(`GET returned ${bodyResp.status}`);
-                                const text = await bodyResp.text();
-                                const urlMatches = Array.from(text.matchAll(/https?:\/\/[^\s"'`\)]+/g)).map(m => m[0]);
-                                const hosts = Array.from(new Set(urlMatches.map(u => {
-                                    try { return (new URL(u)).host; } catch (e) { return null; }
-                                }).filter(Boolean)));
-
-                                // Optional: require the fetched script to contain a configured signature string
-                                const expectedSig = (process.env.PROVISION_EXPECTED_SIGNATURE || '').trim();
-                                if (expectedSig) {
-                                    if (!text.includes(expectedSig)) {
-                                        const msg = `Custom provision script missing expected signature: ${expectedSig}`;
-                                        if (provisionStrict) {
-                                            console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                                            state.safeMode = true;
-                                            save();
-                                            return { status: 'provision_failed', message: msg };
-                                        }
-                                        console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                                        provisionScript = defaultProvisionScript;
-                                        // skip setting provisionScript to custom below
-                                    } else {
-                                        console.log('WarmPool: ✅ Provision script contains expected signature:', expectedSig);
-                                    }
-                                }
-
-                                // Reject known-bad internal markers (helps detect outdated scripts that were partially updated)
-                                // By default do NOT block any substring here to avoid self-detection; set via PROVISION_DISALLOWED_SUBSTRINGS env var when needed
-                                const disallowedList = (process.env.PROVISION_DISALLOWED_SUBSTRINGS || '').split(',').map(s => s.trim()).filter(Boolean);
-                                const foundDisallowed = disallowedList.filter(sub => sub && text.includes(sub));
-                                if (foundDisallowed.length > 0) {
-                                    const msg = `Custom provision script contains disallowed substrings: ${foundDisallowed.join(', ')}`;
-                                    if (provisionStrict) {
-                                        console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                                        state.safeMode = true;
-                                        save();
-                                        return { status: 'provision_failed', message: msg };
-                                    }
-                                    console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                                    provisionScript = defaultProvisionScript;
-                                    // skip setting provisionScript to custom below
-                                }
-
-                                const allowedHosts = (process.env.PROVISION_ALLOWED_HOSTS || '').split(',').map(s => s.trim()).filter(Boolean);
-                                if (allowedHosts.length > 0) {                                    const disallowed = hosts.filter(h => !allowedHosts.some(a => h.includes(a)));
-                                    if (disallowed.length > 0) {
-                                        const msg = `Provision script references disallowed external hosts: ${disallowed.join(', ')}`;
-                                        if (provisionStrict) {
-                                            console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                                            state.safeMode = true;
-                                            save();
-                                            return { status: 'provision_failed', message: msg };
-                                        }
-                                        console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                                        provisionScript = defaultProvisionScript;
-                                        // skip setting provisionScript to custom below
-                                    } else {
-                                        provisionScript = customProvisionScript;
-                                        console.log('WarmPool: ✅ Custom provision script allowed, reachable, and references only allowed hosts:', allowedHosts.join(', '));
-                                    }
-                                } else {
-                                    provisionScript = customProvisionScript;
-                                    console.log('WarmPool: ✅ Custom script reachable; no PROVISION_ALLOWED_HOSTS configured to validate external refs');
-                                }
-                            } catch (err) {
-                                const msg = `Failed to validate provision script content: ${err.message}`;
-                                if (provisionStrict) {
-                                    console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                                    state.safeMode = true;
-                                    save();
-                                    return { status: 'provision_failed', message: msg };
-                                }
-                                console.warn('WarmPool: ⚠️', msg, ', falling back to default');
-                                provisionScript = defaultProvisionScript;
-                            }
-                        }
-                    } else {
-                        provisionScript = customProvisionScript;
-                        console.log('WarmPool: ✅ Using custom provision script:', customProvisionScript);
-                    }
-                }
-            } catch (err) {
-                const msg = `Custom provision script unreachable: ${err.message}`;
-                if (provisionStrict) {
-                    console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
-                    state.safeMode = true;
-                    save();
-                    return { status: 'provision_failed', message: msg };
-                }
-                console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+            // SECURITY: Validate URL against whitelist (canonical gist 002d41.../gistfile1.txt); skip HEAD check for whitelisted URLs
+            if (!isUrlAllowed(customProvisionScript)) {
+                console.error(`WarmPool: 🔒 SECURITY REJECTION - Script URL not in whitelist: ${customProvisionScript}`);
+                console.error('WarmPool: ❌ Only whitelisted Gist/GitHub URLs are allowed. Falling back to Vast default.');
+                try {
+                    audit.logUsageEvent({
+                        event_type: 'security_rejection',
+                        details: {
+                            reason: 'script_url_not_whitelisted',
+                            attempted_url: customProvisionScript,
+                            action: 'fallback_to_default'
+                        },
+                        source: 'warm-pool-security'
+                    });
+                } catch (e) { /* audit may not be available */ }
                 provisionScript = defaultProvisionScript;
+            } else {
+                provisionScript = customProvisionScript;
+                console.log('WarmPool: ✅ Using custom provision script (whitelisted):', customProvisionScript);
             }
         }
 

@@ -6,6 +6,9 @@ node_modules
 .proxy-tokens.json
 coverage/
 data/backup_*
+data/warm_pool.db
+data/warm_pool.db-shm
+data/warm_pool.db-wal
 *.log
 .DS_Store
 # Dropbox-generated link list (may contain private paths/filenames)

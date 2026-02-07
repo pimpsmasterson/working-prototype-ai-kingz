@@ -2,6 +2,10 @@ const path = require('path');
 // Load .env from project root (explicit path - cwd may vary when PM2 loads this)
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
+// Canonical provision script: gist 002d41... (v3.1.8, gistfile1.txt) - used when .env has no COMFYUI_PROVISION_SCRIPT
+const PROVISION_SCRIPT = process.env.COMFYUI_PROVISION_SCRIPT ||
+  'https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw/gistfile1.txt';
+
 module.exports = {
   apps: [{
     name: 'vastai-proxy',
@@ -15,7 +19,7 @@ module.exports = {
       CIVITAI_TOKEN: process.env.CIVITAI_TOKEN,
       AUDIT_SALT: process.env.AUDIT_SALT,
       SCRIPTS_BASE_URL: process.env.SCRIPTS_BASE_URL,
-      COMFYUI_PROVISION_SCRIPT: process.env.COMFYUI_PROVISION_SCRIPT,
+      COMFYUI_PROVISION_SCRIPT: PROVISION_SCRIPT,
       PORT: process.env.PORT || '3000',
       WARM_POOL_SAFE_MODE: process.env.WARM_POOL_SAFE_MODE || '0',
       WARM_POOL_IDLE_MINUTES: process.env.WARM_POOL_IDLE_MINUTES || '15',

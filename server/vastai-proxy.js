@@ -2,8 +2,9 @@
 // Lightweight Express proxy for Vast.ai and ComfyUI to avoid browser CORS issues
 // Usage: VASTAI_API_KEY=<key> node server/vastai-proxy.js
 
-// Load environment variables from .env file
-require('dotenv').config();
+// Load environment variables from .env file (explicit path so cwd does not matter)
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // Global error handlers to prevent silent crashes
 process.on('unhandledRejection', (reason, promise) => {
@@ -30,9 +31,6 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
-const path = require('path');
-// Load environment variables from .env in development
-try { require('dotenv').config(); } catch (e) { /* no dotenv available */ }
 const fs = require('fs');
 const pm2 = require('pm2');
 const tokenManager = require('../lib/token-manager');

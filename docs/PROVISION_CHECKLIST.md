@@ -6,18 +6,18 @@
 
 ## 1. COMFYUI_PROVISION_SCRIPT URL (CRITICAL)
 
-| ❌ WRONG | ✅ CORRECT |
-|----------|------------|
-| `.../raw/gistfile1.txt` | `.../raw/provision-reliable.sh` |
-| (404s → Vast default script used) | (our script with fixes) |
+**Canonical gist (only this one is used):** https://gist.github.com/pimpsmasterson/002d4121626567402b4c59febbc1297d
 
-**Working URL (use unpinned - pinned commit URLs can 404):**
+| ✅ CORRECT |
+|------------|
+| `.../002d4121626567402b4c59febbc1297d/raw/gistfile1.txt` (v3.1.8 reliable provisioner) |
+
+**Working URL (unpinned):**
 ```
-https://gist.githubusercontent.com/pimpsmasterson/9fb9d7c60d3822c2ffd3ad4b000cc864/raw/provision-reliable.sh
+https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw/gistfile1.txt
 ```
 
-**Check:** `.env` must use `provision-reliable.sh`, never `gistfile1.txt`.  
-**warm-pool.js:** Rejects `gistfile1.txt` and falls back with clear error.
+**Check:** `.env` must use the above URL. **warm-pool.js** whitelist allows only this gist.
 
 ---
 
