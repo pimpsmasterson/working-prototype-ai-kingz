@@ -6,10 +6,10 @@
 
 | Item | Status |
 |------|--------|
-| **Provision script** | v3.1.8 — Canonical gist **002d4121626567402b4c59febbc1297d** (file: `gistfile1.txt`) |
-| **Gist** | ✅ Single canonical: `https://gist.github.com/pimpsmasterson/002d4121626567402b4c59febbc1297d` → raw `.../raw/gistfile1.txt` |
+| **Provision script** | v5.2 — Canonical gist **3a4b637b117355b429a29e80acc72a1d** (file: `gistfile1.txt`) |
+| **Gist** | ✅ Single canonical: `https://gist.github.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d` → raw `.../raw/gistfile1.txt` |
 | **One-click rent** | ✅ `one-click-rent.ps1` — restart server, reset state, prewarm; single entry point |
-| **Whitelist** | Only gist 002d41... allowed; old gists (9fb9d7c60, c3f61f20) removed |
+| **Whitelist** | Only gist 3a4b637b... allowed; old gists removed |
 | **China/Ukraine GPUs** | ✅ Excluded in warm-pool filter |
 | **Cloudflare tunnel** | ✅ Post-connect verification, restart-cloudflare-tunnel.sh helper |
 | **Current issue** | Ready for new rental; server uses .env → canonical gist |

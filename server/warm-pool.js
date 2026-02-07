@@ -960,11 +960,11 @@ async function prewarm() {
         // Strict provisioning: PROVISION_STRICT=true => do NOT fall back to default; abort on custom script failure
         const provisionStrict = String(process.env.PROVISION_STRICT || '').toLowerCase() === '1' || String(process.env.PROVISION_STRICT || '').toLowerCase() === 'true';
 
-        // SECURITY: Whitelist of allowed script URLs (canonical gist 002d41... v3.1.8 - gistfile1.txt)
+        // SECURITY: Whitelist of allowed script URLs (canonical gists for image provision)
         const allowedScriptPatterns = [
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-reliable\.sh(\?.*)?$/,
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-image-only\.sh(\?.*)?$/,
-            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/002d4121626567402b4c59febbc1297d\/raw(\/[a-f0-9]+)?\/gistfile1\.txt(\?.*)?$/,
+            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/gistfile1\.txt(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/
         ];

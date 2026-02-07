@@ -150,11 +150,11 @@ HUGGINGFACE_TOKEN=your_huggingface_token
 CIVITAI_TOKEN=your_civitai_token
 AUDIT_SALT=random_salt_for_hashing
 WARM_POOL_IDLE_MINUTES=15
-COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw/gistfile1.txt
+COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw/gistfile1.txt
 # Enforce provisioning to use only the allowed script(s)
-PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw
+PROVISION_ALLOWED_SCRIPTS=https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw
 PROVISION_STRICT=true
-SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw
+SCRIPTS_BASE_URL=https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw
 ```
 
 ## 📊 API Endpoints
@@ -227,7 +227,7 @@ If the automated setup doesn't work, you can manually configure the GPU:
 1. **SSH into the instance** using the Vast.ai web interface
 2. **Run the provisioning script**:
    ```bash
-   wget https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw/gistfile1.txt -O provision.sh
+   wget https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw/gistfile1.txt -O provision.sh
    chmod +x provision.sh
    ./provision.sh
    ```

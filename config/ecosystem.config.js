@@ -2,9 +2,8 @@ const path = require('path');
 // Load .env from project root (explicit path - cwd may vary when PM2 loads this)
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-// Canonical provision script: gist 002d41... (v3.1.8, gistfile1.txt) - used when .env has no COMFYUI_PROVISION_SCRIPT
-const PROVISION_SCRIPT = process.env.COMFYUI_PROVISION_SCRIPT ||
-  'https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw/gistfile1.txt';
+// Canonical provision script: gist 3a4b637b117355b429a29e80acc72a1d (v5.2 image provisioner, file: gistfile1.txt) - used when .env has no COMFYUI_PROVISION_SCRIPT
+const PROVISION_SCRIPT = 'https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw/gistfile1.txt';
 
 module.exports = {
   apps: [{
