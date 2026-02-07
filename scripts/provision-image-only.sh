@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.5"
+VERSION="v5.6"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -432,6 +432,10 @@ install_dependencies() {
         log "   Installing $dep..."
         "$VENV_PYTHON" -m pip install --no-cache-dir "$dep" 2>&1 | grep -v "WARNING:" || true
     done
+    
+    # Force SQLAlchemy 2.0.0 to fix mapping_column error
+    log "   🔗 Forcing SQLAlchemy 2.0.0..."
+    "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING:" || true
     
     log "✅ Dependencies installed"
 }
