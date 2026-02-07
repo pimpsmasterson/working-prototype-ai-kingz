@@ -5,13 +5,13 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.0"
+VERSION="v5.4"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
 # ║   ✓ CUDA 12.4/13.0 Auto-Detection (RTX 50-series support)                    ║
 # ║   ✓ Verified HuggingFace Links Only (No Dead Links)                          ║
-# ║   ✓ Vast.ai GPU Optimized (8GB+ VRAM)                                        ║
+# ║   ✓ Vast.ai GPU Optimized (24GB+ VRAM)                                       ║
 # ║   ✓ 20GB Total Download (vs 100GB+ in video version)                         ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
@@ -33,10 +33,11 @@ log_section() { log ""; log "═════════════════
 cleanup_on_exit() {
     local exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
-        echo "   ✅ Provisioning completed successfully"
+        echo "   ✅ Provisioning script completed (processes running in background)"
         return 0
     fi
     echo "⚠️  Error detected (exit code: $exit_code) - cleaning up..."
+    # Only kill background jobs if we are crashing/exiting on error
     for p in $(jobs -p); do kill -15 "$p" 2>/dev/null || true; done
     sleep 2
     for p in $(jobs -p); do kill -9 "$p" 2>/dev/null || true; done
@@ -234,6 +235,13 @@ QWEN_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors||qwen_3_4b.safetensors"
 )
 
+# --- MASTER WORKFLOWS (Direct from Repo) ---
+WORKFLOWS=(
+    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/fetish_master_pony_xl.json||fetish_master_pony_xl.json"
+    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/nasty_refiner_inpaint.json||nasty_refiner_inpaint.json"
+    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/krita_universal_furry_workflow.json||krita_universal_furry_workflow.json"
+)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CUSTOM NODES (Image-focused only)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -258,8 +266,23 @@ NODES=(
     "https://github.com/SXQBW/ComfyUI-Qwen3"
 )
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SYSTEM FUNCTIONS
+# Verify required Krita-related nodes are present and warn if missing
+REQUIRED_KRITA_NODES=(
+    "https://github.com/Fannovel16/comfyui_controlnet_aux"
+    "https://github.com/Acly/comfyui-tooling-nodes"
+    "https://github.com/Acly/comfyui-inpaint-nodes"
+    "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
+)
+for req in "${REQUIRED_KRITA_NODES[@]}"; do
+    found=false
+    for n in "${NODES[@]}"; do
+        if [[ "$n" == "$req" ]]; then found=true; break; fi
+    done
+    if [ "$found" = false ]; then
+        echo "WARNING: Required Krita node $req not found in NODES list. Please add it to ensure Krita workflows work."
+    fi
+done
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 detect_cuda_version() {
@@ -402,6 +425,7 @@ install_dependencies() {
         "tqdm>=4.66.0"
         "insightface>=0.7.3"
         "onnxruntime-gpu>=1.16.0"
+        "sqlalchemy>=2.0.0"
     )
     
     for dep in "${deps[@]}"; do
@@ -576,6 +600,13 @@ install_nodes() {
     "$VENV_PYTHON" -m pip install --no-cache-dir piexif ultralytics segment_anything 2>&1 | grep -v "WARNING:" || true
     
     log "✅ Nodes installed"
+
+    # Copy repo Krita workflows into ComfyUI workspace for convenience (optional)
+    if [[ -d "${WORKSPACE}/workflows" ]]; then
+        mkdir -p "${COMFYUI_DIR}/workflows"
+        cp -v "${WORKSPACE}/workflows/krita_*.json" "${COMFYUI_DIR}/workflows/" || true
+        log "📁 Copied Krita workflows into ${COMFYUI_DIR}/workflows/"
+    fi
 }
 
 install_models() {
@@ -636,7 +667,12 @@ install_models() {
         log "⏭️  [11/11] Heavy models skipped (requires 100GB+ free space, detected ${available_gb}GB)"
     fi
     
-    log "✅ Models downloaded"
+    # 12. Master Workflows
+    log "🧬 [12/12] Master Workflows..."
+    mkdir -p "${WORKSPACE}/workflows"
+    download_batch "${WORKSPACE}/workflows" "${WORKFLOWS[@]}" || true
+    
+    log "✅ Models and Workflows downloaded"
 }
 
 start_comfyui() {
@@ -663,12 +699,19 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 EOF
     
-    systemctl daemon-reload 2>/dev/null || true
-    systemctl enable --now comfyui.service 2>/dev/null || {
-        log "   ⚠️  systemd failed, using background process"
+    if command -v systemctl >/dev/null 2>&1 && systemctl status >/dev/null 2>&1; then
+        log "   🔧 Using systemd for ComfyUI"
+        systemctl daemon-reload 2>/dev/null || true
+        systemctl enable --now comfyui.service 2>/dev/null || {
+            log "   ⚠️  systemd failed, using background process fallback"
+            setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
+            echo "$!" > "${WORKSPACE}/comfyui.pid"
+        }
+    else
+        log "   ⚠️  systemd not available, starting ComfyUI in background"
         setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
         echo "$!" > "${WORKSPACE}/comfyui.pid"
-    }
+    fi
     
     log "✅ ComfyUI starting on port 8188"
 }
@@ -677,72 +720,205 @@ EOF
 # CLOUDFLARE TUNNEL (Zero-Config Public Access)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-install_cloudflare() {
-    log_section "☁️  SETTING UP CLOUDFLARE TUNNEL"
-    log "   📥 Downloading cloudflared..."
-    
-    if ! command -v cloudflared &> /dev/null; then
-        wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb
-        dpkg -i /tmp/cloudflared.deb 2>/dev/null || {
-            apt-get update && apt-get install -f -y
-            dpkg -i /tmp/cloudflared.deb
-        }
-        rm /tmp/cloudflared.deb
-    fi
-    
-    if command -v cloudflared &> /dev/null; then
-        log "   🚀 Starting Persistent Quick Tunnel..."
-        # Stop any existing tunnel
-        pkill cloudflared || true
-        
-        # Create systemd service for cloudflared
-        cat > /etc/systemd/system/cloudflared.service <<EOF
-[Unit]
-Description=Cloudflare Tunnel for ComfyUI
-After=network.target comfyui.service
+# ═══════════════════════════════════════════════════════════════════════════════
+# PROCESS MONITOR (Keeps Container Alive)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=${WORKSPACE}
-ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:8188
-Restart=always
-RestartSec=5
-StandardOutput=file:${WORKSPACE}/cloudflared.log
-StandardError=file:${WORKSPACE}/cloudflared.log
+monitor_processes() {
+    log_section "🛡️  STARTING PROCESS MONITOR"
+    log "   This loop keeps the container active and restarts services if they crash."
+    log "   Press Ctrl+C to stop everything."
 
-[Install]
-WantedBy=multi-user.target
-EOF
-        
-        systemctl daemon-reload
-        systemctl enable --now cloudflared.service
-        
-        # Wait for URL to appear (increased timeout)
-        log "   ⏳ Waiting for Tunnel URL..."
-        local timeout=45
-        local elapsed=0
-        local tunnel_url=""
-        
-        while [ $elapsed -lt $timeout ]; do
-            tunnel_url=$(grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" "${WORKSPACE}/cloudflared.log" | head -n1 || true)
-            if [ -n "$tunnel_url" ]; then
-                break
+    local comfypid_file="${WORKSPACE}/comfyui.pid"
+    local cfpid_file="${WORKSPACE}/cloudflared.pid"
+
+    while true; do
+        # 1. Check ComfyUI
+        if [[ -f "$comfypid_file" ]]; then
+            local cpid=$(cat "$comfypid_file")
+            if ! kill -0 "$cpid" 2>/dev/null; then
+                log "   ⚠️  ComfyUI (PID $cpid) died! Restarting..."
+                start_comfyui
             fi
-            sleep 3
-            elapsed=$((elapsed + 3))
-        done
-        
-        if [ -n "$tunnel_url" ]; then
-            log "   ✅ PUBLIC ACCESS URL: $tunnel_url"
-            echo "$tunnel_url" > "${WORKSPACE}/tunnel_url.txt"
         else
-            log "   ⚠️  Tunnel URL generation timed out. Check ${WORKSPACE}/cloudflared.log"
-            log "      Partial logs: $(tail -n 5 ${WORKSPACE}/cloudflared.log)"
+             # If PID file missing, just restart
+             log "   ⚠️  ComfyUI PID file missing. Restarting..."
+             start_comfyui
         fi
-    else
-        log "   ❌ Failed to install cloudflared"
+
+        # 2. Check Cloudflare
+        if [[ "${DISABLE_CLOUDFLARED:-0}" != "1" ]]; then
+             if [[ -f "$cfpid_file" ]]; then
+                local cfpid=$(cat "$cfpid_file")
+                if ! kill -0 "$cfpid" 2>/dev/null; then
+                    log "   ⚠️  Cloudflare Tunnel (PID $cfpid) died! Restarting..."
+                    start_cloudflare_tunnel
+                fi
+             else
+                # If PID file missing, restart
+                log "   ⚠️  Cloudflare PID file missing. Restarting..."
+                start_cloudflare_tunnel
+             fi
+        fi
+
+        # Sleep to save CPU
+        sleep 10
+    done
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLOUDFLARE TUNNEL - Robust start (added by automation: retries, multi-path detection, PID/log/tunnel file, reporting)
+# This consolidates tunnel logic into a single, reliable function for image-only provisioner
+start_cloudflare_tunnel() {
+    log_section "☁️  STARTING CLOUDFLARE TUNNEL (robust)"
+
+    local candidates=("/opt/instance-tools/bin/cloudflared" "/usr/local/bin/cloudflared" "$(command -v cloudflared 2>/dev/null || true)" "${PWD}/scripts/bin/cloudflared" "${PWD}/scripts/bin/cloudflared.exe")
+    local cf_bin=""
+    for c in "${candidates[@]}"; do
+        if [[ -x "$c" ]]; then cf_bin="$c"; break; fi
+    done
+
+    if [[ -z "$cf_bin" ]]; then
+        log "   📥 cloudflared not present; attempting download to /usr/local/bin"
+        local CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+        if curl -fsSL --connect-timeout 15 --max-time 120 "$CLOUDFLARED_URL" -o /usr/local/bin/cloudflared 2>/dev/null; then
+            chmod +x /usr/local/bin/cloudflared || true
+            cf_bin="/usr/local/bin/cloudflared"
+            log "   ✅ Downloaded cloudflared to $cf_bin"
+        else
+            log "   ❌ Failed to download cloudflared; skipping tunnel setup"
+            return 1
+        fi
     fi
+
+    if [[ -n "$($cf_bin --version 2>/dev/null | head -n1)" ]]; then
+        log "   ✅ cloudflared: $($cf_bin --version 2>/dev/null | head -n1)"
+    fi
+
+    mkdir -p "$WORKSPACE"
+    local TUNNEL_LOG="$WORKSPACE/cloudflared.log"
+    local TUNNEL_PID_FILE="$WORKSPACE/cloudflared.pid"
+    local TUNNEL_URL_FILE="$WORKSPACE/tunnel_url.txt"
+    touch "$TUNNEL_LOG"
+
+    if [[ "${DISABLE_CLOUDFLARED:-0}" == "1" ]]; then
+        log "   ℹ️ DISABLE_CLOUDFLARED=1 — not starting cloudflared"
+        return 1
+    fi
+
+    # Wait for ComfyUI readiness (first boot can be slow)
+    log "   ⏳ Waiting for ComfyUI on port 8188 (up to 5 min)"
+    local comfy_ready=false
+    for i in {1..60}; do
+        if curl -s --connect-timeout 3 "http://localhost:8188/system_stats" >/dev/null 2>&1; then
+            comfy_ready=true
+            log "   ✅ ComfyUI responsive"
+            break
+        fi
+        sleep 5
+    done
+    if [[ "$comfy_ready" != true ]]; then
+        log "   ⚠️ ComfyUI not yet ready; proceeding to start tunnel anyway"
+    fi
+
+    # Validate named tunnel creds if provided
+    if [[ -n "${CLOUDFLARED_TUNNEL_NAME:-}" ]]; then
+        if [[ -z "${CLOUDFLARED_CRED_FILE:-}" || ! -f "$CLOUDFLARED_CRED_FILE" ]]; then
+            log "   ❌ Named tunnel requested but credentials missing: ${CLOUDFLARED_CRED_FILE:-<not set>}"
+            return 1
+        fi
+    fi
+
+    # Stop any existing run
+    if [[ -f "$TUNNEL_PID_FILE" ]]; then
+        local oldpid
+        oldpid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
+        if [[ -n "$oldpid" ]] && kill -0 "$oldpid" 2>/dev/null; then
+            log "   🔄 Stopping existing cloudflared (PID: $oldpid)"
+            kill "$oldpid" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "$TUNNEL_PID_FILE"
+    fi
+
+    # Decide start command
+    local start_cmd
+    if [[ -n "${CLOUDFLARED_TUNNEL_NAME:-}" ]]; then
+        start_cmd=("$cf_bin" tunnel run "${CLOUDFLARED_TUNNEL_NAME}" --credentials-file "${CLOUDFLARED_CRED_FILE}")
+    else
+        start_cmd=("$cf_bin" tunnel --url http://localhost:8188 --loglevel info)
+    fi
+
+    setsid nohup "${start_cmd[@]}" > "$TUNNEL_LOG" 2>&1 < /dev/null &
+    local tpid=$!
+    echo "$tpid" > "$TUNNEL_PID_FILE"
+    log "   📝 cloudflared started (PID: $tpid)"
+
+    # Capture URL with retries and 429 detection
+    local TUNNEL_URL=""
+    local WAIT_SECONDS=60
+    local MAX_ATTEMPTS=3
+
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+        for i in $(seq 1 $WAIT_SECONDS); do
+            TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\\.trycloudflare\\.com' "$TUNNEL_LOG" 2>/dev/null | head -n1 || true)
+            if [[ -n "$TUNNEL_URL" ]]; then break 2; fi
+            sleep 1
+        done
+
+        if grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null; then
+            log "   ⚠️ Cloudflared logs indicate rate limiting (429); aborting retries"
+            break
+        fi
+
+        log "   ⚠️ Attempt ${attempt}/${MAX_ATTEMPTS}: URL not found; restarting cloudflared"
+        if [[ -f "$TUNNEL_PID_FILE" ]]; then
+            local spid
+            spid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
+            if [[ -n "$spid" ]] && kill -0 "$spid" 2>/dev/null; then
+                kill "$spid" 2>/dev/null || true
+                sleep 2
+            fi
+            rm -f "$TUNNEL_PID_FILE"
+        fi
+        setsid nohup "${start_cmd[@]}" > "$TUNNEL_LOG" 2>&1 < /dev/null &
+        local newpid=$!
+        echo "$newpid" > "$TUNNEL_PID_FILE"
+        log "   🔁 Restarted cloudflared (PID: $newpid)"
+        sleep 3
+    done
+
+    if [[ -z "$TUNNEL_URL" ]]; then
+        log "   ❌ Could not capture tunnel URL after ${MAX_ATTEMPTS} attempts"
+        log "   Last 40 lines of log:"
+        tail -n 40 "$TUNNEL_LOG" 2>/dev/null || true
+        return 1
+    fi
+
+    log "   ✅ Tunnel URL: $TUNNEL_URL"
+    echo "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
+
+    # Report to controller if configured
+    if [[ -n "${COMFYUI_PROXY_REPORT_URL:-}" && -n "${ADMIN_API_KEY:-}" ]]; then
+        log "   📡 Reporting tunnel URL to proxy server..."
+        local CONTRACT_ID="${VAST_CONTAINERLABEL:-${CONTAINER_ID:-unknown}}"
+        local report_response
+        report_response=$(curl -s -X POST "${COMFYUI_PROXY_REPORT_URL}/api/proxy/admin/report-tunnel" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-key: ${ADMIN_API_KEY}" \
+            -d '{"contractId":"'$CONTRACT_ID'","tunnelUrl":"'$TUNNEL_URL'"}' 2>/dev/null || echo '{"error":"request_failed"}')
+        log "   ℹ️ Proxy report response: $report_response"
+    fi
+
+    log "\n   ╔════════════════════════════════════════════════════════════════╗"
+    log "   ║  🌐 COMFYUI PUBLIC ACCESS URL                                   ║"
+    log "   ║                                                                ║"
+    log "   ║  $TUNNEL_URL"
+    log "   ║                                                                ║"
+    log "   ║  Open this URL in your browser - no SSH needed!               ║"
+    log "   ╚════════════════════════════════════════════════════════════════╝"
+
+    return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -775,7 +951,7 @@ main() {
     install_nodes
     install_models
     start_comfyui
-    install_cloudflare
+    start_cloudflare_tunnel
     
     log ""
     log "--- ✅ PROVISIONING COMPLETE ---"
@@ -793,7 +969,11 @@ main() {
     log "  • ControlNet (OpenPose, Canny, Depth)"
     log "  • IPAdapter (Image conditioning)"
     log "  • UltimateSDUpscale + 4x Upscalers"
+
+    # Start the persistent process monitor (BLocking)
+    monitor_processes
 }
 
 # Run
+main "$@"
 main

@@ -10,8 +10,8 @@ const fetch = require('node-fetch');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const GIST_ID = 'c3f61f20067d498b6699d1bdbddea395';
-const PROVISION_PATH = path.join(__dirname, 'provision-reliable.sh');
+const GIST_ID = '3a4b637b117355b429a29e80acc72a1d';
+const PROVISION_PATH = path.join(__dirname, 'provision-image-only.sh');
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 
 async function main() {
@@ -28,9 +28,9 @@ async function main() {
 
   const content = fs.readFileSync(PROVISION_PATH, 'utf8');
   const payload = {
-    description: 'AI Kings ComfyUI reliable provisioner v3.0 (provision-reliable.sh)',
+    description: 'AI Kings ComfyUI Image Only Provisioner (provision-image-only.sh)',
     files: {
-      'provision-reliable.sh': { content }
+      'provision-image-only.sh': { content }
     }
   };
 

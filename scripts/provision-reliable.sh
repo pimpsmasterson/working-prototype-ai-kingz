@@ -329,11 +329,13 @@ start_cloudflare_tunnel() {
     echo "$TUNNEL_PID" > "$TUNNEL_PID_FILE"
     log "   📝 Tunnel started with PID: $TUNNEL_PID"
     
-    # Wait for tunnel URL to appear in logs (allow retries and restarts)
+    # Wait for tunnel URL to appear in logs (allow retries and restarts with backoff)
     log "   ⏳ Waiting for tunnel URL..."
     local TUNNEL_URL=""
-    local WAIT_SECONDS=60
-    local MAX_ATTEMPTS=3
+    local WAIT_SECONDS=90
+    local MAX_ATTEMPTS=5
+    local BACKOFF_BASE=5
+    local BACKOFF_CAP=300
 
     for attempt in $(seq 1 $MAX_ATTEMPTS); do
         for i in $(seq 1 $WAIT_SECONDS); do
@@ -344,17 +346,25 @@ start_cloudflare_tunnel() {
             sleep 1
         done
 
-        # Fail fast if Cloudflare returned rate limit (429) - retrying won't help
+        # If logs indicate rate limiting, avoid tight restart loop; create diagnostic dump and abort retries
         if grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null; then
-            log "   ⚠️  Cloudflare rate limit (429) - skipping tunnel retries; use SSH fallback"
+            log "   ⚠️  Cloudflared logs indicate rate limiting (429); aborting restarts and using SSH fallback"
+            # Save diagnostic snippet for debugging
+            local diag_file="${WORKSPACE}/cloudflared_diagnostic_$(date +%s).log"
+            tail -n 200 "$TUNNEL_LOG" 2>/dev/null > "$diag_file" || true
+            log "   📄 Wrote diagnostic tail to: $diag_file"
             break
         fi
 
-        # If not found, try restarting cloudflared and try again
         if [[ -z "$TUNNEL_URL" ]]; then
-            log "   ⚠️  Attempt ${attempt}/${MAX_ATTEMPTS}: tunnel URL not found; restarting cloudflared and retrying..."
+            # Exponential backoff before restarting (safer than immediate retries)
+            local backoff=$(( BACKOFF_BASE * (2 ** (attempt - 1)) ))
+            if (( backoff > BACKOFF_CAP )); then backoff=$BACKOFF_CAP; fi
+
+            log "   ⚠️  Attempt ${attempt}/${MAX_ATTEMPTS}: tunnel URL not found; restarting cloudflared with backoff ${backoff}s..."
             if [[ -f "$TUNNEL_PID_FILE" ]]; then
-                local pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
+                local pid
+                pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
                 if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
                     kill "$pid" 2>/dev/null || true
                     sleep 2
@@ -365,9 +375,8 @@ start_cloudflare_tunnel() {
             setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
             local new_pid=$!
             echo "$new_pid" > "$TUNNEL_PID_FILE"
-            log "   🔁 Restarted cloudflared (PID: $new_pid)"
-            # short delay before next wait
-            sleep 3
+            log "   🔁 Restarted cloudflared (PID: $new_pid) — sleeping ${backoff}s before next check"
+            sleep "$backoff"
         fi
     done
 

@@ -42,7 +42,7 @@ pm2 start config/ecosystem.config.js --update-env
 pm2 save
 ```
 
-**Alternative: Use the automated script** `start-ai-kings.ps1` for full setup and prewarm.
+**Alternative: Use the automated script** `one-click-rent.ps1` for full setup and prewarm.
 
 3) Start or restart server (plain node for debugging)
 

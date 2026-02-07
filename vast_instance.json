@@ -1,0 +1,193 @@
+{
+  "instances": {
+    "actual_status": "running",
+    "bundle_id": null,
+    "bw_nvlink": 0,
+    "client_run_time": 1.1,
+    "compute_cap": 1200,
+    "cpu_arch": "amd64",
+    "cpu_cores": 32,
+    "cpu_cores_effective": 5.333333333333333,
+    "cpu_name": "AMD EPYC 7302P 16-Core Processor",
+    "cpu_ram": 128673,
+    "cpu_util": 0,
+    "credit_balance": null,
+    "credit_discount": null,
+    "credit_discount_max": 0,
+    "cuda_max_good": 13.1,
+    "cur_state": "running",
+    "direct_port_count": 333,
+    "direct_port_end": -1,
+    "direct_port_start": -1,
+    "disk_bw": 4507.876030581102,
+    "disk_name": "Samsung SSD 990 EVO Plus 2TB",
+    "disk_space": 205,
+    "disk_usage": -1,
+    "disk_util": -1,
+    "dlperf": null,
+    "dlperf_per_dphtotal": null,
+    "dph_base": 0.08666666666666667,
+    "dph_total": 0.1436111111111111,
+    "driver_version": "590.48.01",
+    "duration": 17798267.64240408,
+    "end_date": 1788271242,
+    "external": false,
+    "extra_env": [
+      [
+        "COMFYUI_ARGS",
+        "--listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header"
+      ],
+      [
+        "COMFYUI_API_BASE",
+        "http://localhost:8188"
+      ],
+      [
+        "PORTAL_CONFIG",
+        "localhost:1111:11111:/:Instance Portal|localhost:8188:18188:/:ComfyUI|localhost:8288:18288:/docs:API Wrapper|localhost:8188:18188:/:ComfyUI|localhost:8384:18384:/:Syncthing"
+      ],
+      [
+        "OPEN_BUTTON_PORT",
+        "1111"
+      ],
+      [
+        "JUPYTER_DIR",
+        "/"
+      ],
+      [
+        "DATA_DIRECTORY",
+        "/workspace/"
+      ],
+      [
+        "OPEN_BUTTON_TOKEN",
+        "1"
+      ],
+      [
+        "PROVISION_DROPBOX_LINKS_B64",
+        "aHR0cHM6Ly93d3cuZHJvcGJveC5jb20vc2NsL2ZpL3Y1MnA2NmNpOHU3bjhyNWNxYzFwaS9kcmVhbXNoYXBlcl84LnNhZmV0ZW5zb3JzP3Jsa2V5PTRmMDEzM3IwNjJ4cjhuYWZwc3hwMmg5Z3EmZGw9MXxkcmVhbXNoYXBlcl84LnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS9lcTNxcWM1cm53b2QzYWMxeGZpc3AvUmFqaWktQXJ0aXN0LVN0eWxlLVYyLUlsbHVzdHJpb3VzLnNhZmV0ZW5zb3JzP3Jsa2V5PWN2ZmphbTQ1d2JteWU4OWcybXZqMjQ1bHomZGw9MXxbUmFqaWldIEFydGlzdCBTdHlsZSBWMiBJbGx1c3RyaW91cy5zYWZldGVuc29ycwpodHRwczovL3d3dy5kcm9wYm94LmNvbS9zY2wvZmkvNmFmOHB6dWNncXlyMGR5NzhlaDZxL0RSMzRNSk9CX0kyVl8xNGJfTG93Tm9pc2Uuc2FmZXRlbnNvcnM/cmxrZXk9cGdueXM0aDk4aDM0M2liYXJvMGZnd2hxdiZkbD0xfERSMzRNSk9CX0kyVl8xNGJfTG93Tm9pc2Uuc2FmZXRlbnNvcnMKaHR0cHM6Ly93d3cuZHJvcGJveC5jb20vc2NsL2ZpL2h5NDc2cnh6ZWFjc3g4ZzNhb2RqMC9wb255X3JlYWxpc21fdjIuMi5zYWZldGVuc29ycz9ybGtleT0wOWs1c2JhNDZwcW9wdGR1N2gxdHUwM2I0JmRsPTF8cG9ueV9yZWFsaXNtX3YyLjIuc2FmZXRlbnNvcnMKaHR0cHM6Ly93d3cuZHJvcGJveC5jb20vc2NsL2ZpL2RkN2FpanU1cGV0ZXZiNm5hbGluci9wbVhMX3YxLnNhZmV0ZW5zb3JzP3Jsa2V5PXA0dWtvdXZkZDJvOTEyaWxjZmJpNmNxazMmZGw9MXxwbVhMX3YxLnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS9va2hkYjJyM2k0M2w3ZjhodjA3bGkvd2FpX2lsbHVzdHJpb3VzX3NkeGwuc2FmZXRlbnNvcnM/cmxrZXk9dDdyMTF5anI2MWVjZG0wdnJzZ3JrenRjOCZkbD0xfHdhaV9pbGx1c3RyaW91c19zZHhsLnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS85ZHJjbHc0OTVwbGtpMTV5bmxtc3QvZm9uZGxlZC5zYWZldGVuc29ycz9ybGtleT12aDVlZmJ1eTBlcjQzMzh4cmtpdmlscG5iJmRsPTF8Zm9uZGxlZC5zYWZldGVuc29ycwpodHRwczovL3d3dy5kcm9wYm94LmNvbS9zY2wvZmkvaHA4dDUzaDV5bHJoa3BobnE0Y3l1L3dhbl9kcjM0bWw0eV9hbGxfaW5fb25lLnNhZmV0ZW5zb3JzP3Jsa2V5PTlicTRjbGI0Z21pejRycDZpOGc2OWZsOXUmZGw9MXx3YW5fZHIzNG1sNHlfYWxsX2luX29uZS5zYWZldGVuc29ycwpodHRwczovL3d3dy5kcm9wYm94LmNvbS9zY2wvZmkveW0xMTJjcnFiNmQ3c2RrcXo1czlqL3dhbl9kcjM0bWpvYi5zYWZldGVuc29ycz9ybGtleT1lcXpkMzcxZjg2ZzZ0c29mMGZjZWNmbjhuJmRsPTF8d2FuX2RyMzRtam9iLnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS8wZzRidGpjaDg4NWlqM2tpYXVmZm0vdHdlcmsuc2FmZXRlbnNvcnM/cmxrZXk9OHlxeGhxcHZzMW9zYXQ3NnlueGFkd2toOCZkbD0xfHR3ZXJrLnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS84MjgwdWo5bXl4dWYyMzc2ZDEzanQvcG9ybm1hc3RlclByb19ub29iVjYuc2FmZXRlbnNvcnM/cmxrZXk9bG1kdXFxM2p4dXN0czFmcXFleHVxejcydyZkbD0xfHBvcm5tYXN0ZXJQcm9fbm9vYlY2LnNhZmV0ZW5zb3JzCmh0dHBzOi8vd3d3LmRyb3Bib3guY29tL3NjbC9maS81d2h4a2RvMzltNHcyb2ltY2ZmeDIvZXhwcmVzc2l2ZWhfaGVudGFpLnNhZmV0ZW5zb3JzP3Jsa2V5PTVlamt5anZldGhkMXI3Zm4xMjF4N2N2czEmZGw9MXxleHByZXNzaXZlaF9oZW50YWkuc2FmZXRlbnNvcnMKaHR0cHM6Ly93d3cuZHJvcGJveC5jb20vc2NsL2ZpLzNxeWdrNjR4ZTJ1aTJleTc0bmV0by9zZHhsX3ZhZS5zYWZldGVuc29ycz9ybGtleT14enNsbHYzaHE1dzFxeDgxaDliMnhyeXE4JmRsPTF8c2R4bF92YWUuc2FmZXRlbnNvcnMKaHR0cHM6Ly93d3cuZHJvcGJveC5jb20vc2NsL2ZpL3AwdXh3dXgwM29xOTBsOGZ4bXJxeC9wb255RGlmZnVzaW9uVjZYTC5zYWZldGVuc29ycz9ybGtleT1ueGQ1bGwxaWR4MHVrNmp2c3FuN2w0aG1vJmRsPTF8cG9ueURpZmZ1c2lvblY2WEwuc2FmZXRlbnNvcnMK"
+      ],
+      [
+        "PROVISION_DROPBOX_LINKS_SOURCE",
+        "repo:file"
+      ],
+      [
+        "PROVISIONING_SCRIPT",
+        "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-image-only.sh"
+      ],
+      [
+        "HUGGINGFACE_HUB_TOKEN",
+        "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"
+      ],
+      [
+        "CIVITAI_TOKEN",
+        "8d592efd151078e9f630e9e1e2079650"
+      ],
+      [
+        "DROPBOX_TOKEN",
+        "sl.u.AGSEpdZ9jVjHlopXiDXre2fFvQShMtU9MBNM6WgaEGt9K8K6KGKNBQB7-4tonYnq2j6zBGR3mpZe25oaCbTFHHMPds-1reBHUTQUnEPJCc4g1yZL271ro1FPBZSgAzF1tvdPUM_4xt65epPzvxTiCfxiG6w7YL_rCRf_pb3IVt5xHdqVQev2FcWxwCi8V_KYEUCx2lflnDzq8Ug-Sd-z-QS34bUYS6EcU5xMTRDbrRfyoWuoJfwn-6GmGUVSYUS4Bkk2oU6LwT-jrZlBwJ-sXusgxXfgHZW8HjtU9ezrL8njGzbQuCukkIeyj451DBeSn7PrmZqH2OuiYcTVGuJXkRdU3IgfmmsRiTUMy9Y420sqDKuyzLKHDyTtm0UnBUNHD9tlH8NVRWsuVopT9ZvR5VfvPLLBFLyht0qwYIgV5Cru_dA_8Q-H8wLZ4WE9uEgib1y4AYFqeqswVtbiAZXj18s5N99SzvP8ITBxXNv4wQ78hKD8wUbFltkYVJIS26qJ8YWdQnb-VvdmFtGCc7iREFGybr0kx4L4W8M5LJjUIT8LCYIM3ZL4UH7-4RNLFWkHvDlm8E1LFDUSvOkxbaTe1F5WCStiGKYm2LKZWKK7URFduQds5pwQRV3nTJcQVbwK-QxAlDaPChvSWtazvurpB48o33sOeHs-GBaxDQ6faT_B4KygD10f89m1OpvYP4-svzlHFyx8Yl0UOdV-QD-cSyMz9vHeSuyvD1TBWhV1SlN2gzbJo-hEuDmNDGK1BsoR92CmtnwsJ5519qDGNQ2LqlJKD5fz3_9NnTwNYGGeVCU1oIzQu7aKIh3kjvEL-4vak2C2G57veEM3g1RrDFV0eFyWIRS8t6dzWRcQVSyW6ZvKY4FU2aTs_VFdeKsvgvg6RE8fyycNlLx6cNgwMpbnV5ht-cP3QyMfdKqXoyBivJt3bYy81vOOP1zL_ZsK34UOA29opkFPeWTcr1TYMB3PBDmG0wUsBFlVoxt3dokB9HNxTYMIivNK5wLyLYto_m8RnklDUjzytMkUQx0kXLNcHwyGAChGp2GuL2OIT9Dpb_501Hzt3V5KB0Jh6t64_ti4h3hZftvyulRv-RLyy5fLAUeyeA7YtAzNtu1KRgsygMKOB1UGnNUKmTDrItdA2LX4B936zbvc01Z06eGe035ekOCbTbGTvMk5cHEx8rwNHYSta2uuUwZD0TOmRt7YTNAz8HBE6N7NW743AKdgFUF_mvVQhV6NWja-ZVaV4ABDdkd-yFTGTa9BUOJiNl5vR4jjPSX8ew2jGfvW7USFlL2lJm4NMJKylRpnJqRMiHvGD9gGDrL6i_w_L8zrVpetXCJI361YgSPlFo4kZwMm83bN6GC9uqu2I6EJUuIWnwx3CN3ROcotevDv_txJXtcQ0_YahQx8_X3FI4_GKnYrXhWRdD2l"
+      ],
+      [
+        "DROPBOX_FOLDER",
+        "/home/workspace/pornmaster100"
+      ],
+      [
+        "DROPBOX_PATH",
+        "/home/workspace/pornmaster100"
+      ],
+      [
+        "SCRIPTS_BASE_URL",
+        "https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw"
+      ],
+      [
+        "PROVISION_ALLOWED_SCRIPTS",
+        "https://gist.githubusercontent.com/pimpsmasterson/002d4121626567402b4c59febbc1297d/raw"
+      ],
+      [
+        "PROVISION_STRICT",
+        "false"
+      ]
+    ],
+    "flops_per_dphtotal": 158.6364162475822,
+    "geolocation": "Denmark, DK",
+    "gpu_arch": "nvidia",
+    "gpu_display_active": false,
+    "gpu_frac": 0.16666666666666666,
+    "gpu_lanes": 8,
+    "gpu_mem_bw": 368.8,
+    "gpu_name": "RTX 5060 Ti",
+    "gpu_ram": 16311,
+    "gpu_temp": null,
+    "gpu_totalram": 16311,
+    "gpu_util": null,
+    "has_avx": 1,
+    "host_id": 270760,
+    "host_run_time": 2592000,
+    "hosting_type": null,
+    "id": 31051696,
+    "image_args": [],
+    "image_runtype": "ssh",
+    "image_uuid": "vastai/comfy:v0.10.0-cuda-12.9-py312",
+    "inet_down": 3450.1,
+    "inet_down_billed": null,
+    "inet_down_cost": 0.0026041666666666665,
+    "inet_up": 2234.5,
+    "inet_up_billed": null,
+    "inet_up_cost": 0.00390625,
+    "instance": {
+      "gpuCostPerHour": 0.08666666666666667,
+      "diskHour": 0.05694444444444444,
+      "totalHour": 0.1436111111111111,
+      "discountTotalHour": 0,
+      "discountedTotalPerHour": 0
+    },
+    "intended_status": "running",
+    "internet_down_cost_per_tb": 2.6666666666666665,
+    "internet_up_cost_per_tb": 4,
+    "is_bid": false,
+    "jupyter_token": "3a17df5d0bb09ee33dbe244ded1c0e7969f0a6041dbebad0aa3d7c312cc02fce",
+    "label": null,
+    "local_ipaddrs": "192.168.1.105 172.17.0.1 \n",
+    "logo": "/static/logos/vastai_small2.png",
+    "machine_dir_ssh_port": 39999,
+    "machine_id": 39273,
+    "mem_limit": null,
+    "mem_usage": null,
+    "min_bid": 0.07333333333333333,
+    "mobo_name": "MZ32-AR0-00",
+    "next_state": "running",
+    "num_gpus": 1,
+    "onstart": "bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-image-only.sh" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'",
+    "os_version": "22.04",
+    "pci_gen": 4,
+    "pcie_bw": 13.8,
+    "public_ipaddr": "62.107.25.198",
+    "reliability2": 0.9947886,
+    "rentable": true,
+    "score": null,
+    "search": {
+      "gpuCostPerHour": 0.08666666666666667,
+      "diskHour": 0.05694444444444444,
+      "totalHour": 0.1436111111111111,
+      "discountTotalHour": 0,
+      "discountedTotalPerHour": 0.1436111111111111
+    },
+    "ssh_host": "ssh7.vast.ai",
+    "ssh_idx": "7",
+    "ssh_port": 11696,
+    "start_date": 1770472935.7220194,
+    "static_ip": false,
+    "status_msg": "success, running vastai/comfy_v0.10.0-cuda-12.9-py312/ssh",
+    "storage_cost": 0.19999999999999998,
+    "storage_total_cost": 0.05694444444444444,
+    "template_hash_id": null,
+    "template_id": null,
+    "time_remaining": "Unlimited",
+    "time_remaining_isbid": "Unlimited",
+    "total_flops": 22.781951999999997,
+    "uptime_mins": null,
+    "verification": "verified",
+    "vmem_usage": null,
+    "vram_costperhour": 0.000008804555889345295,
+    "webpage": null,
+    "template_name": null
+  }
+}

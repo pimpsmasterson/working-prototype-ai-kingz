@@ -1,1 +1,0 @@
-{description:"Disable automatic SSH permission fixes to avoid provisioning hangs (operator request)", files: {"scripts/provision-reliable.sh": {content: $a}, "server/warm-pool.js": {content: $b}, "tmp_instance_30846018.json": {content: $c}} }

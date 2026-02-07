@@ -67,10 +67,18 @@ Write-Host "  OK" -ForegroundColor Green
 Write-Host "[4/7] Restarting server (latest code + .env)..." -ForegroundColor Yellow
 $usePm2 = $false
 if ((Get-Command pm2 -ErrorAction SilentlyContinue) -and (Test-Path "config\ecosystem.config.js")) {
-    pm2 delete vastai-proxy 2>$null
-    pm2 start config/ecosystem.config.js --update-env 2>$null
-    pm2 save 2>$null
-    if ($LASTEXITCODE -eq 0) { $usePm2 = $true }
+    try {
+        pm2 delete vastai-proxy 2>$null
+    } catch {
+        Write-Host "  (pm2 delete failed/skipped)" -ForegroundColor Gray
+    }
+    try {
+        pm2 start config/ecosystem.config.js --update-env 2>$null
+        pm2 save 2>$null
+        $usePm2 = $true
+    } catch {
+        Write-Host "  (pm2 start failed)" -ForegroundColor Yellow
+    }
 }
 if (-not $usePm2) {
     $envHash = @{}

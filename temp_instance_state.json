@@ -1,9 +1,0 @@
-{
-  "contractId": 30978908,
-  "status": "running",
-  "connectionUrl": null,
-  "createdAt": "2026-02-05T13:27:12.433Z",
-  "lastHeartbeat": "2026-02-05T13:28:57.239Z",
-  "leasedUntil": null,
-  "lastStatusMessage": "success, running vastai/comfy_v0.10.0-cuda-12.9-py312/ssh"
-}

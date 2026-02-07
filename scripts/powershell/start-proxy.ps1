@@ -31,8 +31,8 @@ $env:ADMIN_API_KEY = if ($env:ADMIN_API_KEY) { $env:ADMIN_API_KEY } else { "secu
 $env:VASTAI_API_KEY = if ($env:VASTAI_API_KEY) { $env:VASTAI_API_KEY } else { "VASTAI_API_KEY_PLACEHOLDER" }
 $env:HUGGINGFACE_HUB_TOKEN = if ($env:HUGGINGFACE_HUB_TOKEN) { $env:HUGGINGFACE_HUB_TOKEN } else { "HUGGINGFACE_HUB_TOKEN_PLACEHOLDER" }
 $env:CIVITAI_TOKEN = if ($env:CIVITAI_TOKEN) { $env:CIVITAI_TOKEN } else { "CIVITAI_TOKEN_PLACEHOLDER" }
-$env:COMFYUI_PROVISION_SCRIPT = if ($env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT } else { "https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw/gistfile1.txt" }
-$env:SCRIPTS_BASE_URL = if ($env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL } else { "https://gist.githubusercontent.com/pimpsmasterson/3a4b637b117355b429a29e80acc72a1d/raw" }
+$env:COMFYUI_PROVISION_SCRIPT = if ($env:COMFYUI_PROVISION_SCRIPT) { $env:COMFYUI_PROVISION_SCRIPT } else { "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-image-only.sh" }
+$env:SCRIPTS_BASE_URL = if ($env:SCRIPTS_BASE_URL) { $env:SCRIPTS_BASE_URL } else { "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts" }
 
 Write-Host "Admin API Key: $env:ADMIN_API_KEY" -ForegroundColor Green
 Write-Host "Vast.ai API Key: $($env:VASTAI_API_KEY.Substring(0, [Math]::Min(10, $env:VASTAI_API_KEY.Length)))..." -ForegroundColor Green

@@ -105,7 +105,7 @@ One-click start had been broken since integration/recent changes due to **PowerS
 
 1. **New rental**: Run `.\one-click-rent.ps1` — restarts server, reset-state, prewarm (single entry point).
 2. **Restore `.env.example`** if it was deleted accidentally (template only, no secrets).
-3. Keep **one-click-start.ps1** as the single canonical launcher; align **one-click-start-fixed.ps1** / **start-ai-kings*.ps1** or retire them to avoid drift.
+3. Retired redundant scripts (one-click-start-fixed.ps1, start-ai-kings*.ps1); now using one-click-rent.ps1 as single canonical launcher to avoid drift.
 4. For **provisioning/warm pool**: see `docs/ONE-CLICK-START-AUDIT.md` and server logs (`pm2 logs vastai-proxy`) if instance rent or ComfyUI readiness is still failing.
 
 ---

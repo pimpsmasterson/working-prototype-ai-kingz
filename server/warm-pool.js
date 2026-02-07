@@ -45,10 +45,10 @@ let comfyKeepalive = null;
 // Lowered to 6.0 to allow datacenter GPUs like P100/P40 which have high VRAM
 const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY || '6.0');
 
-// Configurable minimum disk (GB) for warm instances. Default to 500GB to ensure
+// Configurable minimum disk (GB) for warm instances. Default to 202GB to ensure
 // room for large models (Flux/SDXL/Wan) and custom nodes while meeting user requirements.
-const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '208', 10);
-const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 208;
+const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '202', 10);
+const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 202;
 // Clamp to sane bounds: min 100GB, max 2000GB
 const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 100), 2000);
 /**
@@ -965,6 +965,7 @@ async function prewarm() {
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-reliable\.sh(\?.*)?$/,
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-image-only\.sh(\?.*)?$/,
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/gistfile1\.txt(\?.*)?$/,
+            /^https:\/\/raw\.githubusercontent\.com\/pimpsmasterson\/working-prototype-ai-kingz\/.*\/scripts\/.*\.sh(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/
         ];

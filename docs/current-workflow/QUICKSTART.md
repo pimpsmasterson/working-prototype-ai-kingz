@@ -214,10 +214,10 @@ curl http://localhost:3000/api/proxy/health
 
 ## Automated Startup Script
 
-For convenience, use the provided `start-ai-kings.ps1` script, which handles killing processes, cleaning DB, starting PM2, and triggering prewarm.
+For convenience, use the provided `one-click-rent.ps1` script, which handles killing processes, cleaning DB, starting PM2, and triggering prewarm.
 
 ```powershell
-.\start-ai-kings.ps1
+.\one-click-rent.ps1
 ```
 
 ## Triggering Prewarm (Rents a GPU Instance)

@@ -1,0 +1,102 @@
+[
+  {
+    "id": 38,
+    "ts": "2026-02-07T13:51:18.792Z",
+    "event_type": "instance_started",
+    "contract_id": "31051412.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":13790360,\"gpuName\":\"Tesla T4\",\"pricePerHour\":0.14874074074074073}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 37,
+    "ts": "2026-02-07T04:59:41.846Z",
+    "event_type": "instance_started",
+    "contract_id": "31034242.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916443,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 36,
+    "ts": "2026-02-07T04:34:16.392Z",
+    "event_type": "instance_started",
+    "contract_id": "31033385.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916448,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 35,
+    "ts": "2026-02-07T04:19:10.343Z",
+    "event_type": "instance_started",
+    "contract_id": "31032981.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916441,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 34,
+    "ts": "2026-02-07T03:55:02.132Z",
+    "event_type": "instance_started",
+    "contract_id": "31032438.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":29500345,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.09777777777777778}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 33,
+    "ts": "2026-02-07T03:50:11.271Z",
+    "event_type": "instance_started",
+    "contract_id": "31032354.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916445,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 32,
+    "ts": "2026-02-07T03:26:35.845Z",
+    "event_type": "instance_started",
+    "contract_id": "31031843.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916449,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 31,
+    "ts": "2026-02-07T02:51:31.056Z",
+    "event_type": "instance_started",
+    "contract_id": "31031268.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":30916449,\"gpuName\":\"RTX 5060 Ti\",\"pricePerHour\":0.08888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 30,
+    "ts": "2026-02-07T02:28:07.484Z",
+    "event_type": "instance_started",
+    "contract_id": "31030879.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":29935433,\"gpuName\":\"RTX 3060\",\"pricePerHour\":0.06888888888888889}",
+    "source": "warm-pool"
+  },
+  {
+    "id": 29,
+    "ts": "2026-02-07T02:24:37.535Z",
+    "event_type": "instance_started",
+    "contract_id": "31030845.0",
+    "instance_status": "starting",
+    "duration_seconds": null,
+    "details": "{\"offerId\":29935438,\"gpuName\":\"RTX 3060\",\"pricePerHour\":0.06888888888888889}",
+    "source": "warm-pool"
+  }
+]

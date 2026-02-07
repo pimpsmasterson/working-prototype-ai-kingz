@@ -19,7 +19,7 @@ The instance **WAS actually provisioning successfully**, but the HTTP request ti
 
 ### 1. Client-Side Timeout (PowerShell)
 
-**File**: [one-click-start-fixed.ps1](../one-click-start-fixed.ps1)
+**File**: [one-click-rent.ps1](../one-click-rent.ps1)
 
 **Before:**
 ```powershell
@@ -162,7 +162,7 @@ You'll know the fix works when:
 **Very rare**, but if it happens:
 
 1. **Increase timeout** further in both files:
-   - `one-click-start-fixed.ps1`: Line 429 → `-TimeoutSec 3600` (1 hour)
+   - `one-click-rent.ps1`: Line 429 → `-TimeoutSec 3600` (1 hour)
    - `server/vastai-proxy.js`: Line 1568 → `server.timeout = 3600000;` (1 hour)
 
 2. **Check instance health**:
@@ -174,12 +174,12 @@ You'll know the fix works when:
    ```powershell
    # In Vast.ai console, destroy instance
    # Then re-run one-click-start
-   .\one-click-start-fixed.ps1
+   .\one-click-rent.ps1
    ```
 
 ## 📝 Related Files
 
-- [one-click-start-fixed.ps1](../one-click-start-fixed.ps1) - Client timeout fix
+- [one-click-rent.ps1](../one-click-rent.ps1) - Client timeout fix
 - [server/vastai-proxy.js](../server/vastai-proxy.js) - Server timeout fix
 - [scripts/provision-reliable.sh](../scripts/provision-reliable.sh) - Provision script
 
@@ -220,7 +220,7 @@ To verify the fix works:
 
 ```powershell
 # Run the one-click start
-.\one-click-start-fixed.ps1
+.\one-click-rent.ps1
 
 # You should see (no timeout errors!):
 ✅ Prewarm initiated successfully!
