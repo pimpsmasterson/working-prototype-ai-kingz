@@ -1,4 +1,4 @@
-# AI Kings One-Click Start Script (v3.1)
+# AI Kings One-Click Start Script (v3.0)
 # This script provides a complete one-click startup with:
 # - Environment validation
 # - Clean state reset
@@ -6,15 +6,9 @@
 # - Automated prewarm
 # - SSH log collection
 
-# Ensure we run from project root (where .env and scripts live)
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptDir
-
 Write-Host "╔═══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║   👑 AI KINGS ONE-CLICK START v3.1                           ║" -ForegroundColor Cyan
+Write-Host "║   👑 AI KINGS ONE-CLICK START v3.0                           ║" -ForegroundColor Cyan
 Write-Host "╚═══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Working directory: $(Get-Location)" -ForegroundColor DarkGray
 Write-Host ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -49,22 +43,19 @@ if (-not (Test-Path ".env")) {
     exit 1
 }
 
-# Load .env file into PowerShell environment (trim quotes from values)
-Get-Content ".env" -ErrorAction SilentlyContinue | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
+# Load .env file into PowerShell environment
+Get-Content ".env" | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
     $parts = $_ -split '=', 2
     $key = $parts[0].Trim()
     $value = $parts[1].Trim()
-    # Remove surrounding quotes if present
-    if ($value.Length -ge 2 -and $value[0] -eq '"' -and $value[-1] -eq '"') { $value = $value.Substring(1, $value.Length - 2) }
-    if ($value.Length -ge 2 -and $value[0] -eq "'" -and $value[-1] -eq "'") { $value = $value.Substring(1, $value.Length - 2) }
-    Set-Item -Path "env:$key" -Value $value -Force
+    Set-Item -Path "env:$key" -Value $value
 }
 
-# Verify required environment variables (use $env:VAR - same source as prewarm headers)
+# Verify required environment variables
 $requiredVars = @('VASTAI_API_KEY', 'ADMIN_API_KEY', 'HUGGINGFACE_HUB_TOKEN', 'CIVITAI_TOKEN')
 $missingVars = @()
 foreach ($var in $requiredVars) {
-    $val = (Get-Item -Path "env:$var" -ErrorAction SilentlyContinue).Value
+    $val = [Environment]::GetEnvironmentVariable($var)
     if ([string]::IsNullOrWhiteSpace($val)) {
         $missingVars += $var
     }
@@ -105,8 +96,31 @@ Write-Host "   🔪 Killing all related processes..." -ForegroundColor Red
 # NOTE: Avoid killing all Node.js processes (this can kill the PM2 daemon). Instead, rely on targeted port-based cleanup further below.
 # (If you really need to remove a stray Node process not bound to our ports, inspect it manually.)
 
-# Port-based cleanup will handle any local ComfyUI or proxy instances.
-# Global process killing of 'python' or 'ssh' is skipped to avoid disrupting the IDE's background services.
+# Kill Python processes (HTTP server, etc.) — try graceful first, force if still present
+$pythonProcesses = Get-Process python -ErrorAction SilentlyContinue
+if ($pythonProcesses) {
+    Write-Host "   Stopping $($pythonProcesses.Count) Python process(es) (graceful)..." -ForegroundColor Gray
+    $pythonProcesses | Stop-Process -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $remainingPy = Get-Process python -ErrorAction SilentlyContinue
+    if ($remainingPy) {
+        Write-Host "   Forcibly stopping remaining Python process(es)..." -ForegroundColor Gray
+        $remainingPy | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Kill SSH processes that might be hanging — try graceful first
+$sshProcesses = Get-Process ssh -ErrorAction SilentlyContinue
+if ($sshProcesses) {
+    Write-Host "   Stopping $($sshProcesses.Count) SSH process(es) (graceful)..." -ForegroundColor Gray
+    $sshProcesses | Stop-Process -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    $remainingSsh = Get-Process ssh -ErrorAction SilentlyContinue
+    if ($remainingSsh) {
+        Write-Host "   Forcibly stopping remaining SSH process(es)..." -ForegroundColor Gray
+        $remainingSsh | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+}
 
 # Kill any processes using our ports
 $usedPorts = @(3000, 8080, 8188)
@@ -136,8 +150,7 @@ if (Get-Command pm2 -ErrorAction SilentlyContinue) {
         & pm2 describe vastai-proxy 2>$null | Out-Null
         Write-Host "   Restarting 'vastai-proxy' via PM2 (delete then start)..." -ForegroundColor Gray
         & pm2 delete vastai-proxy 2>&1 | Out-Null
-    }
-    catch {
+    } catch {
         # If describe/delete fail, ignore and continue to start via ecosystem if available
     }
 
@@ -171,27 +184,22 @@ if (Get-Command pm2 -ErrorAction SilentlyContinue) {
 
                     Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force -ErrorAction Stop | Out-Null
                     Write-Host "   ✅ Scheduled task created: $taskName" -ForegroundColor Green
-                }
-                else {
+                } else {
                     Write-Host "   ✅ Scheduled task '$taskName' already exists" -ForegroundColor Gray
                 }
-            }
-            catch {
+            } catch {
                 Write-Host "   ⚠️  Failed to create scheduled task: $($_.Exception.Message)" -ForegroundColor Yellow
                 Write-Host "   💡 PM2 will still work, but watchdog won't auto-restart on failures" -ForegroundColor Gray
             }
-        }
-        else {
+        } else {
             Write-Host "   ⚠️  Not running as Administrator - skipping scheduled task creation" -ForegroundColor Yellow
             Write-Host "   💡 Scheduled task provides auto-restart for PM2 failures (optional)" -ForegroundColor Gray
             Write-Host "   💡 To enable: Right-click PowerShell → Run as Administrator" -ForegroundColor Gray
         }
-    }
-    else {
+    } else {
         Write-Host "   ⚠️  PM2 available but no ecosystem.config.js found; skipping global state wipe" -ForegroundColor Yellow
     }
-}
-else {
+} else {
     Write-Host "   PM2 not found; server will be started directly" -ForegroundColor Gray
 }
 
@@ -234,8 +242,7 @@ try {
 console.log('Database completely cleared and reset');
 "@
     & node -e $dbClearCmd 2>&1 | Out-Null
-}
-catch {
+} catch {
     Write-Host "   ⚠️  Database reset skipped (will be recreated on server start)" -ForegroundColor Yellow
 }
 
@@ -273,7 +280,7 @@ foreach ($port in $usedPorts) {
     }
 }
 
-if ($stillRunning) {
+    if ($stillRunning) {
     Write-Host "   🔄 Attempting graceful shutdown of remaining processes..." -ForegroundColor Red
     foreach ($port in $usedPorts) {
         $portProcesses = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Where-Object { $_.State -eq 'Listen' } | ForEach-Object { Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue }
@@ -317,25 +324,22 @@ if (-not (Test-Path $sshDir)) {
 }
 
 # Use id_rsa_vast as default (matches our server-side defaults)
-$privateKeyPath = Join-Path $sshDir 'id_rsa_happy'
+$privateKeyPath = Join-Path $sshDir 'id_rsa_vast'
 $publicKeyPath = "$privateKeyPath.pub"
 
 if (-not (Test-Path $privateKeyPath)) {
     Write-Host "   Generating new SSH keypair..." -ForegroundColor Gray
     if (Get-Command ssh-keygen -ErrorAction SilentlyContinue) {
-        & ssh-keygen -t rsa -b 4096 -f $privateKeyPath -N "happy" -C "ai-kings-happy" 2>&1 | Out-Null
+        & ssh-keygen -t rsa -b 4096 -f $privateKeyPath -N '""' -C "ai-kings-vastai" 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) {
             Write-Host "   ✅ SSH key generated: $privateKeyPath" -ForegroundColor Green
-        }
-        else {
+        } else {
             Write-Host "   ⚠️  ssh-keygen failed; log collection may not work" -ForegroundColor Yellow
         }
-    }
-    else {
+    } else {
         Write-Host "   ⚠️  ssh-keygen not found; log collection will be disabled" -ForegroundColor Yellow
     }
-}
-else {
+} else {
     Write-Host "   ✅ Using existing SSH key: $privateKeyPath" -ForegroundColor Green
 }
 
@@ -354,8 +358,7 @@ if (Get-Command pm2 -ErrorAction SilentlyContinue) {
         & pm2 start config/ecosystem.config.js --update-env 2>&1 | Out-Null
         & pm2 save 2>&1 | Out-Null
         Write-Host "   ✅ Server started and PM2 state saved" -ForegroundColor Green
-    }
-    else {
+    } else {
         Write-Host "   ⚠️  No ecosystem.config.js found; starting server directly via start-server.ps1" -ForegroundColor Yellow
         $serverJob = Start-Job -ScriptBlock {
             param($workDir)
@@ -363,8 +366,7 @@ if (Get-Command pm2 -ErrorAction SilentlyContinue) {
             & "$workDir\scripts\powershell\start-server.ps1"
         } -ArgumentList (Get-Location).Path
     }
-}
-else {
+} else {
     Write-Host "   PM2 not installed; starting server in PowerShell background job..." -ForegroundColor Yellow
     $serverJob = Start-Job -ScriptBlock {
         param($workDir)
@@ -399,8 +401,7 @@ if (Get-Command pm2 -ErrorAction SilentlyContinue) {
     $pm2Show = & pm2 show vastai-proxy 2>&1 | Out-String
     if ($pm2Show -match 'status\s*:\s*online' -or $pm2Show -match 'online') {
         Write-Host "   ✅ PM2 reports 'vastai-proxy' online" -ForegroundColor Green
-    }
-    else {
+    } else {
         Write-Host "   ⚠️  PM2 reports: `n$pm2Show" -ForegroundColor Yellow
         Write-Host "   Check with: pm2 logs vastai-proxy --lines 200" -ForegroundColor Yellow
     }
@@ -423,8 +424,7 @@ while ($attempt -lt $maxAttempts -and -not $healthy) {
             Write-Host "   ✅ Server is healthy (status: $($response.status))" -ForegroundColor Green
             break
         }
-    }
-    catch {
+    } catch {
         $attempt++
         if ($attempt % 10 -eq 0) {
             Write-Host "   Waiting for server... ($attempt/$maxAttempts)" -ForegroundColor Gray
@@ -443,24 +443,6 @@ if (-not $healthy) {
 # STEP 7: Trigger Prewarm
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host "[7/8] Triggering prewarm..." -ForegroundColor Yellow
-
-# CRITICAL: Re-ensure ADMIN_API_KEY is set (PM2 inherits env from this session)
-if ([string]::IsNullOrWhiteSpace($env:ADMIN_API_KEY)) {
-    Write-Host "   Re-loading .env to ensure ADMIN_API_KEY..." -ForegroundColor Yellow
-    Get-Content ".env" -ErrorAction SilentlyContinue | Where-Object { $_ -match '^[^#].*=' } | ForEach-Object {
-        $parts = $_ -split '=', 2
-        $key = $parts[0].Trim()
-        $value = $parts[1].Trim()
-        if ($value.Length -ge 2 -and $value[0] -eq '"' -and $value[-1] -eq '"') { $value = $value.Substring(1, $value.Length - 2) }
-        if ($value.Length -ge 2 -and $value[0] -eq "'" -and $value[-1] -eq "'") { $value = $value.Substring(1, $value.Length - 2) }
-        Set-Item -Path "env:$key" -Value $value -Force
-    }
-}
-if ([string]::IsNullOrWhiteSpace($env:ADMIN_API_KEY)) {
-    Write-Host "   ❌ ADMIN_API_KEY is empty - prewarm will fail (403). Set it in .env" -ForegroundColor Red
-    exit 1
-}
-Write-Host "   Admin key: $($env:ADMIN_API_KEY.Substring(0, [Math]::Min(8, $env:ADMIN_API_KEY.Length)))..." -ForegroundColor DarkGray
 
 # Ensure desiredSize is set to 1 for the warm pool
 $setDesiredSizeCmd = @"
@@ -502,15 +484,13 @@ for ($i = 1; $i -le $prewarmAttempts; $i++) {
         }
         $prewarmSuccess = $true
         break
-    }
-    catch {
+    } catch {
         $err = $_.Exception.Message
         Write-Host "   ⚠️  Prewarm attempt #$i failed: $err" -ForegroundColor Yellow
 
         if ($err -match '403|forbidden') {
             Write-Host "   Admin key rejected. This may be a caching issue." -ForegroundColor Yellow
-        }
-        elseif ($err -imatch 'timeout|timed out|canceled') {
+        } elseif ($err -imatch 'timeout|timed out|canceled') {
             Write-Host "   Note: Prewarm was triggered but response timed out." -ForegroundColor Yellow
             Write-Host "   Checking if instance is actually provisioning..." -ForegroundColor Gray
 
@@ -536,15 +516,12 @@ for ($i = 1; $i -le $prewarmAttempts; $i++) {
                         $prewarmSuccess = $true
                         $global:instanceContractId = $statusResult.instances[0].contractId
                         break
-                    }
-                    elseif ($statusResult.instances -and $statusResult.instances.Count -gt 0) {
+                    } elseif ($statusResult.instances -and $statusResult.instances.Count -gt 0) {
                         Write-Host "   Instance found but no contractId yet (status: $($statusResult.instances[0].actual_status))" -ForegroundColor Gray
-                    }
-                    else {
+                    } else {
                         Write-Host "   No instance in status response yet" -ForegroundColor Gray
                     }
-                }
-                catch {
+                } catch {
                     $statusErr = $_.Exception.Message
                     Write-Host "   Status check failed: $statusErr" -ForegroundColor DarkGray
                 }
@@ -578,8 +555,7 @@ if (-not $prewarmSuccess) {
             $prewarmSuccess = $true
             $global:instanceContractId = $finalStatus.instances[0].contractId
         }
-    }
-    catch {
+    } catch {
         Write-Host "   Final status check failed: $($_.Exception.Message)" -ForegroundColor DarkGray
     }
 }
@@ -599,7 +575,7 @@ if ($prewarmSuccess) {
     $sshHost = $null
     $sshPort = $null
     # Wait up to 3 minutes for SSH details to appear
-    for ($wait = 0; $wait -lt 36; $wait++) {
+    for ($wait=0; $wait -lt 36; $wait++) {
         try {
             $s = Invoke-RestMethod `
                 -Uri "http://localhost:3000/api/proxy/admin/warm-pool/status" `
@@ -613,8 +589,7 @@ if ($prewarmSuccess) {
                 $sshPort = $s.instances[0].ssh_port
                 break
             }
-        }
-        catch {
+        } catch {
             # transient - ignore
         }
         Start-Sleep -Seconds 5
@@ -624,20 +599,16 @@ if ($prewarmSuccess) {
         Write-Host "   ✅ SSH details found: $($sshHost):$($sshPort)" -ForegroundColor Green
 
         $localScript = Join-Path (Get-Location) 'scripts\provision-reliable.sh'
-        if ($env:COMFYUI_PROVISION_SCRIPT -match 'provision-dropbox-only.sh') {
-            $localScript = Join-Path (Get-Location) 'scripts\provision-dropbox-only.sh'
-        }
         if (Test-Path $localScript) {
             $localHash = (Get-FileHash $localScript -Algorithm SHA256).Hash
             $uploadedOk = $false
 
-            for ($attempt = 1; $attempt -le 5; $attempt++) {
+            for ($attempt=1; $attempt -le 5; $attempt++) {
                 Write-Host "   Upload attempt #$attempt -> /tmp/provision.sh" -ForegroundColor Gray
-                $scpArgs = @('-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=nul', $localScript, "root@$($sshHost):/tmp/provision.sh")
+                $scpArgs = @('-o','StrictHostKeyChecking=no','-o','UserKnownHostsFile=nul',$localScript,"root@$($sshHost):/tmp/provision.sh")
                 try {
                     & scp @scpArgs 2>$null | Out-Null
-                }
-                catch {
+                } catch {
                     # ignore, we'll verify below
                 }
 
@@ -647,8 +618,7 @@ if ($prewarmSuccess) {
                     $remoteCmd = "sha256sum /tmp/provision.sh 2>/dev/null | awk '{print \$1}'"
                     $raw = & ssh -o StrictHostKeyChecking=no "root@$sshHost" $remoteCmd 2>$null
                     $remoteHash = ($raw -join "").Trim()
-                }
-                catch {
+                } catch {
                     $remoteHash = ""
                 }
 
@@ -662,12 +632,10 @@ if ($prewarmSuccess) {
                         & ssh -o StrictHostKeyChecking=no "root@$sshHost" "dos2unix /tmp/provision.sh 2>/dev/null || true; chmod +x /tmp/provision.sh; nohup bash /tmp/provision.sh > /workspace/provision_v3.log 2>&1 &" 2>$null
                         $uploadedOk = $true
                         break
-                    }
-                    catch {
+                    } catch {
                         Write-Host "   ⚠️  Failed to start remote script (attempt $attempt)" -ForegroundColor Yellow
                     }
-                }
-                else {
+                } else {
                     Write-Host "   ⚠️  Remote sha mismatch or not present (attempt $attempt)" -ForegroundColor Yellow
 
                     # After a few attempts, try a safer fallback: pipe file content via SSH
@@ -675,8 +643,7 @@ if ($prewarmSuccess) {
                         Write-Host "   ⚡ Attempting fallback upload via SSH (piping file content)..." -ForegroundColor Gray
                         try {
                             Get-Content $localScript -Raw | & ssh -o StrictHostKeyChecking=no "root@$sshHost" "cat > /tmp/provision.sh"
-                        }
-                        catch {
+                        } catch {
                             Write-Host "   ⚠️  Fallback upload failed" -ForegroundColor Yellow
                         }
 
@@ -684,8 +651,7 @@ if ($prewarmSuccess) {
                         try {
                             $raw = & ssh -o StrictHostKeyChecking=no "root@$sshHost" $remoteCmd 2>$null
                             $remoteHash = ($raw -join "").Trim()
-                        }
-                        catch {
+                        } catch {
                             $remoteHash = ""
                         }
 
@@ -697,12 +663,10 @@ if ($prewarmSuccess) {
                                 & ssh -o StrictHostKeyChecking=no "root@$sshHost" "dos2unix /tmp/provision.sh 2>/dev/null || true; chmod +x /tmp/provision.sh; nohup bash /tmp/provision.sh > /workspace/provision_v3.log 2>&1 &" 2>$null
                                 $uploadedOk = $true
                                 break
-                            }
-                            catch {
+                            } catch {
                                 Write-Host "   ⚠️  Failed to start remote script after fallback" -ForegroundColor Yellow
                             }
-                        }
-                        else {
+                        } else {
                             Write-Host "   ⚠️  Fallback did not produce matching remote hash" -ForegroundColor Yellow
                         }
                     }
@@ -717,12 +681,10 @@ if ($prewarmSuccess) {
                 Write-Host "     scp $localScript root@$($sshHost):/tmp/provision.sh" -ForegroundColor Gray
                 Write-Host "     ssh root@$($sshHost) 'dos2unix /tmp/provision.sh; chmod +x /tmp/provision.sh; nohup bash /tmp/provision.sh > /workspace/provision_v3.log 2>&1 &'" -ForegroundColor Gray
             }
-        }
-        else {
+        } else {
             Write-Host "   ❌ Local provision script not found: $localScript" -ForegroundColor Red
         }
-    }
-    else {
+    } else {
         Write-Host "   ⚠️  SSH details did not appear; will continue waiting for instance readiness" -ForegroundColor Yellow
     }
 }
@@ -779,8 +741,7 @@ if ($prewarmSuccess) {
                                 $comfyReady = $true
                                 break
                             }
-                        }
-                        catch {
+                        } catch {
                             # ComfyUI not ready yet
                         }
 
@@ -793,22 +754,18 @@ if ($prewarmSuccess) {
                         Write-Host "   🎉 Instance fully ready! ComfyUI is running and accessible." -ForegroundColor Green
                         $instanceReady = $true
                         break
-                    }
-                    else {
+                    } else {
                         Write-Host "   ⚠️  Instance running but ComfyUI not accessible yet..." -ForegroundColor Yellow
                     }
-                }
-                elseif ($status -match 'exited|error|failed') {
+                } elseif ($status -match 'exited|error|failed') {
                     Write-Host "   ❌ Instance failed with status: $status" -ForegroundColor Red
                     break
                 }
                 # Continue waiting for other statuses (loading, starting, etc.)
-            }
-            else {
+            } else {
                 Write-Host "   No instance found in status response" -ForegroundColor Yellow
             }
-        }
-        catch {
+        } catch {
             $statusErr = $_.Exception.Message
             if ($attempt % 6 -eq 1) {
                 Write-Host "   Status check failed: $statusErr" -ForegroundColor DarkGray

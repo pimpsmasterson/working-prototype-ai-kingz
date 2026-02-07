@@ -10,6 +10,9 @@ if (Test-Path ".env") {
         $key, $value = $_ -split '=', 2
         $key = $key.Trim()
         $value = $value.Trim()
+        # Remove inline comments and surrounding quotes
+        $value = $value -replace '\s+#.*$',''
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) { if ($value.Length -ge 2) { $value = $value.Substring(1, $value.Length - 2) } }
         Set-Item -Path "env:$key" -Value $value
         Write-Host "Set $key"
     }

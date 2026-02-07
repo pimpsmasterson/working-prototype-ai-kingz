@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Push scripts/provision-reliable.sh to the GitHub Gist used by COMFYUI_PROVISION_SCRIPT.
- * Uses GITHUB_TOKEN from .env. Gist ID 9fb9d7c60d3822c2ffd3ad4b000cc864 (canonical).
+ * Uses GITHUB_TOKEN from .env. Gist ID is from .env.example / docs (pimpsmasterson/c3f61f20067d498b6699d1bdbddea395).
  * No random files: reads only scripts/provision-reliable.sh and updates the existing gist.
  */
 const path = require('path');
@@ -10,9 +10,8 @@ const fetch = require('node-fetch');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const GIST_ID = '9fb9d7c60d3822c2ffd3ad4b000cc864';
+const GIST_ID = 'c3f61f20067d498b6699d1bdbddea395';
 const PROVISION_PATH = path.join(__dirname, 'provision-reliable.sh');
-const CHECK_CF_PATH = path.join(__dirname, 'check-cloudflare.sh');
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 
 async function main() {
@@ -28,16 +27,10 @@ async function main() {
   }
 
   const content = fs.readFileSync(PROVISION_PATH, 'utf8');
-  let checkCfContent = '';
-  if (fs.existsSync(CHECK_CF_PATH)) {
-    checkCfContent = fs.readFileSync(CHECK_CF_PATH, 'utf8');
-  }
-
   const payload = {
-    description: 'AI Kings ComfyUI reliable provisioner v3.1.6 — Real-time process monitoring, PID verification, enhanced diagnostics',
+    description: 'AI Kings ComfyUI reliable provisioner v3.0 (provision-reliable.sh)',
     files: {
-      'provision-reliable.sh': { content },
-      'check-cloudflare.sh': { content: checkCfContent }
+      'provision-reliable.sh': { content }
     }
   };
 
@@ -61,7 +54,7 @@ async function main() {
 
   const data = await res.json();
   console.log('Gist updated successfully.');
-  console.log('Raw URL (use in COMFYUI_PROVISION_SCRIPT):', data.files['provision-reliable.sh']?.raw_url || 'https://gist.githubusercontent.com/pimpsmasterson/' + GIST_ID + '/raw/provision-reliable.sh');
+  console.log('Raw URL (use in COMFYUI_PROVISION_SCRIPT):', data.files['provision-reliable.sh']?.raw_url || 'https://gist.githubusercontent.com/pimpsmasterson/' + GIST_ID + '/raw');
 }
 
 main().catch((err) => {

@@ -2,6 +2,7 @@
 # Auto-generated
 node_modules
 .env
+.env.backup*
 .proxy-tokens.json
 coverage/
 data/backup_*
@@ -9,4 +10,6 @@ data/backup_*
 .DS_Store
 # Dropbox-generated link list (may contain private paths/filenames)
 data/dropbox_links.txt
+# Local binaries (e.g. cloudflared)
+scripts/bin/
 

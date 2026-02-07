@@ -23,6 +23,9 @@ if (Test-Path ".env") {
         $parts = $_ -split '=', 2
         $key = $parts[0].Trim()
         $value = $parts[1].Trim()
+        # Remove inline comments and surrounding quotes
+        $value = $value -replace '\s+#.*$',''
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) { if ($value.Length -ge 2) { $value = $value.Substring(1, $value.Length - 2) } }
         Set-Item -Path "env:$key" -Value $value
     }
 }

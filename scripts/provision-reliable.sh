@@ -1,11 +1,11 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.1.8                          ║
+# ║   👑 AI KINGS COMFYUI - RELIABLE PROVISIONER v3.0                            ║
 # ║                                                                               ║
 # ║   ✓ HuggingFace Primary + Dropbox Fallback (Multi-Source Reliability)       ║
 # ║   ✓ Ultra-Fast Parallel Downloads (aria2c 8x - Optimized)                   ║
-# ║   ✓ All 10+ Production NSFW Workflows (Embedded)                            ║
-# ║   ✓ 55+ Verified Models from Official Sources                                ║
+# ║   ✓ Models Only (Workflows managed separately)                              ║
+# ║   ✓ 45+ Verified Models from Official Sources                                ║
 # ║   ✓ Smart Rate-Limit Handling (Civitai Sequential, HF Parallel)              ║
 # ║   ✓ Full Ubuntu 24.04 Compatibility                                         ║
 # ║   ✓ Enhanced Security (Header-based Auth, PID Tracking)                     ║
@@ -43,52 +43,68 @@ set -euo pipefail
 # Cleanup handler - kill all background download processes on exit
 cleanup_on_exit() {
     local exit_code=$?
-    if [[ $exit_code -ne 0 ]]; then
-        echo "⚠️  Script interrupted (exit code: $exit_code) - cleaning up background processes..."
+
+    # On normal exit, clean exit without killing background jobs
+    if [[ $exit_code -eq 0 ]]; then
+        echo "   ✅ Provisioning completed successfully"
+        return 0
     fi
 
-    # Kill all background jobs (download workers)
-  # Preserve ComfyUI PID if present to avoid killing the running server
-  local preserve_pid_file="${WORKSPACE:-/workspace}/comfyui.pid"
-  local preserve_pid=""
-  if [[ -f "$preserve_pid_file" ]]; then
-    preserve_pid=$(cat "$preserve_pid_file" 2>/dev/null || true)
-  fi
+    # On error, cleanup background processes
+    echo "⚠️  Error detected (exit code: $exit_code) - cleaning up background processes..."
 
-  # Kill jobs except preserved PID
-  for p in $(jobs -p); do
-    if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
-      log "   ⛳ Preserving ComfyUI PID $preserve_pid from cleanup"
-      continue
+    # Preserve ComfyUI PID if present to avoid killing the running server
+    local preserve_pid_file="${WORKSPACE:-/workspace}/comfyui.pid"
+    local preserve_pid=""
+    if [[ -f "$preserve_pid_file" ]]; then
+        preserve_pid=$(cat "$preserve_pid_file" 2>/dev/null || true)
+        echo "   ⛳ Preserving ComfyUI PID: $preserve_pid"
     fi
-    kill -9 "$p" 2>/dev/null || true
-  done
 
-    # Kill any remaining aria2c or wget processes started by this script (avoid killing preserved PID)
+    # Kill jobs except preserved PID (use SIGTERM first for graceful shutdown)
+    for p in $(jobs -p); do
+        if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
+            echo "   ⛳ Skipping ComfyUI PID $preserve_pid from cleanup"
+            continue
+        fi
+        kill -15 "$p" 2>/dev/null || true  # SIGTERM (graceful)
+    done
+
+    # Wait 2 seconds for graceful shutdown
+    sleep 2
+
+    # Force kill any remaining processes
+    for p in $(jobs -p); do
+        if [[ -n "$preserve_pid" && "$p" == "$preserve_pid" ]]; then
+            continue
+        fi
+        kill -9 "$p" 2>/dev/null || true  # SIGKILL (force)
+    done
+
+    # Kill any remaining aria2c or wget processes started by this script
     if [[ -n "$preserve_pid" ]]; then
-      # Kill children of this script except the preserved PID
-      for c in $(pgrep -P $$ || true); do
-        if [[ "$c" == "$preserve_pid" ]]; then
-          log "   ⛳ Skipping kill of preserved PID $preserve_pid"
-          continue
-        fi
-        pkill -P "$c" -9 aria2c 2>/dev/null || true
-        pkill -P "$c" -9 wget 2>/dev/null || true
-      done
-      # Also kill any aria2c/wget not children of this script, but avoid the preserved PID
-      for pid in $(pgrep aria2c || true); do
-        if [[ "$pid" != "$preserve_pid" ]]; then
-          kill -9 "$pid" 2>/dev/null || true
-        fi
-      done
-      for pid in $(pgrep wget || true); do
-        if [[ "$pid" != "$preserve_pid" ]]; then
-          kill -9 "$pid" 2>/dev/null || true
-        fi
-      done
+        # Kill children of this script except the preserved PID
+        for c in $(pgrep -P $$ || true); do
+            if [[ "$c" == "$preserve_pid" ]]; then
+                continue
+            fi
+            pkill -P "$c" -15 aria2c 2>/dev/null || true  # SIGTERM first
+            pkill -P "$c" -15 wget 2>/dev/null || true
+        done
+        sleep 1
+        for c in $(pgrep -P $$ || true); do
+            if [[ "$c" == "$preserve_pid" ]]; then
+                continue
+            fi
+            pkill -P "$c" -9 aria2c 2>/dev/null || true  # SIGKILL if still alive
+            pkill -P "$c" -9 wget 2>/dev/null || true
+        done
     else
-      pkill -P $$ -9 aria2c 2>/dev/null || true
-      pkill -P $$ -9 wget 2>/dev/null || true
+        pkill -P $$ -15 aria2c 2>/dev/null || true
+        pkill -P $$ -15 wget 2>/dev/null || true
+        sleep 1
+        pkill -P $$ -9 aria2c 2>/dev/null || true
+        pkill -P $$ -9 wget 2>/dev/null || true
     fi
 
     exit $exit_code
@@ -103,42 +119,32 @@ log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EMERGENCY SSH FIX (Critical for Vast.ai)
+# START PROVISIONING (No Screen Wrapper - Runs Directly)
 # ═══════════════════════════════════════════════════════════════════════════════
-fix_ssh_permissions() {
-    log "🔐 Fixing SSH permissions for Vast.ai..."
+log "🎯 Starting provisioning directly..."
 
-    # Fix home directory SSH
-    mkdir -p ~/.ssh 2>/dev/null || true
-    chmod 700 ~/.ssh 2>/dev/null || true
-    if [[ -f ~/.ssh/authorized_keys ]]; then
-        chmod 600 ~/.ssh/authorized_keys 2>/dev/null || true
-        log "   ✅ SSH permissions fixed (authorized_keys: 600)"
-    fi
+  # List of filenames that are optional: failures for these will not abort provisioning
+  OPTIONAL_ASSETS=(
+    "example_pose.png"
+    "rife426.zip"
+  )
 
-    # Fix /root SSH directory
-    if [[ -d /root/.ssh ]]; then
-        chmod 700 /root/.ssh 2>/dev/null || true
-        chown -R root:root /root/.ssh 2>/dev/null || true
-        if [[ -f /root/.ssh/authorized_keys ]]; then
-            chmod 600 /root/.ssh/authorized_keys 2>/dev/null || true
-        fi
-    fi
+  is_optional_file() {
+    local f="$1"
+    for opt in "${OPTIONAL_ASSETS[@]:-}"; do
+      if [[ "$opt" == "$f" ]]; then
+        return 0
+      fi
+    done
+    return 1
+  }
+# ═══════════════════════════════════════════════════════════════════════════════
+# EMERGENCY RECOVERY (SSH FIXES COMPLETELY REMOVED)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    # Disable SSH strict mode temporarily for provisioning
-    if [[ -f /etc/ssh/sshd_config ]] && grep -q "StrictModes yes" /etc/ssh/sshd_config 2>/dev/null; then
-        sed -i 's/StrictModes yes/StrictModes no/g' /etc/ssh/sshd_config 2>/dev/null || true
-        systemctl reload ssh 2>/dev/null || true
-        log "   ✅ SSH StrictModes disabled temporarily"
-    fi
-}
-
-# Emergency recovery for critical system issues
+# Emergency recovery for critical system issues (all SSH fixes removed)
 emergency_recovery() {
     log "🚨 Running emergency recovery..."
-
-    # Fix SSH first
-    fix_ssh_permissions
 
     # Suppress pip root warnings
     export PIP_ROOT_USER_ACTION=ignore
@@ -169,6 +175,279 @@ check_required_cmds() {
     done
 }
 
+install_apt_packages() {
+    log_section "📦 INSTALLING APT PACKAGES"
+
+    # Update package list
+    log "   Updating apt package list..."
+    apt-get update -qq || {
+        log "⚠️  apt-get update failed, retrying once..."
+        sleep 5
+        apt-get update -qq || log "⚠️  apt-get update failed again, continuing anyway..."
+    }
+
+    # Install packages - batch mode for speed and resilience
+    log "   Installing system packages (batch mode)..."
+    
+    # Collect packages that need installation
+    local to_install=()
+    for pkg in "${APT_PACKAGES[@]}"; do
+        if ! dpkg -l | grep -q "^ii  $pkg "; then
+            to_install+=("$pkg")
+        else
+            log "   ✓ Already installed: $pkg"
+        fi
+    done
+    
+    # Install all at once with timeout (much faster than one-by-one)
+    if [ ${#to_install[@]} -gt 0 ]; then
+        log "   Installing ${#to_install[@]} packages: ${to_install[*]}"
+        # 5 minute timeout for entire batch (prevents infinite hangs)
+        timeout 300 apt-get install -y -qq "${to_install[@]}" 2>&1 | grep -v "^debconf:" || {
+            log "   ⚠️  Batch installation timed out or failed, trying individually with short timeout..."
+            # Fallback: try each package individually with 60s timeout
+            for pkg in "${to_install[@]}"; do
+                log "   Retry: $pkg"
+                timeout 60 apt-get install -y -qq "$pkg" 2>&1 | grep -v "^debconf:" || {
+                    log "   ⚠️  $pkg failed, skipping..."
+                }
+            done
+        }
+    fi
+
+    log "✅ APT packages installed successfully"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CLOUDFLARE TUNNEL (Zero-Config Public Access)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Cloudflare Quick Tunnel provides instant public URLs without configuration.
+# This eliminates the need for SSH tunneling, port forwarding, or firewall rules.
+
+install_cloudflared() {
+    log_section "📡 INSTALLING CLOUDFLARE TUNNEL"
+    
+    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+    local CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
+    
+    # Check if already installed
+    if [[ -x "$CLOUDFLARED_BIN" ]]; then
+        local version=$("$CLOUDFLARED_BIN" --version 2>/dev/null | head -1 || echo "unknown")
+        log "   ✅ Cloudflared already installed: $version"
+        return 0
+    fi
+    
+    log "   📥 Downloading cloudflared from GitHub..."
+    
+    # Download with retries
+    local download_success=false
+    for attempt in {1..3}; do
+        if curl -fsSL --connect-timeout 30 --max-time 120 \
+            "$CLOUDFLARED_URL" -o "$CLOUDFLARED_BIN" 2>/dev/null; then
+            download_success=true
+            break
+        fi
+        log "   ⚠️  Download attempt $attempt failed, retrying..."
+        sleep 5
+    done
+    
+    if [[ "$download_success" != "true" ]]; then
+        log "   ❌ Failed to download cloudflared after 3 attempts"
+        log "   ComfyUI will still work but tunnel access won't be available"
+        return 1
+    fi
+    
+    # Make executable
+    chmod +x "$CLOUDFLARED_BIN"
+    
+    # Verify installation
+    if "$CLOUDFLARED_BIN" --version >/dev/null 2>&1; then
+        local version=$("$CLOUDFLARED_BIN" --version 2>/dev/null | head -1)
+        log "   ✅ Cloudflared installed: $version"
+        return 0
+    else
+        log "   ❌ Cloudflared installation verification failed"
+        rm -f "$CLOUDFLARED_BIN"
+        return 1
+    fi
+}
+
+start_cloudflare_tunnel() {
+    log_section "🌐 STARTING CLOUDFLARE TUNNEL"
+    
+    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
+    local TUNNEL_LOG="${WORKSPACE}/cloudflared.log"
+    local TUNNEL_PID_FILE="${WORKSPACE}/cloudflared.pid"
+    local TUNNEL_URL_FILE="${WORKSPACE}/.comfyui_tunnel_url"
+    
+    # Check if cloudflared is installed
+    if [[ ! -x "$CLOUDFLARED_BIN" ]]; then
+        log "   ⚠️  Cloudflared not installed, skipping tunnel setup"
+        return 1
+    fi
+    
+    # Kill any existing tunnel process
+    if [[ -f "$TUNNEL_PID_FILE" ]]; then
+        local old_pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null)
+        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+            log "   🔄 Stopping existing tunnel (PID: $old_pid)"
+            kill "$old_pid" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "$TUNNEL_PID_FILE"
+    fi
+    
+    # Wait for ComfyUI to be ready before starting tunnel.
+    # First run with many custom nodes can take 2-5+ minutes; allow up to 5 minutes.
+    log "   ⏳ Waiting for ComfyUI to respond on port 8188 (up to 5 min, first start is slow)..."
+    local comfy_ready=false
+    local max_attempts=60
+    local interval=5
+    for i in $(seq 1 $max_attempts); do
+        if curl -s --connect-timeout 3 "http://localhost:8188/system_stats" >/dev/null 2>&1; then
+            comfy_ready=true
+            log "   ✅ ComfyUI is ready on port 8188 (after $(( i * interval ))s)"
+            break
+        fi
+        if [[ $(( i % 6 )) -eq 0 ]]; then
+            log "   ⏳ Still waiting... ${i}/${max_attempts} (${(( i * interval ))}s)"
+        fi
+        sleep $interval
+    done
+    
+    if [[ "$comfy_ready" != "true" ]]; then
+        log "   ⚠️  ComfyUI not responding on port 8188 after ${max_attempts}x${interval}s"
+        log "   Tunnel will start anyway but may not work until ComfyUI is ready"
+    fi
+    
+    # Start tunnel in background using setsid to detach from script
+    log "   🚀 Starting Cloudflare tunnel..."
+    setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 \
+        > "$TUNNEL_LOG" 2>&1 < /dev/null &
+    
+    local TUNNEL_PID=$!
+    echo "$TUNNEL_PID" > "$TUNNEL_PID_FILE"
+    log "   📝 Tunnel started with PID: $TUNNEL_PID"
+    
+    # Wait for tunnel URL to appear in logs (allow retries and restarts)
+    log "   ⏳ Waiting for tunnel URL..."
+    local TUNNEL_URL=""
+    local WAIT_SECONDS=60
+    local MAX_ATTEMPTS=3
+
+    for attempt in $(seq 1 $MAX_ATTEMPTS); do
+        for i in $(seq 1 $WAIT_SECONDS); do
+            TUNNEL_URL=$(grep -oP 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1 || true)
+            if [[ -n "$TUNNEL_URL" ]]; then
+                break 2
+            fi
+            sleep 1
+        done
+
+        # Fail fast if Cloudflare returned rate limit (429) - retrying won't help
+        if grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null; then
+            log "   ⚠️  Cloudflare rate limit (429) - skipping tunnel retries; use SSH fallback"
+            break
+        fi
+
+        # If not found, try restarting cloudflared and try again
+        if [[ -z "$TUNNEL_URL" ]]; then
+            log "   ⚠️  Attempt ${attempt}/${MAX_ATTEMPTS}: tunnel URL not found; restarting cloudflared and retrying..."
+            if [[ -f "$TUNNEL_PID_FILE" ]]; then
+                local pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
+                if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                    kill "$pid" 2>/dev/null || true
+                    sleep 2
+                fi
+                rm -f "$TUNNEL_PID_FILE"
+            fi
+
+            setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
+            local new_pid=$!
+            echo "$new_pid" > "$TUNNEL_PID_FILE"
+            log "   🔁 Restarted cloudflared (PID: $new_pid)"
+            # short delay before next wait
+            sleep 3
+        fi
+    done
+
+    if [[ -z "$TUNNEL_URL" ]]; then
+        log "   ❌ Could not capture tunnel URL after ${MAX_ATTEMPTS} attempts"
+        log "   Check logs at: $TUNNEL_LOG"
+        cat "$TUNNEL_LOG" 2>/dev/null | tail -40 || true
+        return 1
+    fi
+
+    log "   ✅ Tunnel URL: $TUNNEL_URL"
+    echo "$TUNNEL_URL" > "$TUNNEL_URL_FILE"
+    
+    # Report tunnel URL to proxy server if configured
+    local PROXY_REPORT_URL="${COMFYUI_PROXY_REPORT_URL:-}"
+    local CONTRACT_ID="${VAST_CONTAINERLABEL:-${CONTAINER_ID:-unknown}}"
+    local ADMIN_KEY="${ADMIN_API_KEY:-}"
+    
+    if [[ -n "$PROXY_REPORT_URL" ]]; then
+        log "   📡 Reporting tunnel URL to proxy server..."
+        local report_response
+        report_response=$(curl -s -X POST "${PROXY_REPORT_URL}/api/proxy/admin/report-tunnel" \
+            -H "Content-Type: application/json" \
+            -H "x-admin-key: ${ADMIN_KEY}" \
+            -d "{\"contractId\": \"$CONTRACT_ID\", \"tunnelUrl\": \"$TUNNEL_URL\"}" \
+            2>/dev/null || echo '{"error": "request failed"}')
+        
+        if echo "$report_response" | grep -q '"success"'; then
+            log "   ✅ Tunnel URL reported to proxy server"
+        else
+            log "   ⚠️  Failed to report tunnel URL: $report_response"
+            log "   Tunnel is still accessible at: $TUNNEL_URL"
+        fi
+    else
+        log "   ℹ️  COMFYUI_PROXY_REPORT_URL not set, skipping proxy notification"
+        log "   Tunnel is accessible at: $TUNNEL_URL"
+    fi
+    
+    log ""
+    log "   ╔════════════════════════════════════════════════════════════════╗"
+    log "   ║  🌐 COMFYUI PUBLIC ACCESS URL                                   ║"
+    log "   ║                                                                ║"
+    log "   ║  $TUNNEL_URL"
+    log "   ║                                                                ║"
+    log "   ║  Open this URL in your browser - no SSH needed!               ║"
+    log "   ╚════════════════════════════════════════════════════════════════╝"
+    log ""
+    
+    return 0
+}
+
+generate_cloudflared_service() {
+    log "   ⚙️  Generating systemd service for cloudflared"
+    local svc_file="/etc/systemd/system/cloudflared-tunnel.service"
+    
+    cat > "$svc_file" <<EOF
+[Unit]
+Description=Cloudflare Tunnel for ComfyUI
+After=network.target comfyui.service
+Wants=comfyui.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:8188
+Restart=always
+RestartSec=10
+StandardOutput=append:${WORKSPACE}/cloudflared.log
+StandardError=append:${WORKSPACE}/cloudflared.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    chmod 644 "$svc_file"
+    systemctl daemon-reload 2>/dev/null || true
+    # Don't enable by default - let start_cloudflare_tunnel handle it
+    log "   ✅ Wrote systemd unit: $svc_file"
+}
+
 validate_civitai_token() {
     if [[ -z "$CIVITAI_TOKEN" ]]; then
         log "⚠️  Warning: CIVITAI_TOKEN not set - Civitai downloads will fail"
@@ -182,14 +461,10 @@ validate_civitai_token() {
     local test_file="/tmp/civitai_token_test.tmp"
 
     # Download first 1MB to test auth (abort after to save bandwidth)
-    # -L: follow redirects (Civitai returns 307 redirects; following yields 200)
-    # Do NOT use || echo 000 inside $() — curl can exit 63 (max-filesize) after writing 200, producing "200000"
-    local response
-    response=$(curl -sL -w "%{http_code}" -o "$test_file" \
+    local response=$(curl -s -w "%{http_code}" -o "$test_file" \
         --max-filesize 1048576 \
         --max-time 30 \
-        "$test_url" 2>/dev/null)
-    [[ -z "$response" ]] && response="000"  # curl failed entirely (network error, etc)
+        "$test_url" 2>/dev/null || echo "000")
 
     # Clean up test file
     rm -f "$test_file"
@@ -213,7 +488,7 @@ validate_civitai_token() {
     fi
 }
 
-log "🚀 Starting AI KINGS Provisioner v3.1.8 (Reliable & Secured)..."
+log "🚀 Starting AI KINGS Provisioner v3.0 (Reliable & Secured)..."
 
 # Suppress pip root user warnings (we intentionally run as root on Vast.ai)
 export PIP_ROOT_USER_ACTION=ignore
@@ -224,34 +499,19 @@ if mkdir -p "$DEFAULT_WS" 2>/dev/null && cd "$DEFAULT_WS" 2>/dev/null; then
   WORKSPACE="$PWD"
 fi
 
-# 2.2 FIX SSH PERMISSIONS (Critical for log collection and internal SSH)
-# Vast.ai creates authorized_keys with wrong permissions (644) which causes SSH auth failures
-# Fix this immediately to prevent "bad ownership or modes" errors during provisioning
-log "🔐 Fixing SSH permissions..."
-mkdir -p ~/.ssh 2>/dev/null || true
-chmod 700 ~/.ssh 2>/dev/null || true
-  if [[ -f ~/.ssh/authorized_keys ]]; then
-  chmod 600 ~/.ssh/authorized_keys 2>/dev/null || true
-  log "   ✅ SSH permissions fixed (authorized_keys: 600, .ssh: 700)"
-else
-  log "   ⚠️  authorized_keys not found yet (will be created later)"
-fi
+# 2.2 SSH CONFIGURATION (All SSH fixes removed - they break provisioning)
+log "🔐 SSH configuration skipped (causes provisioning issues)"
 
 # 2.5 DISK SPACE CHECK (Ironclad)
 # Minimum disk in GB required for provisioning (configurable via env MIN_DISK_GB)
-# Allow 5GB buffer for filesystem overhead and rounding differences
 MIN_DISK_GB=${MIN_DISK_GB:-200}
-DISK_BUFFER_GB=5
 AVAILABLE_KB=$(df "$WORKSPACE" | awk 'NR==2 {print $4}')
-AVAILABLE_GB=$((AVAILABLE_KB / 1024 / 1024))
-REQUIRED_KB=$(( (MIN_DISK_GB - DISK_BUFFER_GB) * 1024 * 1024 ))
-if (( AVAILABLE_KB < REQUIRED_KB )); then
-    log "❌ FATAL ERROR: Insufficient disk space in $WORKSPACE."
-    log "   Need: ${MIN_DISK_GB}GB (with ${DISK_BUFFER_GB}GB buffer), Have: ${AVAILABLE_GB}GB"
+if (( AVAILABLE_KB < MIN_DISK_GB * 1024 * 1024 )); then
+  log "❌ FATAL ERROR: Insufficient disk space in $WORKSPACE."
+  log "   Need: ${MIN_DISK_GB}GB, Have: $((AVAILABLE_KB / 1024 / 1024))GB"
     log "   Cannot proceed with provisioning - exiting early"
     exit 1
 fi
-log "   ✅ Disk space check passed: ${AVAILABLE_GB}GB available (required: ${MIN_DISK_GB}GB)"
 
 COMFYUI_DIR=${WORKSPACE}/ComfyUI
 # Finalize the log file to the chosen workspace
@@ -279,7 +539,6 @@ APT_PACKAGES=(
 # ═══════════════════════════════════════════════════════════════════════════════
 NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
-    "https://github.com/AIDC-AI/ComfyUI-Copilot"
     "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"
     "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"
     "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation"
@@ -293,12 +552,14 @@ NODES=(
     "https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes"
     "https://github.com/rgthree/rgthree-comfy"
     "https://github.com/city96/ComfyUI-GGUF"
-    "https://github.com/VykosX/ComfyUI-TripoSR"
+    "https://github.com/flowtyone/ComfyUI-TripoSR"  # Working fork (original VykosX repo deleted)
     "https://github.com/Lightricks/ComfyUI-LTXVideo"
-    # Krita AI Diffusion plugin required nodes
-    "https://github.com/Fannovel16/comfyui_controlnet_aux"
-    "https://github.com/Acly/comfyui-inpaint-nodes"
-    "https://github.com/Acly/comfyui-tooling-nodes"
+    "https://github.com/AIDC-AI/ComfyUI-Copilot"
+    # NEW NODES FOR MISSING WORKFLOW DEPENDENCIES:
+    "https://github.com/yolain/ComfyUI-Easy-Use"  # Provides: easy cleanGpuUsed, easy showAnything, MultiplePathsInput
+    "https://github.com/cubiq/ComfyUI_essentials"  # Provides: INTConstant, ImageResize+, ImageLoader
+    "https://github.com/AIGODLIKE/AIGODLIKE-ComfyUI-Translation"  # Additional utilities
+    "https://github.com/kijai/ComfyUI-Florence2"  # VQA/Vision capabilities (includes Qwen-like models)
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -313,14 +574,17 @@ CHECKPOINT_MODELS=(
     # pmXL v1 (6.5GB) - Dropbox only (no verified HF source)
     "https://www.dropbox.com/scl/fi/dd7aiju5petevb6nalinr/pmXL_v1.safetensors?rlkey=p4ukouvdd2o912ilcfbi6cqk3&dl=1||pmXL_v1.safetensors"
 
-    # DreamShaper 8 (2GB) - Official HF repo by Lykon
-    "https://huggingface.co/Lykon/dreamshaper-8/resolve/main/dreamshaper_8.safetensors|https://www.dropbox.com/scl/fi/v52p66ci8u7n8r5cqc1pi/dreamshaper_8.safetensors?rlkey=4f0133r062xr8nafpsxp2h9gq&dl=1|dreamshaper_8.safetensors"
+    # DreamShaper 8 (2GB) - Working mirror
+    "https://huggingface.co/stablediffusionapi/dreamshaper-8/resolve/main/dreamshaper_8.safetensors|https://civitai.com/api/download/models/128641|dreamshaper_8.safetensors"
 
-    # revAnimated v1.2.2 (2GB) - HF primary, Civitai fallback
-    "https://huggingface.co/danbrown/RevAnimated-v1-2-2/resolve/main/revAnimated_v122.safetensors|https://civitai.com/api/download/models/122606|revAnimated_v122.safetensors"
+    # revAnimated v1.2.2 (2GB) - Civitai working URL
+    "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16|https://civitai.com/api/download/models/122606|revAnimated_v122.safetensors"
 
-    # Pony Realism v2.2 (6.5GB) - HF mirror by John6666
-    "https://huggingface.co/John6666/pony-realism-v22main-sdxl/resolve/main/pony_realism_v2.2.safetensors|https://www.dropbox.com/scl/fi/hy476rxzeacsx8g3aodj0/pony_realism_v2.2.safetensors?rlkey=09k5sba46pqoptdu7h1tu03b4&dl=1|pony_realism_v2.2.safetensors"
+    # Pony Realism v2.2 (6.5GB) - Civitai working URL
+    "https://civitai.com/api/download/models/914390?type=Model&format=SafeTensor&size=pruned&fp=fp16|https://www.dropbox.com/scl/fi/hy476rxzeacsx8g3aodj0/pony_realism_v2.2.safetensors?rlkey=09k5sba46pqoptdu7h1tu03b4&dl=1|pony_realism_v2.2.safetensors"
+    
+    # Pony Diffusion v6 XL (6.6GB) - Popular SDXL model
+    "https://civitai.com/api/download/models/290640?type=Model&format=SafeTensor&size=pruned&fp=fp16||ponyDiffusionV6XL.safetensors"
 
     # WAI Illustrious SDXL - Dropbox only
     "https://www.dropbox.com/scl/fi/okhdb2r3i43l7f8hv07li/wai_illustrious_sdxl.safetensors?rlkey=t7r11yjr61ecdm0vrsgrkztc8&dl=1||wai_illustrious_sdxl.safetensors"
@@ -349,11 +613,15 @@ CHECKPOINT_MODELS=(
     # Twerk - Dropbox only
     "https://www.dropbox.com/scl/fi/0g4btjch885ij3kiauffm/twerk.safetensors?rlkey=8yqxhqpvs1osat76ynxadwkh8&dl=1||twerk.safetensors"
 
-    # SDXL Base 1.0 (6.9GB) - Official Stability AI
-    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors||sd_xl_base_1.0.safetensors"
+    # SDXL VAE (320MB) - Official Stability AI repo
+    "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors|https://www.dropbox.com/scl/fi/3qygk64xe2ui2ey74neto/sdxl_vae.safetensors?rlkey=xzsllv3hq5w1qx81h9b2xryq8&dl=1|sdxl_vae.safetensors"
 
-    # SDXL Refiner 1.0 (6.1GB) - Official Stability AI
-    "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors||sd_xl_refiner_1.0.safetensors"
+    # SDXL base & refiner (official HF) — used by SDXL workflows
+    "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors?download=true||sd_xl_base_1.0.safetensors"
+    "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors?download=true||sd_xl_refiner_1.0.safetensors"
+
+    # LTX-2 distilled (video) — adds LTX-2 video capability
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled.safetensors||ltx-2-19b-distilled.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -362,6 +630,9 @@ CHECKPOINT_MODELS=(
 LORA_MODELS=(
     # Pony Realism v2.1 - HF primary (LyliaEngine), Civitai fallback
     "https://huggingface.co/LyliaEngine/ponyRealism_v21MainVAE/resolve/main/ponyRealism_v21MainVAE.safetensors|https://civitai.com/api/download/models/152309|pony_realism_v2.1.safetensors"
+
+    # LTX-2 camera control LoRA (dolly-left)
+    "https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left/resolve/main/ltx-2-19b-lora-camera-control-dolly-left.safetensors||ltx-2-19b-lora-camera-control-dolly-left.safetensors"
 
     # ExpressiveH Hentai - Dropbox only
     "https://www.dropbox.com/scl/fi/5whxkdo39m4w2oimcffx2/expressiveh_hentai.safetensors?rlkey=5ejkyjvethd1r7fn121x7cvs1&dl=1||expressiveh_hentai.safetensors"
@@ -381,41 +652,92 @@ LORA_MODELS=(
     # Defecation v1 - HF only (already working)
     "https://huggingface.co/JollyIm/Defecation/resolve/main/defecation_v1.safetensors||defecation_v1.safetensors"
 
-    # Wan 2.2 Lightning LoRAs (4-step fast generation) - Comfy-Org HF
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors||wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors||wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors||wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors||wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+    # --- Catbox.moe Fetish LoRAs (dead links removed) ---
+    "https://files.catbox.moe/wmshk3.safetensors||cunnilingus_gesture.safetensors"
+    "https://files.catbox.moe/88e51n.rar||archive_lora.rar"
+    "https://files.catbox.moe/9qixqa.safetensors||empty_eyes_drooling.safetensors"
+    "https://files.catbox.moe/yz5c9g.safetensors||glowing_eyes.safetensors"
+    "https://files.catbox.moe/tlt57h.safetensors||quadruple_amputee.safetensors"
+    "https://files.catbox.moe/odmswn.safetensors||ugly_bastard.safetensors"
+    "https://files.catbox.moe/z71ic0.safetensors||sex_machine.safetensors"
+    "https://files.catbox.moe/mxbbg2.safetensors||stasis_tank.safetensors"
+
+    # --- BlackHat404/scatmodels (HuggingFace) ---
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/Soiling-V1.safetensors||Soiling-V1.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/turtleheading-V1.safetensors||turtleheading-V1.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/poop_squatV2.safetensors||poop_squatV2.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/Poop_SquatV3.safetensors||Poop_SquatV3.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDump.safetensors||HyperDump.safetensors"
+    "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDumpPlus.safetensors||HyperDumpPlus.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODELS - Wan Video & Specialist Arrays
 # ═══════════════════════════════════════════════════════════════════════════════
 WAN_DIFFUSION_MODELS=(
+    # Wan 2.1 T2V (1.3B parameters, FP16)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors|wan2.1_t2v_1.3B_fp16.safetensors"
+
+    # Wan 2.2 T2V (14B parameters, FP8 quantized for speed)
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+
+    # Wan 2.2 TI2V (Text+Image-to-Video, 5B parameters, FP16)
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors|wan2.2_ti2v_5B_fp16.safetensors"
+
+    # Wan 2.2 Remix (FX-FeiHou) - High and Low Noise variants with Civitai fallbacks
+    "hf:FX-FeiHou/wan2.2-Remix||https://civitai.com/api/download/models/2567309?type=Model&format=SafeTensor&size=pruned&fp=fp8||https://civitai.com/api/download/models/915814?type=Model&format=SafeTensor&size=pruned&fp=fp16|wan2.2_remix_fp8.safetensors"
 )
 
 WAN_CLIP_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+    # UMT5 XXL FP8 - Standard version for Wan 2.1
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn.safetensors|umt5_xxl_fp8_e4m3fn.safetensors"
+    
+    # UMT5 XXL FP8 Scaled - Enhanced version for better quality (6.4GB)
+    "https://huggingface.co/Comfy-Org/LTX-2/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODELS - Wan 2.2 LoRAs (Lightning Fast Video Generation)
+# ═══════════════════════════════════════════════════════════════════════════════
+WAN_LORA_MODELS=(
+    # Wan 2.2 T2V Lightning LoRAs (4-step generation for speed)
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors|wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors|wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
+
+    # Wan 2.2 I2V Lightning LoRAs (Image-to-Video 4-step)
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors|wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors|wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+)
+
+# MODELS - Text Encoders (General)
+TEXT_ENCODERS=(
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors|gemma_3_12B_it_fp4_mixed.safetensors"
 )
 
 WAN_VAE_MODELS=(
-    # Wan 2.1 VAE - Official HF (already optimal)
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors||wan_2.1_vae.safetensors"
+    # Wan 2.1 VAE - Official HF
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan2.1_vae.safetensors|wan2.1_vae.safetensors"
 
-    # Wan 2.2 VAE - Official HF (already optimal)
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors||wan2.2_vae.safetensors"
+    # Wan 2.2 VAE - Official HF
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors|wan2.2_vae.safetensors"
+
+    # Lumina Image 2.0 VAE - For advanced image encoding
+    "https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors|ae.safetensors"
 
     # SDXL VAE - Official Stability AI HF repo, Dropbox fallback
     "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors|https://www.dropbox.com/scl/fi/3qygk64xe2ui2ey74neto/sdxl_vae.safetensors?rlkey=xzsllv3hq5w1qx81h9b2xryq8&dl=1|sdxl_vae.safetensors"
+
+    # PonyRealism v2.1 VAE - Civitai
+    "https://civitai.com/api/download/models/105924||ponyRealism_v21MainVAE.safetensors"
 )
 
 
 ANIMATEDIFF_MODELS=(
+    # AnimateDiff SDXL v10 Beta - Correct link from guoyww (official author)
     "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sdxl_v10_beta.ckpt|mm_sdxl_v10_beta.ckpt"
+    
+    # AnimateDiff SD1.5 v2 - Motion module for SD1.5
     "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt|mm_sd_v15_v2.ckpt"
 )
 
@@ -436,32 +758,41 @@ DETECTOR_MODELS=(
 )
 
 RIFE_MODELS=(
-    # RIFE 4.26 - GitHub 404, use HuggingFace zip (extracts to rife426.pth)
-    "https://huggingface.co/hzwer/RIFE/resolve/main/RIFEv4.26_0921.zip|https://huggingface.co/r3gm/RIFE/resolve/main/RIFEv4.26_0921.zip|RIFEv4.26_0921.zip"
+    # RIFE 4.26 - Frame interpolation model (correct link from HuggingFace)
+    "https://huggingface.co/r3gm/RIFE/resolve/main/RIFEv4.26_0921.zip|rife426.zip"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODELS - Flux (Next-Gen Image Generation)
+# MODELS - FLUX (Next-Gen Image Generation & Refinement)
 # ═══════════════════════════════════════════════════════════════════════════════
-# FLUX_MODELS=(
-#     "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors|flux1-dev.safetensors"
-#     "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors|flux1-schnell.safetensors"
-# )
-
-FLUX_MODELS=()
-
-# FLUX_VAE_MODELS=(
-#     "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors|flux_ae.safetensors"
-# )
+FLUX_MODELS=(
+    # FLUX Krea Dev - FP8 quantized for refinement and inpainting
+    "https://huggingface.co/Comfy-Org/FLUX.1-Krea-dev_ComfyUI/resolve/main/split_files/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors|flux1-krea-dev_fp8_scaled.safetensors"
+)
 
 FLUX_VAE_MODELS=()
 
-# FLUX_CLIP_MODELS=(
-#     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|clip_l.safetensors"
-#     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors|t5xxl_fp16.safetensors"
-# )
+# FLUX Text Encoders - Required for FLUX model operation
+FLUX_CLIP_MODELS=(
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|clip_l.safetensors"
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors|t5xxl_fp16.safetensors"
+)
 
-FLUX_CLIP_MODELS=()
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODELS - LTX-2 (Advanced Video Generation with Camera Control)
+# ═══════════════════════════════════════════════════════════════════════════════
+LTX_DIFFUSION_MODELS=(
+    # LTX-2 19B Development - FP8 quantized for video generation
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-dev-fp8.safetensors"
+)
+
+LTX_LORA_MODELS=(
+    # LTX-2 Camera Control - Dolly Left movement
+    "https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left/resolve/main/ltx-2-19b-lora-camera-control-dolly-left.safetensors|ltx-2-19b-lora-camera-control-dolly-left.safetensors"
+
+    # LTX-2 Distilled LoRA - 384 resolution for faster generation
+    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled-lora-384.safetensors|ltx-2-19b-distilled-lora-384.safetensors"
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FUNCTIONS
@@ -487,28 +818,41 @@ activate_venv() {
 }
 
 detect_cuda_version() {
-  # Return a short CUDA tag like cu124, cu121, cu118, cu111 or "cpu"
-  # NOTE: Only echo the result to stdout — log to stderr so $(detect_cuda_version) captures only the tag
+  # Return a short CUDA tag like cu130, cu124, cu121, cu118, cu111 or "cpu"
+  # NOTE: Only echo the result - all logs go to stderr to avoid polluting return value
   if command -v nvidia-smi >/dev/null 2>&1; then
-    # Try to read reported CUDA version (some nvidia-smi lack --query-gpu=cuda_version)
+    # Try to read reported CUDA version from nvidia-smi
     local cuda_raw
     cuda_raw=$(nvidia-smi --query-gpu=cuda_version --format=csv,noheader,nounits 2>/dev/null | head -n1 | tr -d '\r') || true
-    # Skip if empty or nvidia-smi error (e.g. "Field cuda_version is not a valid field")
-    if [[ -n "$cuda_raw" && "$cuda_raw" != *"not a valid"* && "$cuda_raw" != *"Field"* ]]; then
-      log "   🔎 Detected CUDA: $cuda_raw" 1>&2
+    if [[ -n "$cuda_raw" ]]; then
+      echo "   🔎 Detected CUDA from nvidia-smi: $cuda_raw" >&2
       case "$cuda_raw" in
-        12.8*|12.6*|12.4*|12.4) echo "cu124"; return 0 ;;
+        13.*|13.0|13) echo "cu130"; return 0 ;;
+        12.9*|12.9) echo "cu130"; return 0 ;;
+        12.4*|12.4) echo "cu124"; return 0 ;;
         12.1*|12.1) echo "cu121"; return 0 ;;
         11.8*|11.8) echo "cu118"; return 0 ;;
         11.1*|11.1) echo "cu111"; return 0 ;;
       esac
+
+      # Additional heuristic: check GPU name for RTX 50-series / Blackwell cues and prefer cu130
+      local gpu_name
+      gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1 | tr -d '\r' || true)
+      if [[ -n "$gpu_name" ]]; then
+        echo "   🔎 Detected GPU name: $gpu_name" >&2
+        if [[ "$gpu_name" =~ 5060|RTX\ 50|Blackwell|RTX\ 5 ]]; then
+          echo "cu130"; return 0
+        fi
+      fi
     fi
-    # Infer from driver version (driver_version works on all nvidia-smi)
+    # If nvidia-smi didn't report cuda_version, infer from driver version
     local driver
     driver=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -n1 | cut -d. -f1 || true)
     if [[ -n "$driver" ]]; then
-      log "   🔎 Inferred CUDA from driver $driver" 1>&2
-      if (( driver >= 535 )); then
+      echo "   🔎 Detected driver version: $driver" >&2
+      if (( driver >= 570 )); then
+        echo "cu130"; return 0
+      elif (( driver >= 535 )); then
         echo "cu124"; return 0
       elif (( driver >= 525 )); then
         echo "cu121"; return 0
@@ -517,7 +861,8 @@ detect_cuda_version() {
       fi
     fi
   fi
-  log "   ⚠️  No NVIDIA GPU detected; falling back to CPU wheel" 1>&2
+  # Fallback: no GPU detected, return cpu tag
+  echo "   ⚠️  No NVIDIA GPU detected - using CPU-only PyTorch" >&2
   echo "cpu"
 }
 
@@ -591,34 +936,80 @@ install_torch() {
     cuda_tag=$(detect_cuda_version)
     log "   🔎 Selected PyTorch wheel tag: $cuda_tag"
 
-    if [[ "$cuda_tag" == "cpu" ]]; then
-      log "   ⚠️  Installing CPU-only PyTorch (no CUDA detected)"
-      "$VENV_PYTHON" -m pip install --no-cache-dir torch torchvision torchaudio || true
+    # Retry logic for PyTorch installation (large downloads can timeout)
+    local torch_success=false
+    for torch_attempt in {1..3}; do
+        if [[ "$cuda_tag" == "cpu" ]]; then
+          log "   ⚠️  Installing CPU-only PyTorch (no CUDA detected)"
+          if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+              torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+              torch_success=true
+              break
+          fi
+        else
+          case "$cuda_tag" in
+            cu130)
+              log "   📥 Installing torch NIGHTLY for cu130 (RTX 50-series support) (attempt $torch_attempt/3)"
+              log "   ⚠️  Using PyTorch nightly build for sm_120 CUDA arch support (Blackwell GPUs)"
+              log "   🔄 Force-reinstalling to replace pre-installed PyTorch..."
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                --force-reinstall --upgrade \
+                --pre torch torchvision torchaudio \
+                --index-url https://download.pytorch.org/whl/nightly/cu130 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              ;;
+            cu124)
+              log "   📥 Installing torch for cu124 (attempt $torch_attempt/3)"
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
+                --index-url https://download.pytorch.org/whl/cu124 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              ;;
+            cu121)
+              log "   📥 Installing torch for cu121 (attempt $torch_attempt/3)"
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 \
+                --index-url https://download.pytorch.org/whl/cu121 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              ;;
+            cu118)
+              log "   📥 Installing torch for cu118 (attempt $torch_attempt/3)"
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 \
+                --index-url https://download.pytorch.org/whl/cu118 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              ;;
+            *)
+              log "   ⚠️  Unknown CUDA tag ($cuda_tag) - attempting generic wheel (attempt $torch_attempt/3)"
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                  torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                  torch_success=true
+                  break
+              fi
+              ;;
+          esac
+        fi
+
+        if [[ $torch_attempt -lt 3 ]]; then
+            log "   ⚠️  PyTorch install attempt $torch_attempt failed, retrying in 30s..."
+            sleep 30
+        fi
+    done
+
+    if [[ "$torch_success" == "false" ]]; then
+        log "   ❌ PyTorch installation FAILED after 3 attempts - check /workspace/pip_install.log"
+        log "   This is a critical error - provisioning may not complete successfully"
+        return 1
     else
-      case "$cuda_tag" in
-        cu124)
-          log "   📥 Installing torch for cu124"
-          "$VENV_PYTHON" -m pip install --no-cache-dir \
-            torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
-            --index-url https://download.pytorch.org/whl/cu124 || true
-          ;;
-        cu121)
-          log "   📥 Installing torch for cu121"
-          "$VENV_PYTHON" -m pip install --no-cache-dir \
-            torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 \
-            --index-url https://download.pytorch.org/whl/cu121 || true
-          ;;
-        cu118)
-          log "   📥 Installing torch for cu118"
-          "$VENV_PYTHON" -m pip install --no-cache-dir \
-            torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 \
-            --index-url https://download.pytorch.org/whl/cu118 || true
-          ;;
-        *)
-          log "   ⚠️  Unknown CUDA tag ($cuda_tag) - attempting generic wheel"
-          "$VENV_PYTHON" -m pip install --no-cache-dir torch torchvision torchaudio || true
-          ;;
-      esac
+        log "   ✅ PyTorch installed successfully"
     fi
 }
 
@@ -630,28 +1021,120 @@ install_essential_deps() {
     "$VENV_PYTHON" -m pip uninstall -y xformers 2>/dev/null || true
     log "   ✅ Removed conflicting xformers (if present)"
 
-    # Install core dependencies first
-    # CRITICAL: SQLAlchemy 2.0+ required for ComfyUI (uses mapped_column)
-    "$VENV_PYTHON" -m pip install --no-cache-dir \
-        transformers==4.36.0 \
-        accelerate \
-        safetensors \
-        einops \
-        opencv-python-headless \
-        insightface \
-        onnxruntime-gpu \
-        sentencepiece \
-        "sqlalchemy>=2.0.0"
+    # Install core dependencies first with retry logic
+    log "   📦 Installing core dependencies..."
+    local deps_success=false
+    for deps_attempt in {1..3}; do
+        if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+            transformers==4.36.0 \
+            accelerate \
+            safetensors \
+            einops \
+            opencv-python-headless \
+            insightface \
+            onnxruntime-gpu \
+            sentencepiece 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+            deps_success=true
+            break
+        fi
+
+        if [[ $deps_attempt -lt 3 ]]; then
+            log "   ⚠️  Core dependencies install attempt $deps_attempt failed, retrying in 30s..."
+            sleep 30
+        fi
+    done
+
+    if [[ "$deps_success" == "false" ]]; then
+        log "   ❌ Core dependencies installation FAILED after 3 attempts"
+        log "   Check /workspace/pip_install.log for details"
+    else
+        log "   ✅ Core dependencies installed successfully"
+    fi
 
     # Reinstall PyTorch to ensure correct version after accelerate (which may install CPU version)
-    "$VENV_PYTHON" -m pip install --no-cache-dir \
-        torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
-        --index-url https://download.pytorch.org/whl/cu124 || {
-        log "   ⚠️  cu124 failed, trying cu121..."
-        "$VENV_PYTHON" -m pip install --no-cache-dir \
-            torch torchvision torchaudio \
-            --index-url https://download.pytorch.org/whl/cu121
-    }
+    log "   🔧 Ensuring correct PyTorch version..."
+    # Decide based on detected GPU and currently installed torch
+    local cuda_tag
+    cuda_tag=$(detect_cuda_version)
+        local installed_torch_cuda
+        installed_torch_cuda=$("$VENV_PYTHON" - <<'PY'
+try:
+    import torch
+    v = getattr(torch.version, 'cuda', None) or torch.version.cuda
+    print(v if v is not None else 'none')
+except Exception:
+    print('missing')
+PY
+)
+        log "   ℹ️  Detected installed PyTorch CUDA: $installed_torch_cuda"
+
+        # Derive major CUDA family from installed torch (e.g. '13' for '13.0.96', '12' for '12.4')
+        local installed_major=""
+        if [[ "$installed_torch_cuda" =~ ^([0-9]+) ]]; then
+            installed_major="${BASH_REMATCH[1]}"
+        fi
+
+        if [[ "$installed_torch_cuda" == "missing" ]] || [[ "$installed_torch_cuda" == "none" ]]; then
+            log "   ⚠️ No installed torch detected or import failed; proceeding to install for $cuda_tag"
+        fi
+
+    if [[ "$cuda_tag" == "cu130" ]]; then
+      if [[ "$installed_torch_cuda" == 13* ]]; then
+        log "   ✅ Installed PyTorch already supports CUDA 13.x; skipping reinstall"
+      else
+        log "   📥 Ensuring PyTorch supports cu130 (RTX 50-series); attempting nightly cu130"
+        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+          --force-reinstall --upgrade --pre torch torchvision torchaudio \
+          --index-url https://download.pytorch.org/whl/nightly/cu130 2>&1 | tee -a /workspace/pip_install.log || {
+            log "   ⚠️ nightly cu130 install failed, falling back to generic wheels"
+            "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+              torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+        }
+      fi
+        elif [[ "$cuda_tag" == "cpu" ]]; then
+      log "   ⚠️ Ensuring CPU-only PyTorch is installed"
+      "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+          torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+    else
+      # Try to install the pinned wheel matching the detected tag; fallback to generic if failing
+      case "$cuda_tag" in
+                cu124)
+                    if [[ "$installed_major" == "12" ]]; then
+                        log "   ✅ Installed PyTorch already supports CUDA 12.x; skipping cu124 reinstall"
+                    else
+                        log "   📥 Installing torch for cu124"
+                        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                            torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
+                            --index-url https://download.pytorch.org/whl/cu124 2>&1 | tee -a /workspace/pip_install.log || true
+                    fi
+                    ;;
+                cu121)
+                    if [[ "$installed_major" == "12" ]]; then
+                        log "   ✅ Installed PyTorch already supports CUDA 12.x; skipping cu121 reinstall"
+                    else
+                        log "   📥 Installing torch for cu121"
+                        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                            torch==2.5.1+cu121 torchvision==0.20.1+cu121 torchaudio==2.5.1+cu121 \
+                            --index-url https://download.pytorch.org/whl/cu121 2>&1 | tee -a /workspace/pip_install.log || true
+                    fi
+                    ;;
+                cu118)
+                    if [[ "$installed_major" == "11" ]] || [[ "$installed_major" == "12" ]]; then
+                        log "   ✅ Installed PyTorch already supports CUDA 11/12.x; skipping cu118 reinstall"
+                    else
+                        log "   📥 Installing torch for cu118"
+                        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                            torch==2.5.1+cu118 torchvision==0.20.1+cu118 torchaudio==2.5.1+cu118 \
+                            --index-url https://download.pytorch.org/whl/cu118 2>&1 | tee -a /workspace/pip_install.log || true
+                    fi
+                    ;;
+        *)
+          log "   ⚠️ Unknown CUDA tag ($cuda_tag) - attempting generic wheel"
+          "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+              torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+          ;;
+      esac
+    fi
 
     # Install xformers (optional - skip if incompatible to avoid dependency conflicts)
     # xformers is optional for ComfyUI and can cause PyTorch version conflicts
@@ -661,28 +1144,137 @@ install_essential_deps() {
 
 
 
-install_apt_packages() {
-    log_section "📦 INSTALLING SYSTEM PACKAGES"
-    apt-get update -qq
-    apt-get install -y -qq "${APT_PACKAGES[@]}" 2>/dev/null || {
-        log "⚠️  Some packages may have failed, continuing..."
-    }
-    git lfs install --skip-repo 2>/dev/null || true
+install_hf_tools() {
+    log_section "🔧 INSTALLING HUGGING FACE TOOLS"
+    
+    # Install git-xet for large file support
+    if ! command -v git-xet >/dev/null 2>&1; then
+        log "   📦 Installing git-xet for large file support..."
+        # Note: winget is Windows-only, for Linux we'll use alternative installation
+        if command -v apt-get >/dev/null 2>&1; then
+            # Try to install via apt if available (may not be in default repos)
+            apt-get update -qq && apt-get install -y -qq git-lfs 2>/dev/null || log "   ⚠️  git-lfs install failed, continuing..."
+        fi
+    else
+        log "   ✅ git-xet already installed"
+    fi
+    
+    # Install Hugging Face CLI
+    if ! command -v hf >/dev/null 2>&1; then
+        log "   📦 Installing Hugging Face CLI..."
+        # Use the PowerShell installation method adapted for bash
+        if command -v curl >/dev/null 2>&1; then
+            curl -s -L https://hf.co/cli/install.sh | bash || log "   ⚠️  HF CLI install failed, continuing..."
+        else
+            log "   ⚠️  curl not available, skipping HF CLI install"
+        fi
+    else
+        log "   ✅ Hugging Face CLI already installed"
+    fi
+}
+
+# Ensure ComfyUI DB migrations do not re-run if DB already has tables
+ensure_comfyui_migrations() {
+    log "   🔧 Checking ComfyUI DB migrations"
+    cd "${COMFYUI_DIR}"
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+        log "   ⚠️  sqlite3 not available, skipping DB health checks"
+        return 0
+    fi
+
+    local dbs
+    dbs=$(find . -maxdepth 2 -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -print 2>/dev/null || true)
+    for db in $dbs; do
+        if sqlite3 "$db" "SELECT name FROM sqlite_master WHERE type='table' AND name='assets';" | grep -q assets; then
+            log "   ⚠️  Found existing 'assets' table in $db"
+            if ! sqlite3 "$db" "SELECT name FROM sqlite_master WHERE type='table' AND name='alembic_version';" | grep -q alembic_version; then
+                log "   ⚠️  alembic_version table missing in $db - stamping current head to avoid re-running migrations"
+                cp "$db" "${db}.bak.$(date +%s)" || log "   ⚠️  Failed to backup $db"
+                if "$VENV_PYTHON" -m alembic stamp head 2>&1 | tee -a /workspace/pip_install.log; then
+                    log "   ✅ Stamped alembic head for $db"
+                else
+                    log "   ⚠️  Failed to stamp alembic head - please inspect logs"
+                fi
+            else
+                log "   ✅ alembic_version table present in $db"
+            fi
+        fi
+    done
+}
+
+# Attempt a safe DB repair if Alembic/database migration errors appear during ComfyUI startup.
+# This watches the ComfyUI log for known migration failure signatures and will:
+#  - backup any discovered sqlite DB files
+#  - run `alembic stamp head` to mark migrations as applied
+#  - restart ComfyUI once (via systemd if available or by restarting the PID)
+repair_comfyui_db_and_restart() {
+    local comfy_pid="$1"
+    local timeout=${2:-60}
+    local deadline=$((SECONDS + timeout))
+    local log_file="${WORKSPACE}/comfyui.log"
+
+    # Wait for log file to appear
+    while [[ ! -f "$log_file" && SECONDS -lt $deadline ]]; do
+        sleep 1
+    done
+
+    # Poll the log for migration errors
+    while [[ SECONDS -lt $deadline ]]; do
+        if grep -E "(table assets already exists|Failed to initialize database|alembic|OperationalError|table .* already exists)" "$log_file" -i >/dev/null 2>&1; then
+            log "   ⚠️  Detected DB migration error in ${log_file}; attempting safe repair"
+
+            # Find sqlite DB files under COMFYUI_DIR (safe shallow search)
+            local dbs
+            dbs=$(find "${COMFYUI_DIR}" -maxdepth 3 -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -print 2>/dev/null || true)
+            for db in $dbs; do
+                log "   🔁 Backing up DB: $db"
+                cp "$db" "${db}.bak.$(date +%s)" || log "   ⚠️  Failed to backup $db"
+            done
+
+            # Attempt to stamp alembic head (run from COMFYUI_DIR)
+            (cd "${COMFYUI_DIR}" && "$VENV_PYTHON" -m alembic stamp head) 2>&1 | tee -a /workspace/provision_errors.log || true
+            log "   ✅ Ran 'alembic stamp head' (check /workspace/provision_errors.log for details)"
+
+            # Restart ComfyUI
+            if systemctl is-active --quiet comfyui.service 2>/dev/null; then
+                log "   🔁 Restarting comfyui.service via systemd"
+                systemctl restart comfyui.service || log "   ⚠️  systemd restart failed; attempt manual restart"
+            else
+                if [[ -n "$comfy_pid" && -f "${WORKSPACE}/comfyui.pid" ]]; then
+                    log "   🔁 Restarting ComfyUI process (PID: $comfy_pid)"
+                    pkill -F "${WORKSPACE}/comfyui.pid" || true
+                    sleep 1
+                fi
+                # Start fallback process once
+                setsid "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
+                echo "$!" > "${WORKSPACE}/comfyui.pid" || true
+            fi
+
+            return 0
+        fi
+        sleep 2
+    done
+    return 1
 }
 
 install_comfyui() {
     log_section "🖥️  INSTALLING COMFYUI"
     if [[ ! -d "${COMFYUI_DIR}" ]]; then
-        timeout 180 git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}" || {
-            log "❌ ComfyUI clone failed or timed out"
-            return 1
-        }
+        git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFYUI_DIR}"
     fi
     
     cd "${COMFYUI_DIR}"
     install_torch
     install_essential_deps
-    "$VENV_PYTHON" -m pip install -q -r requirements.txt
+
+    # Attempt to reconcile DB state before installing ComfyUI requirements to avoid migration race
+    ensure_comfyui_migrations
+
+    log "   📦 Installing ComfyUI requirements..."
+    "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 -r requirements.txt 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+        log "   ⚠️  ComfyUI requirements install had issues (continuing)"
+    }
+
     cd "${WORKSPACE}"
     log "✅ ComfyUI setup complete"
 }
@@ -690,16 +1282,15 @@ install_comfyui() {
 install_nodes() {
     log_section "🧩 INSTALLING CUSTOM NODES"
 
-    # Emergency SSH fix before git operations
-    fix_ssh_permissions
-
     activate_venv
 
     # Pre-install common dependencies to avoid per-node failures
     log "   📦 Pre-installing common dependencies..."
-    "$VENV_PYTHON" -m pip install --no-cache-dir --timeout 300 \
+    "$VENV_PYTHON" -m pip install --no-cache-dir --timeout 300 --retries 5 \
         gitpython packaging pydantic pyyaml httpx aiohttp \
-        websockets typing-extensions 2>/dev/null || true
+        websockets typing-extensions 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+        log "   ⚠️  Some common dependencies failed to install (will retry per-node)"
+    }
 
     # Nodes with known problematic requirements (skip their requirements.txt)
     # NOTE: ComfyUI-Manager requirements must be installed to enable the Manager UI; do not skip it.
@@ -716,20 +1307,12 @@ install_nodes() {
         else
             log "   📥 Cloning $dir..."
 
-            # Retry git clone up to 3 times with SSH fix between attempts
-            # Use timeout 180s to prevent indefinite hangs (slow submodules, network stalls)
+            # Retry git clone up to 3 times
             local clone_success=false
             for attempt in {1..3}; do
-                fix_ssh_permissions  # Fix SSH before each attempt
-
-                timeout 180 git clone --depth 1 "$repo" "$path" --recursive 2>&1 | grep -v "Authentication refused" || true
-                local clone_exit=${PIPESTATUS[0]}
-                if [[ $clone_exit -eq 0 ]]; then
+                if git clone --depth 1 "$repo" "$path" --recursive 2>&1 | grep -v "Authentication refused"; then
                     clone_success=true
                     break
-                fi
-                if [[ $clone_exit -eq 124 ]]; then
-                    log "   ⚠️  Clone timed out (180s) for $dir"
                 fi
 
                 log "   ⚠️  Clone attempt $attempt/3 failed for $dir, retrying..."
@@ -756,25 +1339,110 @@ install_nodes() {
         # Install requirements with timeout if not skipped
         if [[ "$skip" == "false" ]] && [[ -f "${path}/requirements.txt" ]]; then
             log "   📦 Installing requirements for $dir..."
-            timeout 300 "$VENV_PYTHON" -m pip install --no-cache-dir -q -r "${path}/requirements.txt" 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
-                log "   ⚠️  Requirements install failed for $dir (continuing)"
-            }
+
+            # Retry logic for pip install with exponential backoff (handles rate limiting)
+            local pip_success=false
+            for pip_attempt in {1..3}; do
+                # Use longer timeout (10 min), retries, and verbose output
+                set +e  # Temporarily disable errexit to capture exit codes
+                set +u  # Temporarily disable nounset for PIPESTATUS
+                timeout 600 "$VENV_PYTHON" -m pip install \
+                    --no-cache-dir \
+                    --retries 5 \
+                    --timeout 120 \
+                    -r "${path}/requirements.txt" 2>&1 | tee -a /workspace/pip_install.log | { grep -v "WARNING: Running pip as the 'root' user" || true; }
+                
+                # Capture timeout's exit code with safe default
+                local pip_exit=${PIPESTATUS[0]:-1}
+                set -e  # Re-enable errexit
+                set -u  # Re-enable nounset
+                
+                if [[ $pip_exit -eq 0 ]]; then
+                    pip_success=true
+                    break
+                fi
+
+                if [[ $pip_attempt -lt 3 ]]; then
+                    local wait_time=$((pip_attempt * 30))  # 30s, 60s backoff
+                    log "   ⚠️  Pip install attempt $pip_attempt/3 failed, waiting ${wait_time}s before retry..."
+                    log "   Last 10 lines of error log:"
+                    tail -10 /workspace/pip_install.log | grep -i "error\|failed" || echo "   (no errors found in log)"
+                    sleep $wait_time
+                fi
+            done
+
+            if [[ "$pip_success" == "false" ]]; then
+                log "   ❌ Requirements install failed for $dir after 3 attempts"
+                log "   Error details (last 20 lines):"
+                tail -20 /workspace/pip_install.log
+                log "   Continuing anyway (ComfyUI may still work)..."
+            else
+                log "   ✅ Requirements installed for $dir"
+            fi
         fi
     done
 
     # Post-install: Ensure core dependencies are present
-    # piexif required by ComfyUI-Impact-Pack (FaceDetailer) - workflows break without it
     log "   🔧 Ensuring core dependencies..."
-    "$VENV_PYTHON" -m pip install --no-cache-dir -q \
+    "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 \
         einops>=0.6.0 \
         accelerate>=0.24.0 \
         transformers>=4.36.0 \
         opencv-python-headless>=4.8.0 \
         sageattention \
-        huggingface-hub \
-        piexif 2>/dev/null || true
+        huggingface-hub 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+        log "   ⚠️  Some core dependencies failed to install (may need manual fix)"
+    }
+
+    # Install Impact-Pack dependencies (skipped in requirements due to conflicts)
+    log "   🔧 Installing ComfyUI-Impact-Pack dependencies..."
+    "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 \
+        piexif \
+        ultralytics 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+        log "   ⚠️  Impact-Pack dependencies failed to install"
+    }
+
+    # Optional: install segment_anything if Impact-Pack is present to avoid import error
+    if [[ -d "${COMFYUI_DIR}/custom_nodes/ComfyUI-Impact-Pack" ]]; then
+        log "   📦 Installing optional Impact-Pack dependency 'segment_anything'..."
+        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 segment_anything 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+            log "   ⚠️  segment_anything install failed (continuing)"
+        }
+    fi
 
     log "✅ Custom nodes installation complete"
+}
+
+# Helper function to search logs for rate limit errors
+search_rate_limit_errors() {
+    local log_file="${1:-/workspace/provision_errors.log}"
+    local output_file="${2:-}"
+    
+    if [[ ! -f "$log_file" ]]; then
+        echo "No error log found at $log_file"
+        return 1
+    fi
+    
+    # Search for rate limit related errors
+    local rate_limit_lines=$(grep -iE "429|rate.?limit|too many requests|RATE_LIMIT" "$log_file" 2>/dev/null | wc -l)
+    
+    if [[ $rate_limit_lines -gt 0 ]]; then
+        echo "Found $rate_limit_lines rate limit error(s) in $log_file"
+        echo ""
+        echo "Rate Limit Errors:"
+        echo "═══════════════════════════════════════════════════════════════"
+        grep -iE "429|rate.?limit|too many requests|RATE_LIMIT" "$log_file" 2>/dev/null
+        
+        if [[ -n "$output_file" ]]; then
+            grep -iE "429|rate.?limit|too many requests|RATE_LIMIT" "$log_file" > "$output_file" 2>/dev/null
+            echo ""
+            echo "Filtered results saved to: $output_file"
+        fi
+        return 0
+    else
+        echo "No rate limit errors found in $log_file"
+        return 1
+    fi
 }
 
 # Helper function to get source name for logging
@@ -902,6 +1570,16 @@ attempt_download() {
 
       local exit_code=${PIPESTATUS[0]}
 
+        # Check for rate limit errors (HTTP 429) in log
+        if grep -qi "429\|rate limit\|too many requests" "$file_log" 2>/dev/null; then
+            log "      🚫 Rate Limit Error (429) detected - backing off"
+            # Increase retry wait for next attempt if we're retrying
+            retry_wait=$((retry_wait * 2))
+            # Log to error file for tracking
+            [[ -f "/workspace/provision_errors.log" ]] || touch "/workspace/provision_errors.log"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') RATE_LIMIT_ERROR: $filename - URL: $url" >> "/workspace/provision_errors.log"
+        fi
+
         # Validate download (file exists + reasonable size)
         if [[ $exit_code -eq 0 && -f "$filepath" && $(stat -c%s "$filepath") -gt 1000000 ]]; then
             return 0
@@ -931,6 +1609,13 @@ attempt_download() {
     wget "${wget_opts[@]}" "$url" 2>&1 | tee -a "$LOG_FILE" | tee -a "$file_log"
     local wget_exit=${PIPESTATUS[0]}
 
+    # Check for rate limit errors (HTTP 429) in wget output
+    if grep -qi "429\|rate limit\|too many requests\|HTTP request sent.*429" "$file_log" 2>/dev/null; then
+        log "      🚫 Rate Limit Error (429) detected in wget - backing off"
+        [[ -f "/workspace/provision_errors.log" ]] || touch "/workspace/provision_errors.log"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') RATE_LIMIT_ERROR: $filename - URL: $url (wget)" >> "/workspace/provision_errors.log"
+    fi
+
     if [[ $wget_exit -eq 0 && -f "$filepath" && $(stat -c%s "$filepath") -gt 1000000 ]]; then
         return 0
     fi
@@ -945,6 +1630,8 @@ download_file() {
     local filename="$3"
     local fallback_url="${4:-}"
     local filepath="${dir}/${filename}"
+  # Per-file verbose log path (used for diagnostics on failure)
+  local file_log="${WORKSPACE}/download-logs/${filename}.log"
 
     # 1. Validation (Skip if valid)
     if [[ -f "$filepath" ]]; then
@@ -980,8 +1667,8 @@ download_file() {
             log "   ✅ $filename ($size_human) - COMPLETE (fallback)"
 
             # Log fallback usage for analytics
-            [[ -f "${WORKSPACE}/provision_fallback.log" ]] || touch "${WORKSPACE}/provision_fallback.log"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') FALLBACK USED: $filename (primary: $source_name → fallback: $fallback_source)" >> "${WORKSPACE}/provision_fallback.log"
+            [[ -f "/workspace/provision_fallback.log" ]] || touch "/workspace/provision_fallback.log"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') FALLBACK USED: $filename (primary: $source_name → fallback: $fallback_source)" >> "/workspace/provision_fallback.log"
             return 0
         fi
     fi
@@ -991,12 +1678,26 @@ download_file() {
     log "      Primary: $url"
     [[ -n "$fallback_url" ]] && log "      Fallback: $fallback_url"
 
-    local err_log="${WORKSPACE}/download-logs/${filename}.log"
-    local errfile="${WORKSPACE}/provision_errors.log"
-    [[ -f "$errfile" ]] || touch "$errfile"
-    echo "$(date '+%Y-%m-%d %H:%M:%S') FAILED: $filename - primary: $url, fallback: ${fallback_url:-none}, logfile: ${err_log}" >> "$errfile"
-    echo "--- DIAGNOSTIC: last 80 lines of ${err_log} ---" >> "$errfile"
-    tail -n 80 "${err_log}" >> "$errfile" 2>/dev/null || true
+    [[ -f "/workspace/provision_errors.log" ]] || touch "/workspace/provision_errors.log"
+
+    # If file is optional, log and continue (do not abort provisioning)
+    if is_optional_file "$filename"; then
+      log "   ⚠️  OPTIONAL ASSET FAILED: $filename - continuing provisioning"
+      echo "$(date '+%Y-%m-%d %H:%M:%S') OPTIONAL FAILED: $filename - primary: $url, fallback: ${fallback_url:-none}" >> "/workspace/provision_errors.log"
+      rm -f "$filepath"
+      return 0
+    fi
+
+    # Ensure file_log exists or point to a safe fallback
+    [[ -n "${file_log:-}" ]] || file_log="/dev/null"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') FAILED: $filename - primary: $url, fallback: ${fallback_url:-none}, logfile: ${file_log}" >> "/workspace/provision_errors.log"
+    # Also append a short diagnostic snippet (last 80 lines) to the error log (if available)
+    if [[ -f "${file_log}" ]]; then
+      echo "--- DIAGNOSTIC: last 80 lines of ${file_log} ---" >> "/workspace/provision_errors.log"
+      tail -n 80 "${file_log}" >> "/workspace/provision_errors.log" 2>/dev/null || true
+    else
+      echo "--- DIAGNOSTIC: no per-file log available for ${filename} ---" >> "/workspace/provision_errors.log"
+    fi
     rm -f "$filepath"
     return 1
 }
@@ -1123,7 +1824,7 @@ smart_download_parallel() {
                 if [[ $exit_code -eq 0 ]]; then
                     success_count=$((success_count + 1))
                     # Check if fallback was used
-                    if [[ -f "${WORKSPACE}/provision_fallback.log" ]] && tail -5 "${WORKSPACE}/provision_fallback.log" | grep -q "${pid_files[$pid]}"; then
+                    if [[ -f "/workspace/provision_fallback.log" ]] && tail -5 "/workspace/provision_fallback.log" | grep -q "${pid_files[$pid]}"; then
                         fallback_count=$((fallback_count + 1))
                     fi
                 else
@@ -1167,80 +1868,165 @@ smart_download_parallel() {
     return 0  # Always succeed to prevent script exit
 }
 
+install_workflows() {
+    log_section "📋 DOWNLOADING WORKFLOW TEMPLATES"
+    
+    local workflow_dir="/workspace/ComfyUI/user/default/workflows"
+    mkdir -p "$workflow_dir"
+    
+    # Gist base URL with commit hash to prevent caching
+    local gist_base="https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/a221dea8a2ea50b7f839dc3a82fcebcc30ef455c"
+    
+    # List of all 27 workflow files
+    local workflows=(
+        "Wan2.2-Remix-I2V-Comfy-Qwen3.json"
+        "image work flow sdxl work flow .json"
+        "nsfw_2d_3d_motion_ultimate_workflow.json"
+        "nsfw_3d_generation_workflow.json"
+        "nsfw_cinema_production_workflow.json"
+        "nsfw_controlnet_pose_workflow.json"
+        "nsfw_lora_image_workflow.json"
+        "nsfw_ltx_camera_control_hyperdump_scat_video_workflow.json"
+        "nsfw_ltx_video_workflow.json"
+        "nsfw_pony_hyperdump_cunnilingus_sexmachine_dreamlay_dreamjob_fetish_master_workflow.json"
+        "nsfw_pony_hyperdump_soiling_turtleheading_scat_master_workflow.json"
+        "nsfw_pony_multiple_fetish_stacked_master_workflow.json"
+        "nsfw_pornmaster_workflow.json"
+        "nsfw_realistic_furry_video_workflow.json"
+        "nsfw_sdxl_fetish_workflow.json"
+        "nsfw_sdxl_image_workflow.json"
+        "nsfw_sdxl_realism_hyperdump_cunnilingus_master_workflow.json"
+        "nsfw_sdxl_soiling_turtleheading_poopsquat_scat_master_workflow.json"
+        "nsfw_sdxl_triposr_3d_generation_workflow.json"
+        "nsfw_ultimate_image_workflow.json"
+        "nsfw_ultimate_video_workflow.json"
+        "nsfw_video_workflow.json"
+        "nsfw_wan21_video_workflow.json"
+        "nsfw_wan22_dr34ml4y_dr34mjob_fetish_video_master_workflow.json"
+        "nsfw_wan22_master_video_workflow.json"
+        "nsfw_wan25_preview_video_workflow.json"
+        "video_wan2_2_14B_i2v for videos.json"
+    )
+    
+    log "   📥 Downloading ${#workflows[@]} workflow templates..."
+    
+    local success_count=0
+    local failed_count=0
+    
+    for workflow in "${workflows[@]}"; do
+        # URL encode the filename for spaces and special chars
+        local encoded_name="${workflow// /%20}"
+        local url="${gist_base}/${encoded_name}"
+        local dest="${workflow_dir}/${workflow}"
+        
+        if curl -fsSL "$url" -o "$dest" --retry 3 --retry-delay 2 --connect-timeout 30; then
+            log "   ✅ $workflow"
+            ((success_count++))
+        else
+            log "   ❌ Failed: $workflow"
+            ((failed_count++))
+        fi
+    done
+    
+    log ""
+    log "╔════════════════════════════════════════════════════════════════╗"
+    log "║  📊 WORKFLOW DOWNLOAD COMPLETE                                 "
+    log "║  ✅ Success: $success_count/${#workflows[@]}                             "
+    log "║  ❌ Failed: $failed_count                                        "
+    log "╚════════════════════════════════════════════════════════════════╝"
+    log ""
+    
+    return 0
+}
+
 install_models() {
     log_section "📦 DOWNLOADING MODELS (STAGED)"
 
-    # Calculate total model count
+    # Calculate total model count - includes all new arrays
     local total_models=0
-    total_models=$((${#CHECKPOINT_MODELS[@]} + ${#LORA_MODELS[@]} + ${#WAN_DIFFUSION_MODELS[@]} + ${#WAN_CLIP_MODELS[@]} + ${#WAN_VAE_MODELS[@]} + ${#ANIMATEDIFF_MODELS[@]} + ${#UPSCALE_MODELS[@]} + ${#CONTROLNET_MODELS[@]} + ${#RIFE_MODELS[@]} + 2 + 1 + ${#FLUX_MODELS[@]} + 1 + 1 + 1))
+    total_models=$((${#CHECKPOINT_MODELS[@]} + ${#LORA_MODELS[@]} + ${#WAN_DIFFUSION_MODELS[@]} + ${#WAN_CLIP_MODELS[@]} + ${#WAN_LORA_MODELS[@]} + ${#WAN_VAE_MODELS[@]} + ${#ANIMATEDIFF_MODELS[@]} + ${#UPSCALE_MODELS[@]} + ${#CONTROLNET_MODELS[@]} + ${#RIFE_MODELS[@]} + ${#DETECTOR_MODELS[@]} + ${#FLUX_MODELS[@]} + ${#FLUX_CLIP_MODELS[@]} + ${#TEXT_ENCODERS[@]} + ${#LTX_DIFFUSION_MODELS[@]} + ${#LTX_LORA_MODELS[@]}))
 
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
     log "║  🎯 TOTAL MODELS TO DOWNLOAD: $total_models                           "
-    log "║  📊 This may take 30-90 minutes depending on connection       "
+    log "║  📊 Estimated install size: 100GB+                            "
+    log "║  ⏱️  Est. time: 15-30 minutes on high-speed connection        "
     log "╚════════════════════════════════════════════════════════════════╝"
     log ""
 
-    log "🎨 [1/14] Downloading CHECKPOINTS..."
+    log "🎨 [1/18] Downloading CHECKPOINTS..."
     smart_download_parallel "${COMFYUI_DIR}/models/checkpoints" "$MAX_PAR_HF" "${CHECKPOINT_MODELS[@]}"
 
-    log "🎨 [2/14] Downloading LORAS..."
+    log "🎨 [2/18] Downloading GENERAL LORAS..."
     smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${LORA_MODELS[@]}"
 
-    log "🎥 [3/14] Downloading WAN DIFFUSION MODELS..."
+    log "⚡ [3/18] Downloading WAN LIGHTNING LORAS (4-step generation)..."
+    smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${WAN_LORA_MODELS[@]}"
+
+    log "🎥 [4/18] Downloading WAN DIFFUSION MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${WAN_DIFFUSION_MODELS[@]}"
 
-    log "📝 [4/14] Downloading WAN CLIP MODELS..."
+    log "📝 [5/18] Downloading WAN TEXT ENCODERS..."
     smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${WAN_CLIP_MODELS[@]}"
 
-    log "🎬 [5/14] Downloading WAN VAE MODELS..."
+    log "🎬 [6/18] Downloading WAN VAE MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/vae" "$MAX_PAR_HF" "${WAN_VAE_MODELS[@]}"
 
-    log "🎞️  [6/14] Downloading ANIMATEDIFF MODELS..."
+    log "🎞️  [7/18] Downloading ANIMATEDIFF MOTION MODULES..."
     smart_download_parallel "${COMFYUI_DIR}/models/animatediff_models" "$MAX_PAR_HF" "${ANIMATEDIFF_MODELS[@]}"
 
-    log "⬆️  [7/14] Downloading UPSCALE MODELS..."
+    log "⬆️  [8/18] Downloading UPSCALE MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/upscale_models" "$MAX_PAR_HF" "${UPSCALE_MODELS[@]}"
 
-    log "🎮 [8/14] Downloading CONTROLNET MODELS..."
+    log "🎮 [9/18] Downloading CONTROLNET MODELS..."
     smart_download_parallel "${COMFYUI_DIR}/models/controlnet" "$MAX_PAR_HF" "${CONTROLNET_MODELS[@]}"
 
-    log "🎞️  [9/14] Downloading RIFE MODELS..."
-    RIFE_DIR="${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife"
-    mkdir -p "$RIFE_DIR"
-    smart_download_parallel "$RIFE_DIR" "$MAX_PAR_HF" "${RIFE_MODELS[@]}"
-    # Extract RIFE zip to rife426.pth (ComfyUI-Frame-Interpolation expects .pth)
-    for z in "$RIFE_DIR"/*.zip; do
-        if [[ -f "$z" ]]; then
-            log "   📦 Extracting $(basename "$z")..."
-            (cd "$RIFE_DIR" && unzip -o -j "$z" 2>/dev/null)
-            for p in "$RIFE_DIR"/*.pth; do
-                [[ -f "$p" && "$(basename "$p")" != "rife426.pth" ]] && mv "$p" "$RIFE_DIR/rife426.pth" && log "   ✅ Renamed to rife426.pth"
-                break
-            done
-            rm -f "$z"
-        fi
-    done
+    log "🎞️  [10/18] Downloading RIFE FRAME INTERPOLATION..."
+    smart_download_parallel "${COMFYUI_DIR}/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife" "$MAX_PAR_HF" "${RIFE_MODELS[@]}"
 
-    log "🔍 [10/14] Downloading DETECTOR MODELS (bbox)..."
+    log "🔍 [11/18] Downloading DETECTOR MODELS (Face/Hand YOLO)..."
     smart_download_parallel "${COMFYUI_DIR}/models/ultralytics/bbox" "$MAX_PAR_HF" "${DETECTOR_MODELS[@]:0:2}"
 
-    log "🔍 [11/14] Downloading DETECTOR MODELS (SAM)..."
+    log "🔍 [12/18] Downloading SEGMENTATION MODEL (SAM)..."
     smart_download_parallel "${COMFYUI_DIR}/models/sams" "$MAX_PAR_HF" "${DETECTOR_MODELS[@]:2:1}"
 
-    # log "⚡ [12/14] Downloading FLUX MODELS..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/unet" "$MAX_PAR_HF" "${FLUX_MODELS[@]}"
+    log "⚡ [13/18] Downloading FLUX DIFFUSION MODELS..."
+    if [[ ${#FLUX_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${FLUX_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no FLUX models configured)"
+    fi
 
-    # log "⚡ [13/14] Downloading FLUX VAE..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/vae" "$MAX_PAR_HF" "${FLUX_VAE_MODELS[@]}"
+    log "⚡ [14/18] Downloading FLUX TEXT ENCODERS..."
+    if [[ ${#FLUX_CLIP_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${FLUX_CLIP_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no FLUX CLIP models configured)"
+    fi
 
-    # log "⚡ [14/14] Downloading FLUX CLIP..."
-    # smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${FLUX_CLIP_MODELS[@]}"
+    log "📝 [15/18] Downloading GENERAL TEXT ENCODERS..."
+    if [[ ${#TEXT_ENCODERS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/clip" "$MAX_PAR_HF" "${TEXT_ENCODERS[@]}"
+    else
+        log "   ⏭️  Skipped (no general text encoders configured)"
+    fi
 
-    # OPTIONAL: example_pose.png - never abort provisioning; wrap in subshell so failure cannot crash
-    log "🖼️  [BONUS] Downloading example pose image (optional)..."
-    ( download_file "https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/out_ballerina.png" \
-        "${COMFYUI_DIR}/user/default" "example_pose.png" ) || log "   ⚠️  Optional example_pose.png failed - continuing (non-fatal)"
+    log "🎬 [16/18] Downloading LTX-2 DIFFUSION MODELS..."
+    if [[ ${#LTX_DIFFUSION_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/diffusion_models" "$MAX_PAR_HF" "${LTX_DIFFUSION_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no LTX-2 diffusion models configured)"
+    fi
+
+    log "🎥 [17/18] Downloading LTX-2 LORAS (Camera Control)..."
+    if [[ ${#LTX_LORA_MODELS[@]} -gt 0 ]]; then
+        smart_download_parallel "${COMFYUI_DIR}/models/loras" "$MAX_PAR_HF" "${LTX_LORA_MODELS[@]}"
+    else
+        log "   ⏭️  Skipped (no LTX-2 LoRAs configured)"
+    fi
+
+    log "🎨 [18/18] Downloading LTX-2 SPATIAL UPSCALER..."
+    # Note: Already included in UPSCALE_MODELS array above
 
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
@@ -1253,31 +2039,30 @@ retry_failed_downloads() {
     log_section "🔄 CHECKING FOR FAILED DOWNLOADS"
 
     # Check if error log exists and has content
-    if [[ ! -f "${WORKSPACE}/provision_errors.log" ]] || [[ ! -s "${WORKSPACE}/provision_errors.log" ]]; then
+    if [[ ! -f "/workspace/provision_errors.log" ]] || [[ ! -s "/workspace/provision_errors.log" ]]; then
         log "✅ No failed downloads detected - all models downloaded successfully!"
         return 0
     fi
 
-    # Count failed downloads (only lines with FAILED:, not aria2 diagnostic output)
-    local failed_count=$(grep -c 'FAILED:' "${WORKSPACE}/provision_errors.log" 2>/dev/null || echo 0)
+    # Count failed downloads
+    local failed_count=$(wc -l < "/workspace/provision_errors.log")
     log ""
     log "⚠️  Found $failed_count failed download(s)"
     log ""
 
-    # Show failed files (only lines with FAILED: — skip aria2 diagnostic output)
+    # Show failed files
     log "Failed downloads:"
     while IFS= read -r line; do
-        local filename
-        filename=$(echo "$line" | grep -oP 'FAILED: \K[^\s]+' 2>/dev/null || true)
-        [[ -n "$filename" ]] || continue
+        # Extract filename from error log
+        local filename=$(echo "$line" | grep -oP 'FAILED: \K[^\s]+' || echo "unknown")
         log "   ❌ $filename"
-    done < "${WORKSPACE}/provision_errors.log"
+    done < "/workspace/provision_errors.log"
 
     log ""
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     log "Failed downloads will NOT be retried automatically."
     log "You can:"
-    log "  1. Check ${WORKSPACE}/provision_errors.log for details"
+    log "  1. Check /workspace/provision_errors.log for details"
     log "  2. Manually retry downloads by re-running provision script"
     log "  3. Use ComfyUI Manager to download missing models later"
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -1370,2187 +2155,51 @@ verify_installation() {
     log ""
     if [[ $validation_failed -gt 0 ]]; then
         log "❌ VALIDATION FAILED: $validation_failed critical component(s) missing"
-        log "   ComfyUI may not work correctly. Check ${WORKSPACE}/provision_errors.log for details."
+        log "   ComfyUI may not work correctly. Check /workspace/provision_errors.log for details."
         # Don't exit - let ComfyUI start anyway for debugging, but log the error
-        echo "$(date '+%Y-%m-%d %H:%M:%S') VALIDATION FAILED: $validation_failed critical components missing (checkpoints: $checkpoint_count)" >> "${WORKSPACE}/provision_errors.log"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') VALIDATION FAILED: $validation_failed critical components missing (checkpoints: $checkpoint_count)" >> "/workspace/provision_errors.log"
     else
         log "✅ All critical components verified successfully"
     fi
 }
 
 
-install_workflows() {
-    log_section "📝 INSTALLING PRODUCTION WORKFLOWS"
-    local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
-    mkdir -p "$workflows_dir"
-
-# NSFW IMAGE WORKFLOW (Pony XL - Fully Connected)
-    # ═══════════════════════════════════════════════════════════════════════
-    # ═══════════════════════════════════════════════════════════════════════
-    # NSFW ULTIMATE IMAGE WORKFLOW (Pony XL + FaceDetailer + Upscale)
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_ultimate_image_workflow.json" << 'ULTIMGWORKFLOW'
-{
-  "last_node_id": 101,
-  "last_link_id": 104,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1, 21, 31], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [6, 23, 33], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3, 22, 101, 102], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 50],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [4, 34], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, beautiful detailed face, beautiful detailed eyes, high quality, nsfw, masterpiece, best quality, photorealistic, cinematic lighting"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 200],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5, 35], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, source_pony, source_furry, low quality, worst quality, blurry, censored, watermark, ugly, bad anatomy, deformed, extra limbs, bad hands, bad fingers"]
-    },
-    {
-      "id": 100,
-      "class_type": "CLIPTextEncode",
-      "pos": [1200, 550],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 101}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [50], "slot_index": 0}],
-      "widgets_values": ["detailed face, sharp eyes, high quality, masterpiece"]
-    },
-    {
-      "id": 101,
-      "class_type": "CLIPTextEncode",
-      "pos": [1200, 700],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 102}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [51], "slot_index": 0}],
-      "widgets_values": ["blurry, deformed, ugly, messy, bad anatomy, low quality"]
-    },
-    {
-      "id": 4,
-      "class_type": "EmptyLatentImage",
-      "pos": [400, 350],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}],
-      "widgets_values": [832, 1216, 1]
-    },
-    {
-      "id": 5,
-      "class_type": "KSampler",
-      "pos": [850, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "positive", "type": "CONDITIONING", "link": 4},
-        {"name": "negative", "type": "CONDITIONING", "link": 5},
-        {"name": "latent_image", "type": "LATENT", "link": 7}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
-      "widgets_values": [11223344, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 6,
-      "class_type": "VAEDecode",
-      "pos": [1200, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 8},
-        {"name": "vae", "type": "VAE", "link": 6}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [20], "slot_index": 0}]
-    },
-    {
-      "id": 10,
-      "class_type": "UltralyticsDetectorProvider",
-      "pos": [1200, 250],
-      "size": [315, 100],
-      "outputs": [{"name": "BBOX_DETECTOR", "type": "BBOX_DETECTOR", "links": [24], "slot_index": 0}],
-      "widgets_values": ["face_yolov8m.pt"]
-    },
-    {
-      "id": 11,
-      "class_type": "SAMLoader",
-      "pos": [1200, 400],
-      "size": [315, 100],
-      "outputs": [{"name": "SAM_MODEL", "type": "SAM_MODEL", "links": [25], "slot_index": 0}],
-      "widgets_values": ["sam_vit_b_01ec64.pth"]
-    },
-    {
-      "id": 12,
-      "class_type": "FaceDetailer",
-      "pos": [1600, 100],
-      "size": [315, 500],
-      "inputs": [
-        {"name": "image", "type": "IMAGE", "link": 20},
-        {"name": "model", "type": "MODEL", "link": 21},
-        {"name": "clip", "type": "CLIP", "link": 22},
-        {"name": "vae", "type": "VAE", "link": 23},
-        {"name": "positive", "type": "CONDITIONING", "link": 50},
-        {"name": "negative", "type": "CONDITIONING", "link": 51},
-        {"name": "bbox_detector", "type": "BBOX_DETECTOR", "link": 24},
-        {"name": "sam_model_opt", "type": "SAM_MODEL", "link": 25}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [32], "slot_index": 0}],
-      "widgets_values": [384, 1024, 0.4, 20, 0.5, "randomize", "dpmpp_2m", "karras", 1, 0.4]
-    },
-    {
-      "id": 13,
-      "class_type": "UpscaleModelLoader",
-      "pos": [1600, 650],
-      "size": [315, 58],
-      "outputs": [{"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [36], "slot_index": 0}],
-      "widgets_values": ["4x-UltraSharp.pth"]
-    },
-    {
-      "id": 14,
-      "class_type": "UltimateSDUpscale",
-      "pos": [2000, 100],
-      "size": [315, 600],
-      "inputs": [
-        {"name": "image", "type": "IMAGE", "link": 32},
-        {"name": "model", "type": "MODEL", "link": 31},
-        {"name": "positive", "type": "CONDITIONING", "link": 34},
-        {"name": "negative", "type": "CONDITIONING", "link": 35},
-        {"name": "vae", "type": "VAE", "link": 33},
-        {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": 36}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [40], "slot_index": 0}],
-      "widgets_values": [2, 1024, 0.35, 20, "dpmpp_2m", "karras", 1, 512, 0, 1, 64, 32, 2, true, false]
-    },
-    {
-      "id": 7,
-      "class_type": "SaveImage",
-      "pos": [2400, 100],
-      "size": [315, 270],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 40}],
-      "widgets_values": ["aikings_ultimate"]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 5, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 2, 0, "CLIP"],
-    [3, 99, 0, 3, 0, "CLIP"],
-    [101, 99, 0, 100, 0, "CLIP"],
-    [102, 99, 0, 101, 0, "CLIP"],
-    [4, 2, 0, 5, 1, "CONDITIONING"],
-    [5, 3, 0, 5, 2, "CONDITIONING"],
-    [6, 1, 2, 6, 1, "VAE"],
-    [7, 4, 0, 5, 3, "LATENT"],
-    [8, 5, 0, 6, 0, "LATENT"],
-    [20, 6, 0, 12, 0, "IMAGE"],
-    [21, 1, 0, 12, 1, "MODEL"],
-    [22, 99, 0, 12, 2, "CLIP"],
-    [23, 1, 2, 12, 3, "VAE"],
-    [50, 100, 0, 12, 4, "CONDITIONING"],
-    [51, 101, 0, 12, 5, "CONDITIONING"],
-    [24, 10, 0, 12, 6, "BBOX_DETECTOR"],
-    [25, 11, 0, 12, 7, "SAM_MODEL"],
-    [31, 1, 0, 14, 1, "MODEL"],
-    [32, 12, 0, 14, 0, "IMAGE"],
-    [33, 1, 2, 14, 4, "VAE"],
-    [34, 2, 0, 14, 2, "CONDITIONING"],
-    [35, 3, 0, 14, 3, "CONDITIONING"],
-    [36, 13, 0, 14, 5, "UPSCALE_MODEL"],
-    [40, 14, 0, 7, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-ULTIMGWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # NSFW VIDEO WORKFLOW (AnimateDiff SDXL - Fully Connected)
-    # Uses: ADE_AnimateDiffLoaderGen1 + VHS_VideoCombine
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_video_workflow.json" << 'VIDWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [9], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "ADE_AnimateDiffLoaderGen1",
-      "pos": [50, 350],
-      "size": [315, 98],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1}
-      ],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [4], "slot_index": 0}
-      ],
-      "widgets_values": ["mm_sdxl_v1_beta.ckpt", "linear (AnimateDiff-SDXL)"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 50],
-      "size": [400, 100],
-      "inputs": [
-        {"name": "clip", "type": "CLIP", "link": 2}
-      ],
-      "outputs": [
-        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}
-      ],
-      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, 1girl, dancing, dynamic motion, beautiful detailed face, high quality, nsfw, masterpiece, best quality, smooth animation"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 200],
-      "size": [400, 100],
-      "inputs": [
-        {"name": "clip", "type": "CLIP", "link": 3}
-      ],
-      "outputs": [
-        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}
-      ],
-      "widgets_values": ["score_6, score_5, score_4, source_pony, source_furry, static, frozen, choppy, low quality, worst quality, blurry, censored, watermark, bad anatomy, deformed"]
-    },
-    {
-      "id": 5,
-      "class_type": "EmptyLatentImage",
-      "pos": [450, 350],
-      "size": [315, 106],
-      "outputs": [
-        {"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}
-      ],
-      "widgets_values": [512, 512, 16]
-    },
-    {
-      "id": 6,
-      "class_type": "KSampler",
-      "pos": [900, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 4},
-        {"name": "positive", "type": "CONDITIONING", "link": 5},
-        {"name": "negative", "type": "CONDITIONING", "link": 6},
-        {"name": "latent_image", "type": "LATENT", "link": 7}
-      ],
-      "outputs": [
-        {"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}
-      ],
-      "widgets_values": [987654321, "randomize", 25, 7, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 7,
-      "class_type": "VAEDecode",
-      "pos": [1250, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 8},
-        {"name": "vae", "type": "VAE", "link": 9}
-      ],
-      "outputs": [
-        {"name": "IMAGE", "type": "IMAGE", "links": [10], "slot_index": 0}
-      ]
-    },
-    {
-      "id": 8,
-      "class_type": "VHS_VideoCombine",
-      "pos": [1500, 100],
-      "size": [315, 290],
-      "inputs": [
-        {"name": "images", "type": "IMAGE", "link": 10}
-      ],
-      "widgets_values": ["aikings_video", 8, 0, "image/webp", false, true, ""]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 2, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 3, 0, "CLIP"],
-    [3, 99, 0, 4, 0, "CLIP"],
-    [4, 2, 0, 6, 0, "MODEL"],
-    [5, 3, 0, 6, 1, "CONDITIONING"],
-    [6, 4, 0, 6, 2, "CONDITIONING"],
-    [7, 5, 0, 6, 3, "LATENT"],
-    [8, 6, 0, 7, 0, "LATENT"],
-    [9, 1, 2, 7, 1, "VAE"],
-    [10, 7, 0, 8, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-VIDWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # NSFW ULTIMATE VIDEO WORKFLOW (AnimateDiff + RIFE + Upscale)
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_ultimate_video_workflow.json" << 'ULTVIDWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [9], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "ADE_AnimateDiffLoaderGen1",
-      "pos": [50, 350],
-      "size": [315, 98],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1}
-      ],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [4], "slot_index": 0}
-      ],
-      "widgets_values": ["mm_sdxl_v1_beta.ckpt", "linear (AnimateDiff-SDXL)"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 50],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, beautiful woman dancing, smooth motion, cinematic lighting, high quality, nsfw, masterpiece, best quality, dynamic camera"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 200],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, source_pony, source_furry, static, frozen, choppy, blurry, low quality, worst quality, watermark, deformed, bad anatomy"]
-    },
-    {
-      "id": 5,
-      "class_type": "EmptyLatentImage",
-      "pos": [450, 350],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}],
-      "widgets_values": [512, 768, 24]
-    },
-    {
-      "id": 6,
-      "class_type": "KSampler",
-      "pos": [900, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 4},
-        {"name": "positive", "type": "CONDITIONING", "link": 5},
-        {"name": "negative", "type": "CONDITIONING", "link": 6},
-        {"name": "latent_image", "type": "LATENT", "link": 7}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
-      "widgets_values": [99887766, "randomize", 25, 7, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 7,
-      "class_type": "VAEDecode",
-      "pos": [1250, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 8},
-        {"name": "vae", "type": "VAE", "link": 9}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [10], "slot_index": 0}]
-    },
-    {
-      "id": 9,
-      "class_type": "RIFE VFI",
-      "pos": [1500, 100],
-      "size": [315, 150],
-      "inputs": [{"name": "frames", "type": "IMAGE", "link": 10}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [12], "slot_index": 0}],
-      "widgets_values": ["rife426.pth", 12, 2, true, false, 1.0]
-    },
-    {
-      "id": 13,
-      "class_type": "UpscaleModelLoader",
-      "pos": [1500, 300],
-      "size": [315, 58],
-      "outputs": [{"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [20], "slot_index": 0}],
-      "widgets_values": ["4x-UltraSharp.pth"]
-    },
-    {
-      "id": 14,
-      "class_type": "ImageUpscaleWithModel",
-      "pos": [1900, 100],
-      "size": [240, 46],
-      "inputs": [
-        {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": 20},
-        {"name": "image", "type": "IMAGE", "link": 12}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [21], "slot_index": 0}]
-    },
-    {
-      "id": 10,
-      "class_type": "VHS_VideoCombine",
-      "pos": [2200, 100],
-      "size": [315, 290],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 21}],
-      "widgets_values": ["aikings_ultimate_video", 24, 0, "video/h264-mp4", false, true, ""]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 2, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 3, 0, "CLIP"],
-    [3, 99, 0, 4, 0, "CLIP"],
-    [4, 2, 0, 6, 0, "MODEL"],
-    [5, 3, 0, 6, 1, "CONDITIONING"],
-    [6, 4, 0, 6, 2, "CONDITIONING"],
-    [7, 5, 0, 6, 3, "LATENT"],
-    [8, 6, 0, 7, 0, "LATENT"],
-    [9, 1, 2, 7, 1, "VAE"],
-    [10, 7, 0, 9, 0, "IMAGE"],
-    [12, 9, 0, 14, 1, "IMAGE"],
-    [20, 13, 0, 14, 0, "UPSCALE_MODEL"],
-    [21, 14, 0, 10, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-ULTVIDWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # LORA-FOCUSED IMAGE WORKFLOW (With LoRA Loader - Fully Connected)
-    # For using the specialized fetish LoRAs
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_lora_image_workflow.json" << 'LORAWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [10], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "LoraLoader",
-      "pos": [400, 100],
-      "size": [315, 126],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "clip", "type": "CLIP", "link": 2}
-      ],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [3], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [4, 5], "slot_index": 1}
-      ],
-      "widgets_values": ["pony_realism_v2.1.safetensors", 0.8, 0.8]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [750, 50],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, 1girl, detailed face, beautiful eyes, high quality, nsfw, masterpiece, photorealistic"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [750, 200],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 5}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [7], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, low quality, blurry, censored, watermark, ugly, cartoon, anime"]
-    },
-    {
-      "id": 5,
-      "class_type": "EmptyLatentImage",
-      "pos": [750, 350],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
-      "widgets_values": [1024, 1024, 1]
-    },
-    {
-      "id": 6,
-      "class_type": "KSampler",
-      "pos": [1200, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 3},
-        {"name": "positive", "type": "CONDITIONING", "link": 6},
-        {"name": "negative", "type": "CONDITIONING", "link": 7},
-        {"name": "latent_image", "type": "LATENT", "link": 8}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
-      "widgets_values": [111222333, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 7,
-      "class_type": "VAEDecode",
-      "pos": [1550, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 9},
-        {"name": "vae", "type": "VAE", "link": 10}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [11], "slot_index": 0}]
-    },
-    {
-      "id": 8,
-      "class_type": "SaveImage",
-      "pos": [1800, 100],
-      "size": [315, 270],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 11}],
-      "widgets_values": ["aikings_lora_nsfw"]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 2, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 2, 1, "CLIP"],
-    [3, 2, 0, 6, 0, "MODEL"],
-    [4, 2, 1, 3, 0, "CLIP"],
-    [5, 2, 1, 4, 0, "CLIP"],
-    [6, 3, 0, 6, 1, "CONDITIONING"],
-    [7, 4, 0, 6, 2, "CONDITIONING"],
-    [8, 5, 0, 6, 3, "LATENT"],
-    [9, 6, 0, 7, 0, "LATENT"],
-    [10, 1, 2, 7, 1, "VAE"],
-    [11, 7, 0, 8, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-LORAWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # PORNMASTER PHOTOREALISTIC WORKFLOW (Fully Connected)
-    # Optimized for photorealistic NSFW content
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_pornmaster_workflow.json" << 'PORNMASTERWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [6], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 50],
-      "size": [450, 120],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [4], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, photorealistic, professional photography, beautiful woman, detailed skin texture, natural lighting, high resolution, sharp focus, 8k uhd, dslr quality, nsfw"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 220],
-      "size": [450, 120],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
-      "widgets_values": ["cartoon, anime, illustration, 3d render, fake, plastic, low quality, blurry, censored, watermark, text, ugly, deformed"]
-    },
-    {
-      "id": 4,
-      "class_type": "EmptyLatentImage",
-      "pos": [450, 400],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}],
-      "widgets_values": [832, 1216, 1]
-    },
-    {
-      "id": 5,
-      "class_type": "KSampler",
-      "pos": [950, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "positive", "type": "CONDITIONING", "link": 4},
-        {"name": "negative", "type": "CONDITIONING", "link": 5},
-        {"name": "latent_image", "type": "LATENT", "link": 7}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
-      "widgets_values": [444555666, "randomize", 30, 7, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 6,
-      "class_type": "VAEDecode",
-      "pos": [1300, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 8},
-        {"name": "vae", "type": "VAE", "link": 6}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [9], "slot_index": 0}]
-    },
-    {
-      "id": 7,
-      "class_type": "SaveImage",
-      "pos": [1550, 100],
-      "size": [315, 270],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 9}],
-      "widgets_values": ["aikings_pornmaster"]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 5, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 2, 0, "CLIP"],
-    [3, 99, 0, 3, 0, "CLIP"],
-    [4, 2, 0, 5, 1, "CONDITIONING"],
-    [5, 3, 0, 5, 2, "CONDITIONING"],
-    [6, 1, 2, 6, 1, "VAE"],
-    [7, 4, 0, 5, 3, "LATENT"],
-    [8, 5, 0, 6, 0, "LATENT"],
-    [9, 6, 0, 7, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-PORNMASTERWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # CONTROLNET OPENPOSE WORKFLOW (Pose-Guided Generation)
-    # Uses: ControlNetLoader + Apply ControlNet + OpenPose
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_controlnet_pose_workflow.json" << 'POSEWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [10], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 50],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [4], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, 1girl, beautiful face, detailed eyes, high quality, nsfw, masterpiece, photorealistic, dynamic pose"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 200],
-      "size": [400, 100],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, low quality, blurry, censored, watermark, ugly, bad anatomy, deformed"]
-    },
-    {
-      "id": 4,
-      "class_type": "LoadImage",
-      "pos": [50, 300],
-      "size": [315, 314],
-      "outputs": [
-        {"name": "IMAGE", "type": "IMAGE", "links": [6], "slot_index": 0},
-        {"name": "MASK", "type": "MASK", "links": null, "slot_index": 1}
-      ],
-      "widgets_values": ["example_pose.png", "image"]
-    },
-    {
-      "id": 5,
-      "class_type": "ControlNetLoader",
-      "pos": [400, 400],
-      "size": [315, 58],
-      "outputs": [{"name": "CONTROL_NET", "type": "CONTROL_NET", "links": [7], "slot_index": 0}],
-      "widgets_values": ["OpenPoseXL2.safetensors"]
-    },
-    {
-      "id": 6,
-      "class_type": "ControlNetApplyAdvanced",
-      "pos": [800, 100],
-      "size": [315, 186],
-      "inputs": [
-        {"name": "positive", "type": "CONDITIONING", "link": 4},
-        {"name": "negative", "type": "CONDITIONING", "link": 5},
-        {"name": "control_net", "type": "CONTROL_NET", "link": 7},
-        {"name": "image", "type": "IMAGE", "link": 6}
-      ],
-      "outputs": [
-        {"name": "positive", "type": "CONDITIONING", "links": [8], "slot_index": 0},
-        {"name": "negative", "type": "CONDITIONING", "links": [9], "slot_index": 1}
-      ],
-      "widgets_values": [0.85, 0.0, 1.0]
-    },
-    {
-      "id": 7,
-      "class_type": "EmptyLatentImage",
-      "pos": [800, 350],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [11], "slot_index": 0}],
-      "widgets_values": [832, 1216, 1]
-    },
-    {
-      "id": 8,
-      "class_type": "KSampler",
-      "pos": [1200, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "positive", "type": "CONDITIONING", "link": 8},
-        {"name": "negative", "type": "CONDITIONING", "link": 9},
-        {"name": "latent_image", "type": "LATENT", "link": 11}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [12], "slot_index": 0}],
-      "widgets_values": [55667788, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 9,
-      "class_type": "VAEDecode",
-      "pos": [1550, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 12},
-        {"name": "vae", "type": "VAE", "link": 10}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [13], "slot_index": 0}]
-    },
-    {
-      "id": 10,
-      "class_type": "SaveImage",
-      "pos": [1800, 100],
-      "size": [315, 270],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 13}],
-      "widgets_values": ["aikings_pose"]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 8, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 2, 0, "CLIP"],
-    [3, 99, 0, 3, 0, "CLIP"],
-    [4, 2, 0, 6, 0, "CONDITIONING"],
-    [5, 3, 0, 6, 1, "CONDITIONING"],
-    [6, 4, 0, 6, 3, "IMAGE"],
-    [7, 5, 0, 6, 2, "CONTROL_NET"],
-    [8, 6, 0, 8, 1, "CONDITIONING"],
-    [9, 6, 1, 8, 2, "CONDITIONING"],
-    [10, 1, 2, 9, 1, "VAE"],
-    [11, 7, 0, 8, 3, "LATENT"],
-    [12, 8, 0, 9, 0, "LATENT"],
-    [13, 9, 0, 10, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-POSEWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # WAN 2.1 TEXT-TO-VIDEO WORKFLOW (Repackaged Native Implementation)
-    # Optimized for: 1.3B/14B Wan models, 480p/720p cinematic motion
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_wan21_video_workflow.json" << 'WANWORKFLOW'
-{
-  "last_node_id": 10,
-  "last_link_id": 10,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "WanVideoModelLoader",
-      "pos": [50, 100],
-      "size": [315, 82],
-      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
-      "widgets_values": ["wan2.1_t2v_1.3B_fp16.safetensors", "fp16"]
-    },
-    {
-      "id": 2,
-      "class_type": "WanVideoT5TextEncode",
-      "pos": [50, 250],
-      "size": [315, 82],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 50],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [4], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, nsfw, realistic motion"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 250],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, low quality, worst quality, blurry, watermark, bad anatomy"]
-    },
-    {
-      "id": 5,
-      "class_type": "WanVideoSampler",
-      "pos": [900, 100],
-      "size": [315, 450],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "positive", "type": "CONDITIONING", "link": 4},
-        {"name": "negative", "type": "CONDITIONING", "link": 5},
-        {"name": "latent_image", "type": "LATENT", "link": 9}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [6], "slot_index": 0}],
-      "widgets_values": [30, 7.0, 11223344, "randomize"]
-    },
-    {
-      "id": 9,
-      "class_type": "EmptyWanVideoLatent",
-      "pos": [900, 600],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
-      "widgets_values": [832, 480, 81]
-    },
-    {
-      "id": 6,
-      "class_type": "WanVideoVaeLoader",
-      "pos": [900, 750],
-      "size": [315, 58],
-      "outputs": [{"name": "VAE", "type": "VAE", "links": [7], "slot_index": 0}],
-      "widgets_values": ["wan_2.1_vae.safetensors"]
-    },
-    {
-      "id": 7,
-      "class_type": "VAEDecode",
-      "pos": [1250, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 6},
-        {"name": "vae", "type": "VAE", "link": 7}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [8], "slot_index": 0}]
-    },
-    {
-      "id": 8,
-      "class_type": "VHS_VideoCombine",
-      "pos": [1500, 100],
-      "size": [315, 350],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 8}],
-      "widgets_values": ["aikings_wan", 16, 0, "video/h264-mp4", false, true, "", 6]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 5, 0, "MODEL"],
-    [2, 2, 0, 3, 0, "CLIP"],
-    [3, 2, 0, 4, 0, "CLIP"],
-    [4, 3, 0, 5, 1, "CONDITIONING"],
-    [5, 4, 0, 5, 2, "CONDITIONING"],
-    [9, 9, 0, 5, 3, "LATENT"],
-    [6, 5, 0, 7, 0, "LATENT"],
-    [7, 6, 0, 7, 1, "VAE"],
-    [8, 7, 0, 8, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-WANWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # MASTER FURRY REALISTIC VIDEO WORKFLOW (SDXL + LoRA Stacker)
-    # Optimized for: Realistic furry NSFW, skin/fur texture, heavy LoRA use
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_realistic_furry_video_workflow.json" << 'FURRYWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [3], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "LoraStacker",
-      "pos": [50, 350],
-      "size": [315, 300],
-      "outputs": [{"name": "LORA_STACK", "type": "LORA_STACK", "links": [4], "slot_index": 0}],
-      "widgets_values": [
-        "Enabled", "pony_realism_v2.1.safetensors", 0.6, 0.6,
-        "Enabled", "defecation_v1.safetensors", 0.5, 0.5,
-        "Disabled", "None", 0.0, 0.0,
-        "Disabled", "None", 0.0, 0.0,
-        "Disabled", "None", 0.0, 0.0
-      ]
-    },
-    {
-      "id": 3,
-      "class_type": "ApplyLoraStack",
-      "pos": [400, 100],
-      "size": [315, 120],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "clip", "type": "CLIP", "link": 2},
-        {"name": "lora_stack", "type": "LORA_STACK", "link": 4}
-      ],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [5], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [6], "slot_index": 1}
-      ]
-    },
-    {
-      "id": 4,
-      "class_type": "ADE_AnimateDiffLoaderGen1",
-      "pos": [400, 300],
-      "size": [315, 98],
-      "inputs": [{"name": "model", "type": "MODEL", "link": 5}],
-      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [7], "slot_index": 0}],
-      "widgets_values": ["mm_sdxl_v1_beta.ckpt", "linear (AnimateDiff-SDXL)"]
-    },
-    {
-      "id": 5,
-      "class_type": "CLIPTextEncode",
-      "pos": [750, 50],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 6}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [8], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, masterpiece, best quality, cinematic, furry, anthropomorphic, realistic fur texture, detailed skin, 1girl, full body, wide shot, nsfw, explicit"]
-    },
-    {
-      "id": 6,
-      "class_type": "CLIPTextEncode",
-      "pos": [750, 250],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [9], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, source_pony, low quality, worst quality, blurry, watermark, bad anatomy, deformed, human eyes on furry"]
-    },
-
-    {
-      "id": 7,
-      "class_type": "EmptyLatentImage",
-      "pos": [750, 450],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [10], "slot_index": 0}],
-      "widgets_values": [832, 1216, 16]
-    },
-    {
-      "id": 8,
-      "class_type": "KSampler",
-      "pos": [1200, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 7},
-        {"name": "positive", "type": "CONDITIONING", "link": 8},
-        {"name": "negative", "type": "CONDITIONING", "link": 9},
-        {"name": "latent_image", "type": "LATENT", "link": 10}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [11], "slot_index": 0}],
-      "widgets_values": [44556677, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 1]
-    },
-    {
-      "id": 9,
-      "class_type": "VAEDecode",
-      "pos": [1550, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 11},
-        {"name": "vae", "type": "VAE", "link": 3}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [12], "slot_index": 0}]
-    },
-    {
-      "id": 10,
-      "class_type": "VHS_VideoCombine",
-      "pos": [1800, 100],
-      "size": [315, 350],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 12}],
-      "widgets_values": ["aikings_furry_realistic", 12, 0, "video/h264-mp4", false, true, "", 6]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 3, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 3, 1, "CLIP"],
-    [3, 1, 2, 9, 1, "VAE"],
-    [4, 2, 0, 3, 2, "LORA_STACK"],
-    [5, 3, 0, 4, 0, "MODEL"],
-    [6, 3, 1, 5, 0, "CLIP"],
-    [30, 3, 1, 6, 0, "CLIP"],
-    [7, 4, 0, 8, 0, "MODEL"],
-    [8, 5, 0, 8, 1, "CONDITIONING"],
-    [9, 6, 0, 8, 2, "CONDITIONING"],
-    [10, 7, 0, 8, 3, "LATENT"],
-    [11, 8, 0, 9, 0, "LATENT"],
-    [12, 9, 0, 10, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-FURRYWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # ULTIMATE CINEMA PRODUCTION WORKFLOW (Full Scene, Multiple Subjects)
-    # Optimized for: Wide shots, full body, realistic motion, NSFW scenes
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_cinema_production_workflow.json" << 'CINEMAWORKFLOW'
-{
-  "last_node_id": 99,
-  "last_link_id": 100,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "CheckpointLoaderSimple",
-      "pos": [50, 100],
-      "size": [315, 98],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0},
-        {"name": "CLIP", "type": "CLIP", "links": [100], "slot_index": 1},
-        {"name": "VAE", "type": "VAE", "links": [15], "slot_index": 2}
-      ],
-      "widgets_values": ["pmXL_v1.safetensors"]
-    },
-    {
-      "id": 99,
-      "class_type": "CLIPSetLastLayer",
-      "pos": [50, 250],
-      "size": [315, 58],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 100}],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [2, 3], "slot_index": 0}],
-      "widgets_values": [-2]
-    },
-    {
-      "id": 2,
-      "class_type": "ADE_AnimateDiffLoaderGen1",
-      "pos": [50, 350],
-      "size": [315, 98],
-      "inputs": [{"name": "model", "type": "MODEL", "link": 1}],
-      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [4], "slot_index": 0}],
-      "widgets_values": ["mm_sdxl_v1_beta.ckpt", "linear (AnimateDiff-SDXL)"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 50],
-      "size": [500, 120],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 2}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, score_7_up, source_anime, rating_explicit, masterpiece, best quality, cinematic, wide shot, full body, multiple girls, 2girls, detailed background, interior room, professional lighting, realistic proportions, detailed faces, beautiful eyes, nsfw, explicit, dynamic pose, interaction"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 220],
-      "size": [500, 120],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [6], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, score_4, source_pony, source_furry, low quality, worst quality, blurry, censored, watermark, ugly, bad anatomy, deformed, extra limbs, bad hands, bad fingers, close-up, cropped, out of frame, jpeg artifacts, duplicate, mutation"]
-    },
-    {
-      "id": 5,
-      "class_type": "ADE_AnimateDiffUniformContextOptions",
-      "pos": [400, 400],
-      "size": [315, 150],
-      "outputs": [{"name": "CONTEXT_OPTIONS", "type": "CONTEXT_OPTIONS", "links": [7], "slot_index": 0}],
-      "widgets_values": [16, 1, 4, "uniform", false, "flat", false, 0, 1.0]
-    },
-    {
-      "id": 6,
-      "class_type": "EmptyLatentImage",
-      "pos": [750, 400],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [8], "slot_index": 0}],
-      "widgets_values": [576, 1024, 32]
-    },
-    {
-      "id": 7,
-      "class_type": "KSamplerAdvanced",
-      "pos": [1100, 100],
-      "size": [315, 400],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 4},
-        {"name": "positive", "type": "CONDITIONING", "link": 5},
-        {"name": "negative", "type": "CONDITIONING", "link": 6},
-        {"name": "latent_image", "type": "LATENT", "link": 8}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
-      "widgets_values": ["enable", 44556677, "randomize", 30, 7.0, "dpmpp_2m_sde", "karras", 0, 30, "disable"]
-    },
-    {
-      "id": 8,
-      "class_type": "VAEDecode",
-      "pos": [1450, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 9},
-        {"name": "vae", "type": "VAE", "link": 15}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [10], "slot_index": 0}]
-    },
-    {
-      "id": 9,
-      "class_type": "RIFE VFI",
-      "pos": [1700, 100],
-      "size": [315, 150],
-      "inputs": [{"name": "frames", "type": "IMAGE", "link": 10}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [11], "slot_index": 0}],
-      "widgets_values": ["rife426.pth", 12, 2, true, true, 1.0]
-    },
-    {
-      "id": 10,
-      "class_type": "UpscaleModelLoader",
-      "pos": [1700, 300],
-      "size": [315, 58],
-      "outputs": [{"name": "UPSCALE_MODEL", "type": "UPSCALE_MODEL", "links": [20], "slot_index": 0}],
-      "widgets_values": ["4x-UltraSharp.pth"]
-    },
-    {
-      "id": 11,
-      "class_type": "ImageUpscaleWithModel",
-      "pos": [2050, 100],
-      "size": [240, 46],
-      "inputs": [
-        {"name": "upscale_model", "type": "UPSCALE_MODEL", "link": 20},
-        {"name": "image", "type": "IMAGE", "link": 11}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [21], "slot_index": 0}]
-    },
-    {
-      "id": 12,
-      "class_type": "ImageScaleBy",
-      "pos": [2050, 200],
-      "size": [240, 80],
-      "inputs": [{"name": "image", "type": "IMAGE", "link": 21}],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [22], "slot_index": 0}],
-      "widgets_values": ["lanczos", 0.5]
-    },
-    {
-      "id": 13,
-      "class_type": "VHS_VideoCombine",
-      "pos": [2350, 100],
-      "size": [315, 350],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 22}],
-      "widgets_values": ["aikings_cinema", 24, 0, "video/h264-mp4", false, true, "", 6]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 2, 0, "MODEL"],
-    [100, 1, 1, 99, 0, "CLIP"],
-    [2, 99, 0, 3, 0, "CLIP"],
-    [3, 99, 0, 4, 0, "CLIP"],
-    [4, 2, 0, 7, 0, "MODEL"],
-    [5, 3, 0, 7, 1, "CONDITIONING"],
-    [6, 4, 0, 7, 2, "CONDITIONING"],
-    [7, 5, 0, 2, 1, "CONTEXT_OPTIONS"],
-    [8, 6, 0, 7, 3, "LATENT"],
-    [9, 7, 0, 8, 0, "LATENT"],
-    [15, 1, 2, 8, 1, "VAE"],
-    [10, 8, 0, 9, 0, "IMAGE"],
-    [11, 9, 0, 11, 1, "IMAGE"],
-    [20, 10, 0, 11, 0, "UPSCALE_MODEL"],
-    [21, 11, 0, 12, 0, "IMAGE"],
-    [22, 12, 0, 13, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-CINEMAWORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # WAN 2.2 MASTER MoE WORKFLOW (Expert Chaining)
-    # Optimized for: 14B High/Low noise mixture-of-experts, cinema motion
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_wan22_master_video_workflow.json" << 'WAN22WORKFLOW'
-{
-  "last_node_id": 15,
-  "last_link_id": 20,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "WanVideoModelLoader",
-      "pos": [50, 100],
-      "size": [315, 82],
-      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1], "slot_index": 0}],
-      "widgets_values": ["wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors", "fp8_e4m3fn"]
-    },
-    {
-      "id": 2,
-      "class_type": "WanVideoModelLoader",
-      "pos": [50, 200],
-      "size": [315, 82],
-      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [2], "slot_index": 0}],
-      "widgets_values": ["wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors", "fp8_e4m3fn"]
-    },
-    {
-      "id": 3,
-      "class_type": "WanVideoT5TextEncode",
-      "pos": [50, 350],
-      "size": [315, 82],
-      "outputs": [{"name": "CLIP", "type": "CLIP", "links": [3, 4], "slot_index": 0}],
-      "widgets_values": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"]
-    },
-    {
-      "id": 4,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 50],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 3}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [5, 6], "slot_index": 0}],
-      "widgets_values": ["score_9, score_8_up, rating_explicit, masterpiece, best quality, cinematic, 1girl, full body, realistic texture, mo-e motion"]
-    },
-    {
-      "id": 5,
-      "class_type": "CLIPTextEncode",
-      "pos": [450, 250],
-      "size": [400, 150],
-      "inputs": [{"name": "clip", "type": "CLIP", "link": 4}],
-      "outputs": [{"name": "CONDITIONING", "type": "CONDITIONING", "links": [7, 8], "slot_index": 0}],
-      "widgets_values": ["score_6, score_5, low quality, worst quality, watermark"]
-    },
-    {
-      "id": 6,
-      "class_type": "EmptyWanVideoLatent",
-      "pos": [450, 450],
-      "size": [315, 106],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [9], "slot_index": 0}],
-      "widgets_values": [832, 480, 81]
-    },
-    {
-      "id": 7,
-      "class_type": "WanVideoSampler",
-      "pos": [900, 50],
-      "size": [315, 450],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 1},
-        {"name": "positive", "type": "CONDITIONING", "link": 5},
-        {"name": "negative", "type": "CONDITIONING", "link": 7},
-        {"name": "latent_image", "type": "LATENT", "link": 9}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [10], "slot_index": 0}],
-      "widgets_values": [25, 7.0, 5566, "randomize"]
-    },
-    {
-      "id": 8,
-      "class_type": "WanVideoSampler",
-      "pos": [1250, 50],
-      "size": [315, 450],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 2},
-        {"name": "positive", "type": "CONDITIONING", "link": 6},
-        {"name": "negative", "type": "CONDITIONING", "link": 8},
-        {"name": "latent_image", "type": "LATENT", "link": 10}
-      ],
-      "outputs": [{"name": "LATENT", "type": "LATENT", "links": [11], "slot_index": 0}],
-      "widgets_values": [10, 7.0, 5566, "randomize"]
-    },
-    {
-      "id": 9,
-      "class_type": "WanVideoVaeLoader",
-      "pos": [1250, 600],
-      "size": [315, 58],
-      "outputs": [{"name": "VAE", "type": "VAE", "links": [12], "slot_index": 0}],
-      "widgets_values": ["wan2.2_vae.safetensors"]
-    },
-    {
-      "id": 10,
-      "class_type": "VAEDecode",
-      "pos": [1600, 50],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 11},
-        {"name": "vae", "type": "VAE", "link": 12}
-      ],
-      "outputs": [{"name": "IMAGE", "type": "IMAGE", "links": [13], "slot_index": 0}]
-    },
-    {
-      "id": 11,
-      "class_type": "VHS_VideoCombine",
-      "pos": [1850, 50],
-      "size": [315, 350],
-      "inputs": [{"name": "images", "type": "IMAGE", "link": 13}],
-      "widgets_values": ["aikings_wan22_moe", 24, 0, "video/h264-mp4", false, true, "", 6]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 7, 0, "MODEL"],
-    [2, 2, 0, 8, 0, "MODEL"],
-    [3, 3, 0, 4, 0, "CLIP"],
-    [4, 3, 0, 5, 0, "CLIP"],
-    [5, 4, 0, 7, 1, "CONDITIONING"],
-    [6, 4, 0, 8, 1, "CONDITIONING"],
-    [7, 5, 0, 7, 2, "CONDITIONING"],
-    [8, 5, 0, 8, 2, "CONDITIONING"],
-    [9, 6, 0, 7, 3, "LATENT"],
-    [10, 7, 0, 8, 3, "LATENT"],
-    [11, 8, 0, 10, 0, "LATENT"],
-    [12, 9, 0, 10, 1, "VAE"],
-    [13, 10, 0, 11, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-WAN22WORKFLOW
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # FLUX SCHNELL WORKFLOW (Ultra-Fast Next-Gen Image Generation)
-    # Optimized for: Flux schnell (4-step), photorealistic NSFW, fast iteration
-    # ═══════════════════════════════════════════════════════════════════════
-    cat > "${workflows_dir}/nsfw_flux_schnell_workflow.json" << 'FLUXWORKFLOW'
-{
-  "last_node_id": 13,
-  "last_link_id": 13,
-  "nodes": [
-    {
-      "id": 1,
-      "class_type": "DualCLIPLoader",
-      "pos": [50, 100],
-      "size": [315, 106],
-      "outputs": [
-        {"name": "CLIP", "type": "CLIP", "links": [1, 2], "slot_index": 0}
-      ],
-      "widgets_values": ["clip_l.safetensors", "t5xxl_fp16.safetensors", "flux"]
-    },
-    {
-      "id": 2,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 50],
-      "size": [450, 150],
-      "inputs": [
-        {"name": "clip", "type": "CLIP", "link": 1}
-      ],
-      "outputs": [
-        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [3], "slot_index": 0}
-      ],
-      "widgets_values": ["score_9, score_8_up, score_7_up, masterpiece, best quality, highly detailed, photorealistic, professional photography, beautiful woman, detailed skin texture, natural lighting, sharp focus, 8k uhd, nsfw, explicit"]
-    },
-    {
-      "id": 3,
-      "class_type": "CLIPTextEncode",
-      "pos": [400, 250],
-      "size": [450, 100],
-      "inputs": [
-        {"name": "clip", "type": "CLIP", "link": 2}
-      ],
-      "outputs": [
-        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [4], "slot_index": 0}
-      ],
-      "widgets_values": ["low quality, worst quality, blurry, censored, watermark, text, ugly, deformed, cartoon, anime, illustration"]
-    },
-    {
-      "id": 10,
-      "class_type": "UNETLoader",
-      "pos": [50, 250],
-      "size": [315, 82],
-      "outputs": [
-        {"name": "MODEL", "type": "MODEL", "links": [5], "slot_index": 0}
-      ],
-      "widgets_values": ["flux1-schnell.safetensors"]
-    },
-    {
-      "id": 11,
-      "class_type": "VAELoader",
-      "pos": [50, 380],
-      "size": [315, 58],
-      "outputs": [
-        {"name": "VAE", "type": "VAE", "links": [8], "slot_index": 0}
-      ],
-      "widgets_values": ["flux_ae.safetensors"]
-    },
-    {
-      "id": 4,
-      "class_type": "EmptyLatentImage",
-      "pos": [900, 350],
-      "size": [315, 106],
-      "outputs": [
-        {"name": "LATENT", "type": "LATENT", "links": [6], "slot_index": 0}
-      ],
-      "widgets_values": [1024, 1024, 1]
-    },
-    {
-      "id": 5,
-      "class_type": "KSampler",
-      "pos": [900, 100],
-      "size": [315, 262],
-      "inputs": [
-        {"name": "model", "type": "MODEL", "link": 5},
-        {"name": "positive", "type": "CONDITIONING", "link": 3},
-        {"name": "negative", "type": "CONDITIONING", "link": 4},
-        {"name": "latent_image", "type": "LATENT", "link": 6}
-      ],
-      "outputs": [
-        {"name": "LATENT", "type": "LATENT", "links": [7], "slot_index": 0}
-      ],
-      "widgets_values": [11223344, "randomize", 4, 1.0, "euler", "simple", 1]
-    },
-    {
-      "id": 8,
-      "class_type": "VAEDecode",
-      "pos": [1250, 100],
-      "size": [210, 46],
-      "inputs": [
-        {"name": "samples", "type": "LATENT", "link": 7},
-        {"name": "vae", "type": "VAE", "link": 8}
-      ],
-      "outputs": [
-        {"name": "IMAGE", "type": "IMAGE", "links": [9], "slot_index": 0}
-      ]
-    },
-    {
-      "id": 9,
-      "class_type": "SaveImage",
-      "pos": [1500, 100],
-      "size": [315, 270],
-      "inputs": [
-        {"name": "images", "type": "IMAGE", "link": 9}
-      ],
-      "widgets_values": ["aikings_flux"]
-    }
-  ],
-  "links": [
-    [1, 1, 0, 2, 0, "CLIP"],
-    [2, 1, 0, 3, 0, "CLIP"],
-    [3, 2, 0, 5, 1, "CONDITIONING"],
-    [4, 3, 0, 5, 2, "CONDITIONING"],
-    [5, 10, 0, 5, 0, "MODEL"],
-    [6, 4, 0, 5, 3, "LATENT"],
-    [7, 5, 0, 8, 0, "LATENT"],
-    [8, 11, 0, 8, 1, "VAE"],
-    [9, 8, 0, 9, 0, "IMAGE"]
-  ],
-  "version": 0.4
-}
-FLUXWORKFLOW
-
-    log "✅ Workflows complete"
-}
-
-    update_workflow_outputs() {
-      log_section "🗂️ NORMALIZING WORKFLOW OUTPUTS"
-      local workflows_dir="${COMFYUI_DIR}/user/default/workflows"
-      local outputs_subdir="aikings_outputs"
-      mkdir -p "${COMFYUI_DIR}/user/default/${outputs_subdir}"
-
-      # Use Python to safely update JSON workflow files in-place
-      # Export COMFYUI_DIR so Python can access it
-      export COMFYUI_DIR
-      python3 - <<'PY'
-import json, os
-wd = os.environ.get('COMFYUI_DIR')
-if not wd:
-  wd = os.getcwd()
-wf_dir = os.path.join(wd, 'user', 'default', 'workflows')
-out_prefix = os.path.join('aikings_outputs')
-for fn in os.listdir(wf_dir):
-  if not fn.endswith('.json'):
-    continue
-  path = os.path.join(wf_dir, fn)
-  try:
-    with open(path, 'r', encoding='utf-8') as f:
-      data = json.load(f)
-  except Exception:
-    continue
-  changed = False
-  base = os.path.splitext(fn)[0]
-  for node in data.get('nodes', []):
-    c = node.get('class_type','')
-    if c == 'SaveImage':
-      w = node.get('widgets_values', [])
-      if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
-        if not w:
-          node['widgets_values'] = [os.path.join(out_prefix, base)]
-        else:
-          node['widgets_values'][0] = os.path.join(out_prefix, base)
-        changed = True
-    if 'VHS_VideoCombine' in c or c == 'VHS_VideoCombine':
-      w = node.get('widgets_values', [])
-      if not w or not isinstance(w[0], str) or not w[0].startswith(out_prefix):
-        if not w:
-          node['widgets_values'] = [os.path.join(out_prefix, base + '_video')] + w[1:]
-        else:
-          node['widgets_values'][0] = os.path.join(out_prefix, base + '_video')
-        changed = True
-  if changed:
-    try:
-      with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-      print(f'Normalized outputs in {fn}')
-    except Exception as e:
-      print('Failed to write', fn, e)
-PY
-      log "✅ Workflow outputs normalized (directory: ${COMFYUI_DIR}/user/default/${outputs_subdir})"
-    }
-
-# Check and free port 8188 if occupied
-free_port_8188() {
-    log "   🔍 Checking port 8188 availability..."
-    local port_in_use=0
-    local pid_using_port=""
-    
-    # Try ss first (modern, faster)
-    if command -v ss >/dev/null 2>&1; then
-        pid_using_port=$(ss -tlnp 2>/dev/null | grep ":8188 " | grep -oE 'pid=[0-9]+' | cut -d= -f2 | head -1 || true)
-    # Fallback to netstat
-    elif command -v netstat >/dev/null 2>&1; then
-        pid_using_port=$(netstat -tlnp 2>/dev/null | grep ":8188 " | awk '{print $7}' | cut -d/ -f1 | head -1 || true)
-    # Fallback to lsof
-    elif command -v lsof >/dev/null 2>&1; then
-        pid_using_port=$(lsof -ti:8188 2>/dev/null | head -1 || true)
-    fi
-    
-    if [[ -n "$pid_using_port" ]] && kill -0 "$pid_using_port" 2>/dev/null; then
-        local proc_name=$(ps -p "$pid_using_port" -o comm= 2>/dev/null || echo "unknown")
-        log "   ⚠️  Port 8188 is in use by PID $pid_using_port ($proc_name)"
-        log "   🗑️  Killing process to free port..."
-        kill "$pid_using_port" 2>/dev/null || kill -9 "$pid_using_port" 2>/dev/null || true
-        sleep 2
-        # Verify port is free
-        if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 "; then
-            log "   ❌ Port 8188 still in use after kill — may need manual intervention"
-            return 1
-        else
-            log "   ✅ Port 8188 freed"
-        fi
-    else
-        log "   ✅ Port 8188 is available"
-    fi
-    
-    # Also kill any existing ComfyUI process from previous runs
-    if [[ -f "${WORKSPACE}/comfyui.pid" ]]; then
-        local old_pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
-        if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
-            log "   🗑️  Killing old ComfyUI process (PID: $old_pid)"
-            kill "$old_pid" 2>/dev/null || kill -9 "$old_pid" 2>/dev/null || true
-            sleep 1
-        fi
-        rm -f "${WORKSPACE}/comfyui.pid"
-    fi
-    
-    return 0
-}
-
-# Comprehensive diagnostics when ComfyUI fails to start
-diagnose_comfyui_failure() {
-    log "   🔍 DIAGNOSTICS: Hunting for why ComfyUI isn't working..."
-    
-    # 1. Check if process exists
-    local pid=""
-    [[ -f "${WORKSPACE}/comfyui.pid" ]] && pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
-    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-        log "      ✓ Process running (PID: $pid)"
-    else
-        log "      ✗ Process NOT running"
-    fi
-    
-    # 2. Check port
-    if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
-       (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
-        log "      ✓ Port 8188 is listening"
-    else
-        log "      ✗ Port 8188 NOT listening"
-    fi
-    
-    # 3. Check comfyui.log for errors
-    if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
-        local log_size=$(stat -c%s "${WORKSPACE}/comfyui.log" 2>/dev/null || echo 0)
-        if [[ $log_size -gt 0 ]]; then
-            log "      📋 comfyui.log exists ($(numfmt --to=iec-i $log_size 2>/dev/null || echo ${log_size} bytes))"
-            log "      Last 50 lines:"
-            tail -50 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/         /'
-            
-            # Pattern matching for common issues
-            if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: Missing Python module"
-                log "      💡 Fix: Install missing dependencies or check custom node requirements.txt"
-                grep -E "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -5 | sed 's/^/         /'
-            fi
-            
-            if grep -qE "CUDA.*error|cuda.*Error|CUDA.*failed|RuntimeError.*CUDA" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: CUDA/GPU error"
-                log "      💡 Fix: Check PyTorch CUDA installation — run: python3 -c 'import torch; print(torch.cuda.is_available())'"
-                grep -E "CUDA.*error|cuda.*Error|CUDA.*failed|RuntimeError.*CUDA" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -3 | sed 's/^/         /'
-            fi
-            
-            if grep -qE "Address already in use|port.*8188|OSError.*98" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: Port conflict"
-                log "      💡 Fix: Port 8188 is in use — should have been freed, but check manually"
-            fi
-            
-            if grep -qE "Permission denied|PermissionError|EACCES" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: Permission denied"
-                log "      💡 Fix: Check file permissions in ${COMFYUI_DIR}"
-            fi
-            
-            if grep -qE "No space left|ENOSPC|disk full" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: Disk full"
-                log "      💡 Fix: Free disk space — check: df -h"
-            fi
-            
-            if grep -qE "SyntaxError|IndentationError" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                log "      🔴 ERROR TYPE: Python syntax error"
-                log "      💡 Fix: Check custom node Python files for syntax errors"
-                grep -E "SyntaxError|IndentationError" "${WORKSPACE}/comfyui.log" 2>/dev/null | tail -3 | sed 's/^/         /'
-            fi
-        else
-            log "      ⚠️  comfyui.log is empty — process may have crashed before writing"
-        fi
-    else
-        log "      ⚠️  comfyui.log does not exist — process never started or crashed immediately"
-    fi
-    
-    # 4. Check Python/CUDA availability
-    log "      🔍 Checking Python environment..."
-    if "$VENV_PYTHON" -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available())" 2>&1 | sed 's/^/         /'; then
-        log "      ✓ PyTorch check passed"
-    else
-        log "      ✗ PyTorch check failed"
-    fi
-    
-    # 5. Check disk space
-    log "      🔍 Checking disk space..."
-    df -h "${WORKSPACE}" 2>/dev/null | tail -1 | awk '{print "         " $0}'
-    local avail_space=$(df "${WORKSPACE}" 2>/dev/null | tail -1 | awk '{print $4}' || echo "unknown")
-    log "      Available: $avail_space"
-    
-    # 6. Check if ComfyUI directory is valid
-    if [[ -f "${COMFYUI_DIR}/main.py" ]]; then
-        log "      ✓ ComfyUI main.py exists"
-    else
-        log "      ✗ ComfyUI main.py NOT found at ${COMFYUI_DIR}/main.py"
-    fi
-}
 
 start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFYUI_DIR}"
     activate_venv
-    
-    # CRITICAL: Ensure SQLAlchemy 2.0+ is installed (ComfyUI requires mapped_column)
-    log "   🔧 Ensuring SQLAlchemy 2.0+ is installed..."
-    "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || true
-    
-    # CRITICAL: Free port 8188 before starting
-    free_port_8188 || {
-        log "   ❌ Failed to free port 8188 — cannot start ComfyUI"
-        return 1
-    }
-    
-    # Prefer creating a systemd service for reliable supervision
-    generate_comfyui_service
-    systemctl daemon-reload || true
-    systemctl enable --now comfyui.service || {
-        log "   ⚠️  systemd service failed to start; falling back to background start"
-        # Start detached so cleanup/traps won't kill the process
-        # Start ComfyUI in background and capture PID immediately
-        setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
-        local comfyui_pid=$!
-        echo "$comfyui_pid" > "${WORKSPACE}/comfyui.pid"
-        log "✅ ComfyUI started on port 8188 (PID: $comfyui_pid)"
-        log "   Log: ${WORKSPACE}/comfyui.log"
-        log "   PID file: ${WORKSPACE}/comfyui.pid"
-        log "   To stop: kill \$(cat ${WORKSPACE}/comfyui.pid)"
-        
-        # Verify process is actually running (wait 3s for startup)
-        sleep 3
-        
-        # Double-check PID is correct (sometimes $! can be wrong with setsid)
-        if ! kill -0 "$comfyui_pid" 2>/dev/null; then
-            log "   ⚠️  PID $comfyui_pid not found — checking for actual ComfyUI process..."
-            # Find actual Python process running main.py
-            local actual_pid=$(ps aux | grep -E "[p]ython.*main\.py.*8188" | awk '{print $2}' | head -1 || true)
-            if [[ -n "$actual_pid" ]] && kill -0 "$actual_pid" 2>/dev/null; then
-                log "   ✅ Found ComfyUI process at PID $actual_pid (updating PID file)"
-                echo "$actual_pid" > "${WORKSPACE}/comfyui.pid"
-                comfyui_pid="$actual_pid"
-            else
-                log "   ❌ ComfyUI process died immediately after start!"
-                diagnose_comfyui_failure
-                return 1
-            fi
-        fi
-        
-        # Verify process is actually ComfyUI (not a zombie or wrong process)
-        local proc_cmd=$(ps -p "$comfyui_pid" -o cmd= 2>/dev/null || echo "")
-        if [[ "$proc_cmd" != *"main.py"* ]] && [[ "$proc_cmd" != *"python"* ]]; then
-            log "   ⚠️  PID $comfyui_pid doesn't appear to be ComfyUI (cmd: $proc_cmd)"
-            diagnose_comfyui_failure
-            return 1
-        fi
-        
-        # Attempt to create a reverse SSH tunnel (if configured)
-        start_reverse_tunnel || true
-        return 0
-    }
+  # Prefer creating a systemd service for reliable supervision
+  generate_comfyui_service
+  systemctl daemon-reload || true
+  systemctl enable --now comfyui.service || {
+    log "   ⚠️  systemd service failed to start; falling back to background start"
+    # Start detached so cleanup/traps won't kill the process
+    setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
+    local comfyui_pid=$!
+    echo "$comfyui_pid" > "${WORKSPACE}/comfyui.pid"
+    log "✅ ComfyUI started on port 8188 (PID: $comfyui_pid)"
+    log "   Log: ${WORKSPACE}/comfyui.log"
+    log "   PID file: ${WORKSPACE}/comfyui.pid"
+    log "   To stop: kill \$(cat ${WORKSPACE}/comfyui.pid)"
+        # After starting, attempt DB repair if migrations fail during initial startup
+        repair_comfyui_db_and_restart "$comfyui_pid" 60 || true
+    return
+  }
 
-    # If systemd started the unit, report status
-    log "✅ ComfyUI systemd service enabled and started (port 8188)"
-    log "   Check logs with: journalctl -u comfyui.service -f"
-    # If a reverse SSH tunnel destination is configured, attempt to start it
-    start_reverse_tunnel || true
+  # If systemd started the unit, report status
+  log "✅ ComfyUI systemd service enabled and started (port 8188)"
+  log "   Check logs with: journalctl -u comfyui.service -f"
+    # Monitor logs for alembic/migration failures and attempt repair once
+    repair_comfyui_db_and_restart "" 60 || true
 }
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CLOUDFLARE TUNNEL (Zero-Config Public Access)
-# Quick Tunnel gives you a trycloudflare.com URL - no SSH or port forwarding needed.
-# ═══════════════════════════════════════════════════════════════════════════════
-install_cloudflared() {
-    log_section "📡 INSTALLING CLOUDFLARE TUNNEL"
-    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
-    local CLOUDFLARED_URL="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-
-    if [[ -x "$CLOUDFLARED_BIN" ]]; then
-        log "   ✅ Cloudflared already installed"
-        return 0
-    fi
-
-    log "   📥 Downloading cloudflared..."
-    for attempt in 1 2 3; do
-        if curl -fsSL --connect-timeout 30 --max-time 120 "$CLOUDFLARED_URL" -o "$CLOUDFLARED_BIN" 2>/dev/null; then
-            chmod +x "$CLOUDFLARED_BIN"
-            if "$CLOUDFLARED_BIN" --version >/dev/null 2>&1; then
-                log "   ✅ Cloudflared installed"
-                return 0
-            fi
-        fi
-        log "   ⚠️  Attempt $attempt failed, retrying..."
-        sleep 5
-    done
-    log "   ❌ Failed to install cloudflared"
-    return 1
-}
-
-start_cloudflare_tunnel() {
-    log_section "🌐 STARTING CLOUDFLARE TUNNEL (Public URL)"
-    local CLOUDFLARED_BIN="/usr/local/bin/cloudflared"
-    local TUNNEL_LOG="${WORKSPACE}/cloudflared.log"
-    local TUNNEL_PID_FILE="${WORKSPACE}/cloudflared.pid"
-
-    [[ "${DISABLE_CLOUDFLARED:-0}" == "1" ]] && log "   ℹ️  DISABLE_CLOUDFLARED=1 — skipping" && return 1
-    [[ ! -x "$CLOUDFLARED_BIN" ]] && log "   ⚠️  Cloudflared not installed" && return 1
-
-    # Kill existing tunnel
-    if [[ -f "$TUNNEL_PID_FILE" ]]; then
-        local old_pid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
-        [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null && kill "$old_pid" 2>/dev/null || true
-        sleep 2
-        rm -f "$TUNNEL_PID_FILE"
-    fi
-
-    # Wait for ComfyUI (first start can take 3-8 min with many custom nodes)
-    # Use / (root) — universal in ComfyUI; /system_stats may not exist in some setups
-    local comfy_ready=0
-    local comfyui_pid=""
-    [[ -f "${WORKSPACE}/comfyui.pid" ]] && comfyui_pid=$(cat "${WORKSPACE}/comfyui.pid" 2>/dev/null || true)
-    
-    log "   ⏳ Waiting for ComfyUI on port 8188 (up to 10 min)..."
-    for i in $(seq 1 120); do
-        # Check if process is still alive (if PID file exists)
-        if [[ -n "$comfyui_pid" ]] && ! kill -0 "$comfyui_pid" 2>/dev/null; then
-            log "   ❌ ComfyUI process (PID $comfyui_pid) died!"
-            log "   📋 Last 30 lines of comfyui.log:"
-            [[ -f "${WORKSPACE}/comfyui.log" ]] && tail -30 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/      /'
-            # Check for common errors
-            if [[ -f "${WORKSPACE}/comfyui.log" ]]; then
-                if grep -qE "ModuleNotFoundError|ImportError|No module named" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                    log "   🔍 ERROR: Missing Python module — install missing dependencies"
-                fi
-                if grep -qE "CUDA.*error|cuda.*Error|GPU.*failed" "${WORKSPACE}/comfyui.log" 2>/dev/null; then
-                    log "   🔍 ERROR: CUDA/GPU issue — check PyTorch installation"
-                fi
-            fi
-            log "   🚀 Starting tunnel anyway — restart ComfyUI manually, then use tunnel URL"
-            break
-        fi
-        
-        # Check if port is listening (faster than HTTP)
-        if command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 "; then
-            # Port is listening, try HTTP
-            if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
-                log "   ✅ ComfyUI ready (after $((i * 5))s)"
-                comfy_ready=1
-                break
-            fi
-        elif command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "; then
-            # Port is listening, try HTTP
-            if curl -s --connect-timeout 5 --max-time 8 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$'; then
-                log "   ✅ ComfyUI ready (after $((i * 5))s)"
-                comfy_ready=1
-                break
-            fi
-        fi
-        
-        # Progress updates every 30s (6 iterations) with real-time diagnostics
-        [[ $((i % 6)) -eq 0 ]] && {
-            log "   ⏳ Still waiting... ${i}/120 ($((i * 5))s elapsed)"
-            # Show process status
-            if [[ -n "$comfyui_pid" ]] && kill -0 "$comfyui_pid" 2>/dev/null; then
-                local proc_cmd=$(ps -p "$comfyui_pid" -o cmd= 2>/dev/null | head -1 || echo "")
-                log "      ✓ Process alive (PID: $comfyui_pid)"
-                [[ -n "$proc_cmd" ]] && log "         Command: ${proc_cmd:0:80}..."
-            else
-                log "      ✗ Process NOT running (PID: ${comfyui_pid:-none})"
-                # Try to find actual ComfyUI process
-                local actual_pid=$(ps aux | grep -E "[p]ython.*main\.py.*8188" | awk '{print $2}' | head -1 || true)
-                if [[ -n "$actual_pid" ]]; then
-                    log "      ⚠️  Found different ComfyUI process at PID $actual_pid — updating PID file"
-                    echo "$actual_pid" > "${WORKSPACE}/comfyui.pid"
-                    comfyui_pid="$actual_pid"
-                else
-                    log "      ❌ No ComfyUI process found — checking log for crash..."
-                    [[ -f "${WORKSPACE}/comfyui.log" ]] && {
-                        log "      Last 10 lines of comfyui.log:"
-                        tail -10 "${WORKSPACE}/comfyui.log" 2>/dev/null | sed 's/^/         /'
-                    }
-                fi
-            fi
-            # Check port status
-            if (command -v ss >/dev/null 2>&1 && ss -tln 2>/dev/null | grep -q ":8188 ") || \
-               (command -v netstat >/dev/null 2>&1 && netstat -tln 2>/dev/null | grep -q ":8188 "); then
-                log "      ✓ Port 8188 is listening"
-            else
-                log "      ✗ Port 8188 NOT listening"
-            fi
-        }
-        sleep 5
-    done
-    
-    if [[ "$comfy_ready" -eq 0 ]]; then
-        log "   ⚠️  ComfyUI not responding after 10 min"
-        diagnose_comfyui_failure
-        log "   🚀 Starting tunnel anyway — URL will work when ComfyUI is up"
-        log "   💡 To restart ComfyUI: cd /workspace/ComfyUI && /venv/main/bin/python3 main.py --listen 0.0.0.0 --port 8188"
-    fi
-
-    log "   🚀 Starting Cloudflare Quick Tunnel..."
-    rm -f "$TUNNEL_LOG" 2>/dev/null || true  # Start fresh log
-    setsid nohup "$CLOUDFLARED_BIN" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
-    local tunnel_pid=$!
-    echo "$tunnel_pid" > "$TUNNEL_PID_FILE"
-    
-    # Verify tunnel process started
-    sleep 2
-    if ! kill -0 "$tunnel_pid" 2>/dev/null; then
-        log "   ❌ Cloudflare tunnel process died immediately!"
-        [[ -f "$TUNNEL_LOG" ]] && {
-            log "   Tunnel log:"
-            cat "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /' | head -20
-        }
-        return 1
-    fi
-
-    # Wait for trycloudflare.com URL (up to 90s)
-    local TUNNEL_URL=""
-    for i in $(seq 1 90); do
-        # Check if tunnel process is still alive
-        if ! kill -0 "$tunnel_pid" 2>/dev/null; then
-            log "   ❌ Cloudflare tunnel process died!"
-            [[ -f "$TUNNEL_LOG" ]] && {
-                log "   Last 20 lines of tunnel log:"
-                tail -20 "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /'
-            }
-            return 1
-        fi
-        
-        # Extract URL from log
-        TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -1 || true)
-        [[ -n "$TUNNEL_URL" ]] && break
-        
-        # Check for rate limit
-        if grep -qE '429|Too Many Requests|error code: 1015' "$TUNNEL_LOG" 2>/dev/null; then
-            log "   ⚠️  Cloudflare rate limit (429) - use SSH tunnel fallback"
-            log "   Tunnel log excerpt:"
-            tail -10 "$TUNNEL_LOG" 2>/dev/null | sed 's/^/      /'
-            return 1
-        fi
-        
-        # Check for other errors
-        if grep -qE 'error|Error|ERROR|failed|Failed' "$TUNNEL_LOG" 2>/dev/null; then
-            local error_line=$(grep -E 'error|Error|ERROR|failed|Failed' "$TUNNEL_LOG" 2>/dev/null | tail -1)
-            [[ -n "$error_line" ]] && log "   ⚠️  Tunnel error: $error_line"
-        fi
-        
-        sleep 1
-    done
-
-    if [[ -n "$TUNNEL_URL" ]]; then
-        echo "$TUNNEL_URL" > "${WORKSPACE}/.comfyui_tunnel_url"
-        echo "$TUNNEL_URL" > "${WORKSPACE}/COMFYUI_URL.txt"
-        log "   ✅ Tunnel URL obtained: $TUNNEL_URL"
-        
-        # Verify tunnel reachability (catches 502 / origin unreachable early)
-        log "   🔗 Verifying tunnel reachability..."
-        local http_code=$(curl -s --connect-timeout 10 --max-time 15 "${TUNNEL_URL}/" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
-        if [[ "$http_code" == "200" ]]; then
-            log "   ✅ Tunnel verified — URL reachable (HTTP 200)"
-        elif [[ "$http_code" == "502" ]]; then
-            log "   ⚠️  Tunnel URL returns 502 — ComfyUI not ready yet"
-            log "   💡 Wait 1-2 min for ComfyUI to finish loading, then refresh the URL"
-        elif [[ "$http_code" == "000" ]]; then
-            log "   ⚠️  Tunnel URL not reachable (connection failed)"
-            log "   💡 Check tunnel log: tail -f ${TUNNEL_LOG}"
-        else
-            log "   ⚠️  Tunnel URL returned HTTP $http_code — may need to wait for ComfyUI"
-        fi
-        # Helper: run "bash /workspace/restart-cloudflare-tunnel.sh" if URL stops working
-        cat > "${WORKSPACE}/restart-cloudflare-tunnel.sh" <<-'RESTART_TUNNEL_EOF'
-#!/bin/bash
-# Restart Cloudflare Quick Tunnel when URL stops working (instance/ComfyUI restart)
-WORKSPACE="${WORKSPACE:-/workspace}"
-CF="/usr/local/bin/cloudflared"
-LOG="${WORKSPACE}/cloudflared.log"
-PID_FILE="${WORKSPACE}/cloudflared.pid"
-[[ -x "$CF" ]] || { echo "cloudflared not found"; exit 1; }
-[[ -f "$PID_FILE" ]] && kill $(cat "$PID_FILE") 2>/dev/null; sleep 2; rm -f "$PID_FILE"
-echo "Waiting for ComfyUI on 8188..."
-for i in $(seq 1 24); do
-  curl -s --connect-timeout 3 --max-time 5 "http://localhost:8188/" -o /dev/null -w "%{http_code}" 2>/dev/null | grep -qE '^200$' && break
-  sleep 5
-done
-setsid nohup "$CF" tunnel --url http://localhost:8188 > "$LOG" 2>&1 < /dev/null &
-echo $! > "$PID_FILE"
-for i in $(seq 1 90); do
-  URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" 2>/dev/null | head -1 || true)
-  [[ -n "$URL" ]] && { echo "$URL" > "${WORKSPACE}/COMFYUI_URL.txt"; echo "New URL: $URL"; exit 0; }
-  sleep 1
-done
-echo "Timeout waiting for tunnel URL - check $LOG"; exit 1
-	RESTART_TUNNEL_EOF
-        chmod +x "${WORKSPACE}/restart-cloudflare-tunnel.sh"
-        log ""
-        log "   ╔════════════════════════════════════════════════════════════════╗"
-        log "   ║  🌐 COMFYUI PUBLIC URL — Open in browser:                       ║"
-        log "   ║                                                                ║"
-        log "   ║  $TUNNEL_URL"
-        log "   ║                                                                ║"
-        log "   ║  No SSH needed! Use this URL even if you see                    ║"
-        log "   ║  'remote port forwarding failed' (Vast.ai SSH noise - ignore).  ║"
-        log "   ║  URL also saved to: ${WORKSPACE}/COMFYUI_URL.txt"
-        log "   ║  If URL stops working (502/restart): bash ${WORKSPACE}/restart-cloudflare-tunnel.sh"
-        log "   ╚════════════════════════════════════════════════════════════════╝"
-        log ""
-        return 0
-    else
-        log "   ⚠️  Tunnel URL not found - check ${TUNNEL_LOG}"
-        tail -20 "$TUNNEL_LOG" 2>/dev/null || true
-        return 1
-    fi
-}
-
-# Start a reverse SSH tunnel to expose ComfyUI when remote host info is provided.
+# Reverse SSH tunnel function DISABLED (it breaks provisioning)
 # Supports either REVERSE_SSH_DEST (user@host[:port]) or REVERSE_SSH_USER/REVERSE_SSH_HOST vars.
 start_reverse_tunnel() {
-  log_section "🔁 STARTING REVERSE SSH TUNNEL (if configured)"
-
-  # Determine destination
-  if [[ -n "${REVERSE_SSH_DEST:-}" ]]; then
-    # format: user@host or user@host:port
-    dest="${REVERSE_SSH_DEST}"
-    # parse
-    if [[ "$dest" =~ :(.*)$ ]]; then
-      remote_port_raw="${BASH_REMATCH[1]}"
-    fi
-    # Parse remote host (user@host[:port]) -> remote_host (hostname only)
-    if [[ "$dest" == *"@"* ]]; then
-      host_and_port="${dest#*@}"
-    else
-      host_and_port="$dest"
-    fi
-    remote_host="${host_and_port%%:*}"
-  elif [[ -n "${REVERSE_SSH_USER:-}" && -n "${REVERSE_SSH_HOST:-}" ]]; then
-    remote_port_raw="${REVERSE_SSH_PORT:-22}"
-    dest="${REVERSE_SSH_USER}@${REVERSE_SSH_HOST}"
-    # remote_host available from REVERSE_SSH_HOST
-    remote_host="${REVERSE_SSH_HOST}"
-  else
-    log "   ⚠️  No reverse SSH destination configured (set REVERSE_SSH_DEST or REVERSE_SSH_USER+REVERSE_SSH_HOST)"
-    return 0
-  fi
-
-  ssh_key_arg=""
-  if [[ -n "${REVERSE_SSH_KEY:-}" ]]; then
-    ssh_key_arg="-i ${REVERSE_SSH_KEY}"
-  fi
-
-  # Prepare log file for tunnel negotiation
-  TUNNEL_LOG="${WORKSPACE}/comfyui_tunnel.log"
-  rm -f "$TUNNEL_LOG"
-
-  # Prefer autossh if available (more resilient)
-  if command -v autossh &>/dev/null; then
-    SSH_BIN="autossh"
-    SSH_ARGS=("-M" "0" "-o" "ExitOnForwardFailure=yes" "-o" "ServerAliveInterval=30" "-o" "ServerAliveCountMax=3")
-  else
-    SSH_BIN="ssh"
-    SSH_ARGS=("-o" "ExitOnForwardFailure=yes" "-o" "ServerAliveInterval=30" "-o" "ServerAliveCountMax=3")
-  fi
-
-  # First try: request dynamic remote port (-R 0:localhost:8188)
-  log "   ⏳ Attempting dynamic remote allocation via ${SSH_BIN} to ${dest}"
-  ${SSH_BIN} ${ssh_key_arg} "${SSH_ARGS[@]}" -R 0:localhost:8188 -N -v "$dest" 2> >(tee "$TUNNEL_LOG" >&2) &
-  local ssh_pid=$!
-
-  # Wait and parse allocated port
-  local attempts=0
-  local allocated_port=""
-  while [[ $attempts -lt 10 ]]; do
-    sleep 2
-    if grep -qi "Allocated port" "$TUNNEL_LOG"; then
-      allocated_port=$(grep -i "Allocated port" "$TUNNEL_LOG" | head -n1 | sed -E 's/.*Allocated port ([0-9]+).*/\1/I')
-      break
-    fi
-    # Also detect failure for listen port
-    if grep -qi "remote port forwarding failed" "$TUNNEL_LOG"; then
-      break
-    fi
-    attempts=$((attempts+1))
-  done
-
-  if [[ -n "$allocated_port" ]]; then
-    log "   ✅ Allocated remote port: $allocated_port"
-    echo "COMFYUI_TUNNEL_URL=http://${remote_host}:${allocated_port}" > "${WORKSPACE}/comfyui_tunnel_env"
-    export COMFYUI_TUNNEL_URL="http://${remote_host}:${allocated_port}"
-    echo "$ssh_pid" > "${WORKSPACE}/comfyui_tunnel_pid"
-    log "   Tunnel established and recorded (env: ${WORKSPACE}/comfyui_tunnel_env)"
-    return 0
-  fi
-
-  # Dynamic allocation failed — kill and try fixed-port fallback range
-  log "   ⚠️  Dynamic allocation failed; trying fixed port range fallback"
-  kill -9 "$ssh_pid" 2>/dev/null || true
-
-  local port_start=${REVERSE_TUNNEL_PORT_START:-26700}
-  local port_end=${REVERSE_TUNNEL_PORT_END:-26799}
-  for p in $(seq $port_start $port_end); do
-    log "   → Trying remote port $p"
-    rm -f "$TUNNEL_LOG"
-    ${SSH_BIN} ${ssh_key_arg} "${SSH_ARGS[@]}" -R ${p}:localhost:8188 -N -v "$dest" 2> >(tee "$TUNNEL_LOG" >&2) &
-    ssh_pid=$!
-    sleep 2
-    if grep -qi "Allocated port" "$TUNNEL_LOG" || ! grep -qi "remote port forwarding failed" "$TUNNEL_LOG"; then
-      # assume success if no failure line and process still running
-      if ps -p $ssh_pid > /dev/null 2>&1; then
-        log "   ✅ Remote port $p forwarded successfully"
-        echo "COMFYUI_TUNNEL_URL=http://${remote_host}:$p" > "${WORKSPACE}/comfyui_tunnel_env"
-        export COMFYUI_TUNNEL_URL="http://${remote_host}:$p"
-        echo "$ssh_pid" > "${WORKSPACE}/comfyui_tunnel_pid"
-        return 0
-      fi
-    fi
-    kill -9 "$ssh_pid" 2>/dev/null || true
-  done
-
-  log "❌ Failed to establish reverse SSH tunnel to ${dest}"
-  log "   Check ${TUNNEL_LOG} for SSH verbose output"
-  return 1
+  # DISABLED: This functionality caused provisioning hangs and SSH issues
+  # If needed, set up tunneling manually after provisioning completes
+  return 0
 }
 
 generate_comfyui_service() {
@@ -3560,7 +2209,6 @@ generate_comfyui_service() {
 [Unit]
 Description=ComfyUI Service
 After=network.target
-
 [Service]
 Type=simple
 User=root
@@ -3569,55 +2217,237 @@ ExecStart=${VENV_PYTHON} ${COMFYUI_DIR}/main.py --listen 0.0.0.0 --port 8188 --e
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
-
 [Install]
 WantedBy=multi-user.target
 EOF
+
+  # Ensure systemd notices the new unit and start it
+  log "   🔁 Reloading systemd daemon and enabling comfyui.service"
+  systemctl daemon-reload || log "   ⚠️  systemctl daemon-reload failed (non-systemd image?)"
+  systemctl enable --now comfyui.service || log "   ⚠️  systemctl enable/start comfyui.service failed (will attempt fallback start)"
+
+  # Verify ComfyUI process is running (fallback: start manually)
+  sleep 2
+  if ! sudo ss -tunlp | grep -q ":8188"; then
+    log "   ⚠️  comfy.service not listening on 8188; attempting manual start"
+    nohup ${VENV_PYTHON} ${COMFYUI_DIR}/main.py --listen 0.0.0.0 --port 8188 --enable-cors-header >/dev/null 2>&1 &
+  fi
+  sleep 1
+  if sudo ss -tunlp | grep -q ":8188"; then
+    log "   ✅ ComfyUI is listening on 8188"
+  else
+    log "   ❌ ComfyUI failed to start and is not listening on 8188"
+  fi
   chmod 644 "$svc_file" || true
   log "   ✅ Wrote systemd unit: $svc_file"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHECKPOINT SYSTEM (Resume from Last Completed Phase)
+# ═══════════════════════════════════════════════════════════════════════════════
+CHECKPOINT_FILE="${WORKSPACE:-/workspace}/.provision_checkpoint"
+DOWNLOADS_COMPLETE="${WORKSPACE:-/workspace}/.downloads_complete"
+
+checkpoint_save() {
+    local phase="$1"
+    echo "$phase" > "$CHECKPOINT_FILE"
+    log "📌 Checkpoint: $phase saved"
+}
+
+checkpoint_load() {
+    if [[ -f "$CHECKPOINT_FILE" ]]; then
+        cat "$CHECKPOINT_FILE"
+    else
+        echo "START"
+    fi
+}
+
+checkpoint_is_complete() {
+    local phase="$1"
+    local current=$(checkpoint_load)
+
+    # Phase progression: START → PACKAGES → COMFYUI → NODES → MODELS → COMFYUI_STARTED → COMPLETE
+    case "$current" in
+        START)
+            return 1 ;;  # Nothing completed yet
+        PACKAGES)
+            [[ "$phase" == "START" ]] && return 0 || return 1 ;;
+        COMFYUI)
+            [[ "$phase" =~ ^(START|PACKAGES)$ ]] && return 0 || return 1 ;;
+        NODES)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI)$ ]] && return 0 || return 1 ;;
+        MODELS)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI|NODES)$ ]] && return 0 || return 1 ;;
+        COMFYUI_STARTED)
+            [[ "$phase" =~ ^(START|PACKAGES|COMFYUI|NODES|MODELS)$ ]] && return 0 || return 1 ;;
+        COMPLETE)
+            return 0 ;;  # Everything completed
+        *)
+            log "⚠️  Unknown checkpoint state: $current"
+            return 1 ;;
+    esac
+}
+
+checkpoint_reset() {
+    rm -f "$CHECKPOINT_FILE"
+    log "🔄 Checkpoint reset - will start from beginning"
 }
 
 main() {
     log "--- Provisioning Start ---"
 
-    # Run emergency recovery FIRST to fix SSH and environment
-    emergency_recovery
+    # Load and display checkpoint status
+    local checkpoint=$(checkpoint_load)
+    log "📌 Current checkpoint: $checkpoint"
 
-    install_apt_packages
-    check_required_cmds
-
-    # Validate token before downloads - fail early to save time
-    if ! validate_civitai_token; then
-        log "❌ FATAL: Civitai token validation failed - cannot proceed with provisioning"
-        log "   Please set a valid CIVITAI_TOKEN and try again"
-        exit 1
+    if [[ "$checkpoint" != "START" ]]; then
+        log "   ✅ Resuming from previous run - completed phases will be skipped"
     fi
 
-    install_comfyui
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 1: SYSTEM PACKAGES & EMERGENCY RECOVERY
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "START"; then
+        log "⏭️  Skipping: Emergency recovery & APT packages (already done)"
+    else
+        log_section "PHASE 1: SYSTEM PACKAGES & EMERGENCY RECOVERY"
+        emergency_recovery
+        install_apt_packages
+        check_required_cmds
+        
+        # Install cloudflared for tunnel access (non-blocking if fails)
+        install_cloudflared || log "   ⚠️  Cloudflared install failed - tunnel access will be unavailable"
 
-    # Emergency recovery before nodes (git operations need SSH)
-    emergency_recovery
-    install_nodes
+        # Validate token before downloads - fail early to save time
+        if ! validate_civitai_token; then
+            log "❌ FATAL: Civitai token validation failed - cannot proceed with provisioning"
+            log "   Please set a valid CIVITAI_TOKEN and try again"
+            exit 1
+        fi
 
-    # Emergency recovery before models (large downloads)
-    emergency_recovery
-    install_models         # Download models FIRST
-    retry_failed_downloads # Check and report failed downloads
-    verify_installation    # Then verify (checks for models)
-    install_workflows
-    # Normalize workflow outputs so all generated assets go to a unified folder
-    update_workflow_outputs
-    start_comfyui
+        checkpoint_save "PACKAGES"
+    fi
 
-    # Cloudflare Quick Tunnel: gives trycloudflare.com URL for simple browser access
-    ( install_cloudflared || log "   ⚠️  Cloudflared install failed - use SSH tunnel" )
-    ( start_cloudflare_tunnel || log "   ⚠️  Cloudflare tunnel failed - use SSH or direct IP:8188" )
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 2: COMFYUI INSTALLATION
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "PACKAGES"; then
+        log "⏭️  Skipping: ComfyUI installation (already done)"
+    else
+        log_section "PHASE 2: COMFYUI INSTALLATION"
+        install_comfyui
+        checkpoint_save "COMFYUI"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 3: CUSTOM NODES
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "COMFYUI"; then
+        log "⏭️  Skipping: Custom nodes (already done)"
+    else
+        log_section "PHASE 3: CUSTOM NODES"
+        emergency_recovery
+        install_nodes
+        checkpoint_save "NODES"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 4: MODEL DOWNLOADS
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "NODES"; then
+        log "⏭️  Skipping: Model downloads (already done)"
+    else
+        log_section "PHASE 4: MODEL DOWNLOADS (Longest Phase)"
+        emergency_recovery
+        install_hf_tools
+        install_models
+        install_workflows
+        retry_failed_downloads
+        checkpoint_save "MODELS"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 5: VERIFICATION & START COMFYUI
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "MODELS"; then
+        log "⏭️  Skipping: Verification (already done)"
+    else
+        log_section "PHASE 5: VERIFICATION & START COMFYUI"
+        verify_installation
+        start_comfyui
+        checkpoint_save "COMFYUI_STARTED"
+    fi
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # PHASE 6: CLOUDFLARE TUNNEL (Public Access)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    if checkpoint_is_complete "COMFYUI_STARTED"; then
+        log "⏭️  Skipping: Tunnel setup (already done)"
+    else
+        log_section "PHASE 6: CLOUDFLARE TUNNEL (Public Access)"
+        # Generate systemd service for persistence
+        generate_cloudflared_service || true
+        # Start tunnel and capture/report URL
+        start_cloudflare_tunnel || log "   ⚠️  Tunnel setup failed - use SSH tunnel as fallback"
+        
+        # ═══════════════════════════════════════════════════════════════════════════════
+        # PHASE 7: POST-INSTALL DEPENDENCY FIX (OPTIONAL)
+        # ═══════════════════════════════════════════════════════════════════════════════
+        log_section "PHASE 7: POST-INSTALL DEPENDENCY FIX"
+        log "   🔧 Running comprehensive dependency installer..."
+        log "   This ensures ALL custom node requirements are satisfied"
+        
+        # Download and run the dependency fixer
+        local fix_script_url="https://gist.githubusercontent.com/pimpsmasterson/c3f61f20067d498b6699d1bdbddea395/raw/9a30de5de797797975a92eafb6d590e20424f014/fix-dependencies.sh"
+        
+        if wget -q -O /tmp/fix-dependencies.sh "$fix_script_url"; then
+            chmod +x /tmp/fix-dependencies.sh
+            if /tmp/fix-dependencies.sh 2>&1 | tee /tmp/post-install-fix.log; then
+                log "   ✅ Dependency fix completed successfully"
+            else
+                log "   ⚠️  Dependency fix had warnings (check /tmp/post-install-fix.log)"
+            fi
+        else
+            log "   ⚠️  Could not download dependency fix script (skipping)"
+        fi
+        
+        checkpoint_save "COMPLETE"
+    fi
 
     log "--- Provisioning Complete ---"
-    log ""
-    log "   ℹ️  If you see 'remote port forwarding failed' above: that's from Vast.ai's"
-    log "      SSH proxy, not our script. Provisioning completed. Use the Cloudflare"
-    log "      URL above or direct IP:8188 (with direct_port) to reach ComfyUI."
+    log "✅ All phases completed successfully!"
+    log "   Checkpoint file: $CHECKPOINT_FILE"
+    log "   To reset checkpoint and start fresh: rm $CHECKPOINT_FILE"
 }
 
-main "$@"
+# Command-line argument handling
+if [[ $# -gt 0 ]]; then
+    case "$1" in
+        --search-rate-limits|--rate-limits)
+            search_rate_limit_errors "${2:-/workspace/provision_errors.log}" "${3:-}"
+            exit 0
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --search-rate-limits [LOG_FILE] [OUTPUT_FILE]  Search for rate limit errors in logs"
+            echo "  --help, -h                                    Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                                            Run full provisioning"
+            echo "  $0 --search-rate-limits                        Search default error log"
+            echo "  $0 --search-rate-limits /path/to/log           Search custom log file"
+            echo "  $0 --search-rate-limits /path/to/log output.txt Save filtered results"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Run '$0 --help' for usage information"
+            exit 1
+            ;;
+    esac
+fi
+
+# Run main provisioning function
+main

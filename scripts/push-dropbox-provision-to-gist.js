@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Push scripts/provision-dropbox-only.sh to the GitHub Gist.
- * Uses GITHUB_TOKEN from .env. Gist ID 9fb9d7c60d3822c2ffd3ad4b000cc864 (canonical).
+ * Uses GITHUB_TOKEN from .env. Gist ID is from .env.example / docs (pimpsmasterson/c3f61f20067d498b6699d1bdbddea395).
  */
 const path = require('path');
 const fs = require('fs');
@@ -9,7 +9,7 @@ const fetch = require('node-fetch');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const GIST_ID = '9fb9d7c60d3822c2ffd3ad4b000cc864';
+const GIST_ID = 'c3f61f20067d498b6699d1bdbddea395';
 const PROVISION_PATH = path.join(__dirname, 'provision-dropbox-only.sh');
 const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 

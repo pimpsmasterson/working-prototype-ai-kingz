@@ -4,12 +4,30 @@
 const fs = require('fs');
 const path = require('path');
 const fetch = require('node-fetch');
+const { fetchWithTimeout, fetchWithRetry } = require('../lib/fetch-with-timeout');
+const { spawn } = require('child_process');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'warm_pool.json');
 const db = require('./db');
 const audit = require('./audit');
+const ComfyUIKeepalive = require('../lib/comfyui-keepalive');
+const processWatchdog = require('../lib/process-watchdog');
 const VAST_BASE = 'https://console.vast.ai/api/v0';
 const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY || null;
+
+// Start process watchdog
+processWatchdog.start();
+
+processWatchdog.on('process-restarted', ({ id, restartCount, consecutiveCrashes }) => {
+  console.log(`[Watchdog] Restarted ${id} (attempt ${restartCount}, ${consecutiveCrashes} consecutive crashes)`);
+});
+
+processWatchdog.on('process-failed', ({ id, restartCount }) => {
+  console.error(`[Watchdog] Process ${id} FAILED after ${restartCount} restarts`);
+});
+
+// Global ComfyUI keepalive monitor
+let comfyKeepalive = null;
 
 // ============================================================================
 // GPU CUDA CAPABILITY REFERENCE
@@ -27,10 +45,10 @@ const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY
 // Lowered to 6.0 to allow datacenter GPUs like P100/P40 which have high VRAM
 const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY || '6.0');
 
-// Configurable minimum disk (GB) for warm instances. Default to 150GB to ensure
-// room for large models (Flux/SDXL) and custom nodes while meeting user requirements.
-const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '150', 10);
-const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 150;
+// Configurable minimum disk (GB) for warm instances. Default to 500GB to ensure
+// room for large models (Flux/SDXL/Wan) and custom nodes while meeting user requirements.
+const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '500', 10);
+const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 500;
 // Clamp to sane bounds: min 100GB, max 2000GB
 const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 100), 2000);
 /**
@@ -91,7 +109,7 @@ let state = {
 
 const vastaiSsh = require('../lib/vastai-ssh');
 
-function load() {
+async function load() {
     try {
         const row = db.getState();
         if (row) {
@@ -103,20 +121,41 @@ function load() {
     // Always reset volatile prewarming status on load to prevent stuck state after crash/restart
     state.isPrewarming = false;
     prewarmLock = false;
+
+    // Validate instance still exists on Vast.ai (auto-cleanup stale state)
+    if (state.instance && state.instance.contractId) {
+        console.log(`WarmPool: Validating instance ${state.instance.contractId} after load...`);
+        try {
+            await checkInstance();
+            if (!state.instance) {
+                console.log('WarmPool: Stale instance cleared during load validation');
+            } else {
+                console.log('WarmPool: Instance validated successfully');
+            }
+        } catch (err) {
+            console.warn('WarmPool: Instance validation failed during load:', err.message);
+            // Don't clear instance on validation errors - might be transient network issue
+        }
+    }
 }
 
 // Wait for ComfyUI to respond on the instance (polls /system_stats)
 // Now includes comprehensive GPU and model health validation
 // ADAPTIVE POLLING: Wait for provisioning buffer, then poll slowly during provisioning
-async function waitForComfyReady(contractId, timeoutMs = 1500000, intervalMs = 90000) {
+async function waitForComfyReady(contractId, timeoutMs = parseInt(process.env.WARM_POOL_HEALTH_TIMEOUT_MS || '1500000', 10), intervalMs = parseInt(process.env.WARM_POOL_HEALTH_INITIAL_INTERVAL_MS || '90000', 10)) {
     const start = Date.now();
     let lastHealthReport = null;
     let consecutiveFailures = 0;
+    let consecutiveSuccesses = 0;
     let currentInterval = intervalMs;
 
-    // Provisioning buffer: skip health checks for the first 5 minutes
-    // Parallel provisioning can take ~8-12 minutes; this reduces false failures
-    const provisioningBufferMs = 5 * 60 * 1000; // 5 minutes
+    // Configurable health parameters (minutes, thresholds, intervals)
+    const provisioningBufferMs = parseInt(process.env.WARM_POOL_HEALTH_BUFFER_MINUTES || '5', 10) * 60 * 1000;
+    const FAILURE_THRESHOLD = parseInt(process.env.WARM_POOL_HEALTH_FAILURES_THRESHOLD || '3', 10);
+    const SUCCESS_THRESHOLD = parseInt(process.env.WARM_POOL_HEALTH_SUCCESS_THRESHOLD || '2', 10);
+    const REPAIR_THRESHOLD = parseInt(process.env.WARM_POOL_REPAIR_THRESHOLD || '5', 10); // attempt repair after consecutive failures
+    const LATER_INTERVAL_MS = parseInt(process.env.WARM_POOL_HEALTH_LATER_INTERVAL_MS || '30000', 10);
+
     console.log(`WarmPool: Provisioning buffer active - waiting ${provisioningBufferMs / 1000}s before health checks`);
     await new Promise(r => setTimeout(r, provisioningBufferMs));
 
@@ -131,60 +170,99 @@ async function waitForComfyReady(contractId, timeoutMs = 1500000, intervalMs = 9
             lastHealthReport = healthReport;
 
             if (isInstanceHealthy(healthReport)) {
-                // Instance is fully healthy - API responding, GPU available and functional
-                state.instance.status = 'ready';
-                state.instance.lastHeartbeat = new Date().toISOString();
-                state.instance.lastHealthReport = healthReport;
+                // Healthy check: require multiple consecutive successes to avoid flapping
+                consecutiveSuccesses++;
+                consecutiveFailures = 0;
+                console.log(`WarmPool: ✅ Health success (${consecutiveSuccesses}/${SUCCESS_THRESHOLD} consecutive)`);
+                if (consecutiveSuccesses >= SUCCESS_THRESHOLD) {
+                    // Instance is fully healthy - API responding, GPU available and functional
+                    state.instance.status = 'ready';
+                    state.instance.lastHeartbeat = new Date().toISOString();
+                    state.instance.lastHealthReport = healthReport;
 
-                // Fetch complete model inventory for pre-flight validation
-                try {
-                    state.instance.modelInventory = await fetchModelInventory(state.instance.connectionUrl);
-                    console.log('WarmPool: Model inventory cached', {
-                        checkpoints: state.instance.modelInventory.checkpoints.length,
-                        loras: state.instance.modelInventory.loras.length
-                    });
-                } catch (invErr) {
-                    console.warn('WarmPool: Failed to fetch model inventory:', invErr.message);
-                    state.instance.modelInventory = { checkpoints: [], loras: [], vaes: [], customNodes: [], errors: [invErr.message] };
+                    // Fetch complete model inventory for pre-flight validation
+                    try {
+                        state.instance.modelInventory = await fetchModelInventory(state.instance.connectionUrl);
+                        console.log('WarmPool: Model inventory cached', {
+                            checkpoints: state.instance.modelInventory.checkpoints.length,
+                            loras: state.instance.modelInventory.loras.length
+                        });
+                    } catch (invErr) {
+                        console.warn('WarmPool: Failed to fetch model inventory:', invErr.message);
+                        state.instance.modelInventory = { checkpoints: [], loras: [], vaes: [], customNodes: [], errors: [invErr.message] };
+                    }
+
+                    save();
+
+                    try {
+                        audit.logUsageEvent({
+                            event_type: 'instance_ready',
+                            contract_id: contractId,
+                            instance_status: 'ready',
+                            details: {
+                                vram_total: healthReport.vram_total,
+                                vram_free: healthReport.vram_free,
+                                checkpoint_count: healthReport.checkpoint_count,
+                                lora_count: state.instance.modelInventory?.loras?.length || 0
+                            },
+                            source: 'warm-pool'
+                        });
+                    } catch (e) { }
+
+                    return true;
+                }
+            } else {
+                // Not healthy - track consecutive failures and detect script errors to trigger fallback sooner
+                consecutiveSuccesses = 0;
+                consecutiveFailures++;
+
+                const elapsed = Math.round((Date.now() - start) / 1000);
+
+                // Detect provisioning/script-level failures from reported errors and trigger fallback
+                const errs = (healthReport.errors || []).join(' ').toLowerCase();
+                if (consecutiveFailures >= FAILURE_THRESHOLD && /nohup|failed to run command 'node'|enoent|permission denied|failed to run command/.test(errs)) {
+                    console.warn('WarmPool: ⚠️ Detected provisioning script failure on instance. Enabling default fallback and aborting prewarm attempt early.');
+                    state.useDefaultScript = true;
+                    save();
+                    try { audit.logUsageEvent({ event_type: 'provision_failure_script', contract_id: contractId, details: { errors: healthReport.errors }, source: 'warm-pool' }); } catch (e) {}
+                    return false;
                 }
 
-                save();
+                // Automated repair attempt: if failures exceed REPAIR_THRESHOLD, try restarting ComfyUI on the instance
+                if (consecutiveFailures >= REPAIR_THRESHOLD) {
+                    console.warn(`WarmPool: Consecutive failures (${consecutiveFailures}) reached REPAIR_THRESHOLD (${REPAIR_THRESHOLD}). Attempting automated repair...`);
+                    try {
+                        const repairOk = await attemptRepairInstance(contractId);
+                        try { audit.logUsageEvent({ event_type: 'instance_repair_attempt', contract_id: contractId, details: { success: !!repairOk, consecutiveFailures }, source: 'warm-pool' }); } catch (e) {}
+                        if (repairOk) {
+                            console.log('WarmPool: Repair attempt succeeded; continuing health checks')
+                            consecutiveFailures = 0; // reset failures and continue
+                        } else {
+                            console.warn('WarmPool: Repair attempt did not fix the instance');
+                            // Notify via webhook if configured
+                            notifyFailure(contractId, 'Automated repair attempt failed');
+                        }
+                    } catch (e) {
+                        console.error('WarmPool: Repair attempt threw an error:', e && e.message ? e.message : e);
+                    }
+                }
 
-                try {
-                    audit.logUsageEvent({
-                        event_type: 'instance_ready',
-                        contract_id: contractId,
-                        instance_status: 'ready',
-                        details: {
-                            vram_total: healthReport.vram_total,
-                            vram_free: healthReport.vram_free,
-                            checkpoint_count: healthReport.checkpoint_count,
-                            lora_count: state.instance.modelInventory?.loras?.length || 0
-                        },
-                        source: 'warm-pool'
-                    });
-                } catch (e) { }
+                // Adaptive polling based on elapsed provisioning time
+                if (elapsed < 600) {
+                    currentInterval = intervalMs; // use initial interval during early provisioning phase
+                } else {
+                    currentInterval = LATER_INTERVAL_MS; // faster polling after 10 minutes
+                }
 
-                return true;
+                console.log(`WarmPool: Waiting for healthy instance (${elapsed}s elapsed, poll every ${currentInterval / 1000}s)...`, {
+                    api: healthReport.comfyui_api,
+                    gpu: healthReport.gpu_available,
+                    functional: healthReport.gpu_functional,
+                    errors: healthReport.errors,
+                    consecutiveFailures
+                });
             }
 
-            // Adaptive polling based on elapsed provisioning time
-            const elapsed = Math.round((Date.now() - start) / 1000);
-            consecutiveFailures++;
-
-            // Slow polling during provisioning (first 10 minutes), faster after
-            if (elapsed < 600) {
-                currentInterval = 90000; // 90s during provisioning phase
-            } else {
-                currentInterval = 30000; // 30s after 10 minutes
-            }
-
-            console.log(`WarmPool: Waiting for healthy instance (${elapsed}s elapsed, poll every ${currentInterval / 1000}s)...`, {
-                api: healthReport.comfyui_api,
-                gpu: healthReport.gpu_available,
-                functional: healthReport.gpu_functional,
-                errors: healthReport.errors
-            });
         } else {
             consecutiveFailures = 0; // Reset on any progress
         }
@@ -236,26 +314,50 @@ async function validateInstanceHealth(connectionUrl, contractId) {
         return healthReport;
     }
 
-    const base = connectionUrl.replace(/\/$/, '');
+    // Candidate URLs: prefer local SSH tunnel if configured (or via COMFYUI_TUNNEL_URL env var)
+    const TUNNEL_URL = process.env.COMFYUI_TUNNEL_URL || 'http://localhost:8188';
+    const urlsToTry = [];
+    if (TUNNEL_URL) urlsToTry.push(TUNNEL_URL.replace(/\/$/, ''));
+    urlsToTry.push(connectionUrl.replace(/\/$/, ''));
+
+    let usedBase = null;
+    let stats = null;
 
     try {
-        // 1. Check ComfyUI API responds with system stats
-        const systemStatsUrl = base + '/system_stats';
-        const statsResponse = await fetch(systemStatsUrl, {
-            method: 'GET',
-            timeout: 10000
-        });
+        // Try each candidate base URL until one succeeds
+        for (const candidateBase of urlsToTry) {
+            try {
+                const systemStatsUrl = candidateBase + '/system_stats';
+                console.log(`WarmPool: Trying health endpoint ${systemStatsUrl}`);
+                const statsResponse = await fetchWithTimeout(systemStatsUrl, {
+                    method: 'GET'
+                }, 10000);
 
-        if (!statsResponse.ok) {
-            healthReport.errors.push(`API returned ${statsResponse.status}`);
+                if (!statsResponse.ok) {
+                    console.warn(`WarmPool: Health endpoint ${systemStatsUrl} returned HTTP ${statsResponse.status}`);
+                    // try next candidate
+                    continue;
+                }
+
+                stats = await statsResponse.json();
+                usedBase = candidateBase;
+                healthReport.comfyui_api = true;
+                console.log(`WarmPool: Using ComfyUI base URL: ${usedBase}`);
+                break;
+            } catch (e) {
+                console.warn(`WarmPool: Health check failed for candidate ${candidateBase}: ${e.message}`);
+                // Try next candidate
+                continue;
+            }
+        }
+
+        if (!usedBase) {
+            healthReport.errors.push('All health endpoints failed');
             return healthReport;
         }
 
-        const stats = await statsResponse.json();
-        healthReport.comfyui_api = true;
-
         // 2. Verify GPU is detected and has VRAM
-        if (stats.system) {
+        if (stats && stats.system) {
             healthReport.vram_total = stats.system.vram_total || 0;
             healthReport.vram_free = stats.system.vram_free || 0;
             healthReport.gpu_available = healthReport.vram_total > 0;
@@ -276,13 +378,12 @@ async function validateInstanceHealth(connectionUrl, contractId) {
         }
 
         // 3. Check if models/checkpoints are loaded via object_info endpoint
-        // CRITICAL: Verify models actually downloaded (not just ComfyUI running)
+        // CRITICAL: Verify models actually downloaded (not just ComfyUI running) - 60s timeout for large model lists
         try {
-            const objectInfoUrl = base + '/object_info/CheckpointLoaderSimple';
-            const objectInfoResponse = await fetch(objectInfoUrl, {
-                method: 'GET',
-                timeout: 10000
-            });
+            const objectInfoUrl = usedBase + '/object_info/CheckpointLoaderSimple';
+            const objectInfoResponse = await fetchWithTimeout(objectInfoUrl, {
+                method: 'GET'
+            }, 60000);
 
             if (objectInfoResponse.ok) {
                 const objectInfo = await objectInfoResponse.json();
@@ -309,6 +410,8 @@ async function validateInstanceHealth(connectionUrl, contractId) {
         console.error('WarmPool: Health check error:', error);
     }
 
+
+
     // Log health check result
     const isHealthy = healthReport.comfyui_api && healthReport.gpu_available && healthReport.gpu_functional;
     console.log(`WarmPool: Health check for ${contractId}:`, {
@@ -325,6 +428,72 @@ async function validateInstanceHealth(connectionUrl, contractId) {
 }
 
 /**
+ * Attempt to repair an instance by SSHing into it and restarting ComfyUI service/process
+ * Returns true if the repair action appears successful
+ */
+async function attemptRepairInstance(contractId) {
+    try {
+        if (!state.instance || state.instance.contractId != contractId) return false;
+        const inst = state.instance;
+        const sshHost = inst.ssh_host || inst.host || null;
+        const sshPort = inst.ssh_port || inst.machine_ssh_port || process.env.VASTAI_SSH_PORT || null;
+        const keyPath = process.env.VASTAI_SSH_KEY_PATH || (process.env.HOME || process.env.USERPROFILE ? (path.join(process.env.HOME || process.env.USERPROFILE, '.ssh', 'id_rsa_vast')) : null);
+        if (!sshHost || !sshPort) {
+            console.warn('WarmPool: Cannot attempt repair - SSH host/port missing');
+            return false;
+        }
+
+        // Construct restart commands: prefer systemd restart; fall back to pkill+manual start
+        const restartCmd = `sudo systemctl restart comfyui.service || (pkill -f main.py || true; nohup python3 /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188 --enable-cors-header >/dev/null 2>&1 &)`;
+
+        console.log(`WarmPool: Attempting SSH repair to ${sshHost}:${sshPort} (cmd: ${restartCmd.substring(0,80)}...)`);
+
+        const { exec } = require('child_process');
+        const sshArgs = ['-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10', '-p', sshPort.toString(), '-i', keyPath, `root@${sshHost}`, restartCmd];
+
+        return await new Promise((resolve) => {
+            const child = exec(`ssh ${sshArgs.map(a => (a.indexOf(' ')>=0 ? `"${a}"` : a)).join(' ')}`, { timeout: 60000 }, (err, stdout, stderr) => {
+                if (err) {
+                    console.warn(`WarmPool: SSH repair command failed: ${err && err.message ? err.message : err}`);
+                    console.warn('WarmPool: stderr:', stderr);
+                    resolve(false);
+                    return;
+                }
+                console.log('WarmPool: SSH repair stdout:', stdout);
+                // Quick local check: try fetching system_stats via tunnel or public URL
+                validateInstanceHealth(inst.connectionUrl, contractId).then(hr => {
+                    const ok = hr.comfyui_api && hr.gpu_available;
+                    resolve(ok);
+                }).catch(() => resolve(false));
+            });
+            // Safety: kill child after 55s if still running
+            setTimeout(() => { try { child.kill(); } catch (e) {} }, 55000);
+        });
+
+    } catch (e) {
+        console.error('WarmPool: attemptRepairInstance error:', e && e.message ? e.message : e);
+        return false;
+    }
+}
+
+/**
+ * Notify failure via webhook (if configured)
+ */
+async function notifyFailure(contractId, message) {
+    try {
+        const url = process.env.WARM_POOL_ALERT_WEBHOOK;
+        if (!url) return false;
+        const payload = { contractId, message, time: new Date().toISOString() };
+        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        console.log('WarmPool: Sent failure notification to webhook');
+        return true;
+    } catch (e) {
+        console.warn('WarmPool: notifyFailure error:', e && e.message ? e.message : e);
+        return false;
+    }
+}
+
+/**
  * Check if health report indicates a fully functional instance
  * ENHANCED: Now also requires models to be loaded (prevents returning broken instances)
  * @param {Object} healthReport - Result from validateInstanceHealth
@@ -335,11 +504,37 @@ function isInstanceHealthy(healthReport) {
         healthReport.gpu_available &&
         healthReport.gpu_functional;
 
-    // REQUIRE at least 1 checkpoint to be loaded (catches provision failures)
-    const modelsReady = healthReport.models_loaded && healthReport.checkpoint_count > 0;
+    // Configurable grace period for models to finish downloading/initialising.
+    // Some images or very large models (Flux / SDXL conversions) can take >10-20 minutes.
+    const defaultGraceMs = parseInt(process.env.COMFYUI_MODELS_GRACE_MS || String(20 * 60 * 1000), 10); // default: 20 minutes
+
+    // Determine if models are ready. If checkpoints are reported as loaded, it's ready.
+    // Otherwise allow a temporary grace period (since provisioning may still be downloading/extracting models).
+    let modelsReady = false;
+    if (healthReport.models_loaded && healthReport.checkpoint_count > 0) {
+        modelsReady = true;
+    } else {
+        try {
+            if (state.instance && state.instance.createdAt) {
+                const elapsed = Date.now() - new Date(state.instance.createdAt).getTime();
+                if (elapsed < defaultGraceMs) {
+                    console.log(`WarmPool: Models not yet loaded but within grace period (${Math.round(elapsed/1000)}s elapsed < ${Math.round(defaultGraceMs/1000)}s). Waiting.`);
+                    modelsReady = true; // treat as 'in-progress' and don't fail immediately
+                } else {
+                    modelsReady = false;
+                }
+            } else {
+                // No createdAt available - be conservative and don't mark models ready
+                modelsReady = false;
+            }
+        } catch (e) {
+            console.warn('WarmPool: Error while evaluating model grace period:', e && e.message ? e.message : e);
+            modelsReady = false;
+        }
+    }
 
     if (basicHealth && !modelsReady) {
-        console.warn('WarmPool: Instance API/GPU healthy but NO MODELS LOADED - provisioning failed');
+        console.warn('WarmPool: Instance API/GPU healthy but NO MODELS LOADED - provisioning failed (post-grace)');
     }
 
     return basicHealth && modelsReady;
@@ -453,7 +648,25 @@ async function prewarm() {
     if (prewarmLock) {
         if (prewarmInFlight) {
             console.log('[PREWARM DEBUG] Waiting on in-flight prewarm');
-            return await prewarmInFlight;
+
+            // Add 5-minute timeout to prevent indefinite waiting on stuck promises
+            const PREWARM_WAIT_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Prewarm lock wait timeout exceeded (5 min)')), PREWARM_WAIT_TIMEOUT);
+            });
+
+            try {
+                // Race between actual prewarm completion and timeout
+                return await Promise.race([prewarmInFlight, timeoutPromise]);
+            } catch (err) {
+                if (err.message.includes('timeout exceeded')) {
+                    console.error('WarmPool: Prewarm lock timeout - clearing stuck promise');
+                    // Clear the stuck promise to allow retry
+                    prewarmInFlight = null;
+                    prewarmLock = false;
+                }
+                throw err;
+            }
         }
     }
 
@@ -475,19 +688,43 @@ async function prewarm() {
 
     state.isPrewarming = true;
     state.lastAction = new Date().toISOString();
-    console.log('[PREWARM DEBUG] Calling save()...');
-    save();
-    console.log('[PREWARM DEBUG] isPrewarming set and save() completed');
-
-    if (state.instance && (state.instance.status === 'starting' || state.instance.status === 'running')) {
-        // resolve inflight before returning
-        resolveInflight({ status: 'already_present', instance: state.instance });
-        prewarmInFlight = null;
-        return { status: 'already_present', instance: state.instance };
-    }
-    console.log('[PREWARM DEBUG] No existing instance, proceeding');
 
     try {
+        console.log('[PREWARM DEBUG] Calling save()...');
+        save();
+        console.log('[PREWARM DEBUG] isPrewarming set and save() completed');
+
+        // PRE-FLIGHT: Validate critical tokens before starting expensive operations
+        const tokenManager = require('../lib/token-manager');
+        console.log('[Prewarm] Validating tokens before instance rental...');
+        const tokenValidation = await tokenManager.validateAll(true); // Use cache
+
+        if (tokenValidation.vastai?.valid === false) {
+            const error = `VastAI API token invalid: ${tokenValidation.vastai.error}`;
+            console.error(`[Prewarm] ❌ ${error}`);
+            throw new Error(error);
+        }
+
+        if (tokenValidation.civitai?.valid === false) {
+            console.warn(`[Prewarm] ⚠️  Civitai token invalid: ${tokenValidation.civitai.error}`);
+            console.warn('[Prewarm]    Model downloads from Civitai may fail');
+        }
+
+        if (tokenValidation.huggingface?.valid === false) {
+            console.warn(`[Prewarm] ⚠️  HuggingFace token invalid: ${tokenValidation.huggingface.error}`);
+            console.warn('[Prewarm]    Model downloads from HuggingFace may fail');
+        }
+
+        if (state.instance && (state.instance.status === 'starting' || state.instance.status === 'running')) {
+            // resolve inflight before returning
+            resolveInflight({ status: 'already_present', instance: state.instance });
+            prewarmInFlight = null;
+            state.isPrewarming = false;
+            prewarmLock = false;
+            save();
+            return { status: 'already_present', instance: state.instance };
+        }
+        console.log('[PREWARM DEBUG] No existing instance, proceeding');
         // Vast.ai bundle search - use minimal server-side params, filter client-side
         // Note: Many filters (verified, rentable, rented, etc.) are NOT valid server-side ops
         const searchParams = {
@@ -501,11 +738,9 @@ async function prewarm() {
             if (!o.rentable) { reasons.push('not rentable'); return false; }
             if (o.rented) { reasons.push('already rented'); return false; }
 
-            // Exclude Ukraine and China regions
-            const loc = (o.geolocation || '').toLowerCase();
-            if (loc.includes('ukraine') || loc.includes('ua') ||
-                loc.includes('china') || loc.includes('cn')) {
-                reasons.push(`region excluded: ${o.geolocation || 'unknown'}`);
+            // Exclude Ukraine region
+            if (o.geolocation && (o.geolocation.includes('Ukraine') || o.geolocation.includes('UA'))) {
+                reasons.push('region excluded: Ukraine');
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
                 return false;
             }
@@ -568,7 +803,7 @@ async function prewarm() {
             }
 
             // High-speed download requirement
-            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '900'); // 900 Mbps minimum
+            const minInetDown = parseFloat(process.env.VASTAI_MIN_INET_DOWN || '2000'); // 2000 Mbps (2 Gbps) minimum
             if (typeof o.inet_down === 'number' && o.inet_down < minInetDown) {
                 reasons.push(`internet speed too low: ${o.inet_down.toFixed(1)} Mbps < ${minInetDown} Mbps`);
                 console.log(`WarmPool: Filtered offer ${o.id}: ${reasons.join(', ')} [${o.gpu_name}]`);
@@ -619,9 +854,26 @@ async function prewarm() {
                     });
 
                     if (!r.ok) {
-                        console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
                         const errorText = await r.text();
+                        
+                        // Handle rate limiting (429) - this is expected behavior
+                        if (r.status === 429) {
+                            console.warn(`WarmPool: Vast.ai API rate limited (429) on bundle search attempt ${i}. This is normal - backing off before retry.`);
+                            const backoffDelay = 2000 * i; // Increasing backoff
+                            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                            continue; // Try again after waiting
+                        }
+                        
+                        console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
                         console.error(`WarmPool: Error response:`, errorText);
+                        
+                        // Rate limiting handled above, now check for other transient errors
+                        if (r.status >= 500 || r.status === 408) {
+                            console.warn(`WarmPool: Server error detected, will retry after brief pause`);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * i));
+                            continue;
+                        }
+                        
                         continue;
                     }
 
@@ -645,10 +897,14 @@ async function prewarm() {
                     // Apply client-side filtering
                     let offers = allOffers.filter(filterOffer);
 
-                    // Sort results: Primary by price ($/hr), secondarily by bandwidth (Mbps DESC)
-                    // This satisfies the "prefer higher" requirement for internet speed.
+                    // Sort results: Primary by value (price per Gbps), secondarily by bandwidth (Mbps DESC)
+                    // This balances cost vs speed - allows higher price for significantly faster network
                     offers.sort((a, b) => {
-                        if (a.dph_total !== b.dph_total) return a.dph_total - b.dph_total;
+                        const a_speed_gbps = (a.inet_down || 0) / 1000;
+                        const b_speed_gbps = (b.inet_down || 0) / 1000;
+                        const a_price_per_gbps = a.dph_total / Math.max(a_speed_gbps, 0.1); // avoid div by zero
+                        const b_price_per_gbps = b.dph_total / Math.max(b_speed_gbps, 0.1);
+                        if (a_price_per_gbps !== b_price_per_gbps) return a_price_per_gbps - b_price_per_gbps;
                         return (b.inet_down || 0) - (a.inet_down || 0);
                     });
 
@@ -698,115 +954,220 @@ async function prewarm() {
         const customProvisionScript = process.env.COMFYUI_PROVISION_SCRIPT;
         const defaultProvisionScript = "https://raw.githubusercontent.com/vast-ai/base-image/refs/heads/main/derivatives/pytorch/derivatives/comfyui/provisioning_scripts/default.sh";
 
-        // SECURITY: Whitelist of allowed script URLs to prevent malicious code execution
-        const allowedScriptPatterns = [
-            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/9fb9d7c60d3822c2ffd3ad4b000cc864\/raw\/provision-reliable\.sh(\?.*)?$/,
-            /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
-            /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/  // Allow other GitHub raw URLs for flexibility
-        ];
-
-        // Validate URL against whitelist
-        const isUrlAllowed = (url) => {
-            if (!url || typeof url !== 'string') return false;
-            return allowedScriptPatterns.some(pattern => pattern.test(url));
-        };
+        // Strict provisioning controls:
+        // - PROVISION_STRICT=true  => do NOT fall back to default; abort provisioning on custom script failure
+        // - PROVISION_ALLOWED_SCRIPTS="url1,url2" => whitelist of allowed provision script URLs (exact match or substring)
+        const provisionStrict = String(process.env.PROVISION_STRICT || '').toLowerCase() === '1' || String(process.env.PROVISION_STRICT || '').toLowerCase() === 'true';
+        const allowedProvisionScripts = (process.env.PROVISION_ALLOWED_SCRIPTS || '').split(',').map(s => s.trim()).filter(Boolean);
 
         // Increment provision attempt counter
         state.provisionAttempt = (state.provisionAttempt || 0) + 1;
-        console.log(`WarmPool: 📦 Provisioning attempt #${state.provisionAttempt} (fallback mode: ${state.useDefaultScript})`);
+        console.log(`WarmPool: 📦 Provisioning attempt #${state.provisionAttempt} (fallback mode: ${state.useDefaultScript}, provisionStrict: ${provisionStrict})`);
 
-        // FALLBACK LOGIC: If useDefaultScript flag is set (from previous failure), use default script
-        let provisionScript = defaultProvisionScript;
+        // Cap provisioning attempts to avoid endless churn and enter safe mode if exceeded
+        const MAX_ATTEMPTS = parseInt(process.env.WARM_POOL_MAX_PROVISION_ATTEMPTS || '5', 10);
+        if (state.provisionAttempt >= MAX_ATTEMPTS) {
+            console.error(`WarmPool: ❌ Exceeded max provisioning attempts (${MAX_ATTEMPTS}). Entering safe mode to prevent further churn.`);
+            state.safeMode = true;
+            save();
+            try { audit.logUsageEvent({ event_type: 'safe_mode_engaged', details: { provisionAttempt: state.provisionAttempt }, source: 'warm-pool' }); } catch (e) {}
+            return { status: 'safe_mode', message: 'Max provisioning attempts exceeded, safe mode engaged' };
+        }
+
+        // FALLBACK / STRICT LOGIC: If useDefaultScript flag is set (from previous failure)
+        let provisionScript = null;
         if (state.useDefaultScript) {
+            if (provisionStrict) {
+                console.error('WarmPool: ❌ Custom provisioning previously failed and PROVISION_STRICT=true — aborting provisioning instead of using default');
+                state.safeMode = true;
+                save();
+                return { status: 'provision_failed', message: 'Custom provisioning failed previously and strict mode prevents fallback' };
+            }
             console.warn('WarmPool: ⚠️ Using DEFAULT Vast.ai script (fallback from failed custom script)');
             provisionScript = defaultProvisionScript;
         } else if (customProvisionScript) {
-            // SECURITY: Validate URL against whitelist before proceeding
-            if (!isUrlAllowed(customProvisionScript)) {
-                console.error(`WarmPool: 🔒 SECURITY REJECTION - Script URL not in whitelist: ${customProvisionScript}`);
-                console.error('WarmPool: ❌ Only whitelisted Gist/GitHub URLs are allowed. Falling back to Vast default.');
-                // Audit log security violation
-                try {
-                    audit.logUsageEvent({
-                        event_type: 'security_rejection',
-                        details: {
-                            reason: 'script_url_not_whitelisted',
-                            attempted_url: customProvisionScript,
-                            action: 'fallback_to_default'
-                        },
-                        source: 'warm-pool-security'
-                    });
-                } catch (e) { /* audit may not be available */ }
-                provisionScript = defaultProvisionScript;
-            }
-            // CRITICAL: gistfile1.txt 404s - gist has provision-reliable.sh, not gistfile1.txt
-            else if (customProvisionScript.includes('gistfile1.txt')) {
-                console.error('WarmPool: ❌ COMFYUI_PROVISION_SCRIPT uses gistfile1.txt which 404s! Use .../raw/provision-reliable.sh instead. Falling back to Vast default.');
-                provisionScript = defaultProvisionScript;
-            }
             // Validate custom script URL before using it (check for 404 gist issues)
-            else try {
-                const testResp = await fetch(customProvisionScript, { method: 'HEAD', timeout: 10000 });
-                if (testResp.ok) {
-                    provisionScript = customProvisionScript;
-                    console.log('WarmPool: ✅ Using custom provision script (whitelist validated):', customProvisionScript);
-                } else {
-                    console.warn(`WarmPool: ⚠️ Custom provision script returned ${testResp.status}, falling back to default`);
+            try {
+                const testResp = await fetchWithTimeout(customProvisionScript, { method: 'HEAD' }, 10000);
+                if (!testResp.ok) {
+                    const msg = `Custom provision script returned ${testResp.status}`;
+                    if (provisionStrict) {
+                        console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                        state.safeMode = true;
+                        save();
+                        return { status: 'provision_failed', message: msg };
+                    }
+                    console.warn('WarmPool: ⚠️', msg, ', falling back to default');
                     provisionScript = defaultProvisionScript;
+                } else {
+                    // If an allowlist exists, ensure the provided script matches one of the allowed values
+                    if (allowedProvisionScripts.length > 0) {
+                        const allowed = allowedProvisionScripts.some(a => customProvisionScript.includes(a) || customProvisionScript === a);
+                        if (!allowed) {
+                            const msg = 'Custom provision script is not in PROVISION_ALLOWED_SCRIPTS';
+                            if (provisionStrict) {
+                                console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                                state.safeMode = true;
+                                save();
+                                return { status: 'provision_failed', message: msg };
+                            }
+                            console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+                            provisionScript = defaultProvisionScript;
+                        } else {
+                            // Further safety: fetch the script body and scan for any external hosts
+                            try {
+                                const bodyResp = await fetchWithTimeout(customProvisionScript, { method: 'GET' }, 20000);
+                                if (!bodyResp.ok) throw new Error(`GET returned ${bodyResp.status}`);
+                                const text = await bodyResp.text();
+                                const urlMatches = Array.from(text.matchAll(/https?:\/\/[^\s"'`\)]+/g)).map(m => m[0]);
+                                const hosts = Array.from(new Set(urlMatches.map(u => {
+                                    try { return (new URL(u)).host; } catch (e) { return null; }
+                                }).filter(Boolean)));
+
+                                // Optional: require the fetched script to contain a configured signature string
+                                const expectedSig = (process.env.PROVISION_EXPECTED_SIGNATURE || '').trim();
+                                if (expectedSig) {
+                                    if (!text.includes(expectedSig)) {
+                                        const msg = `Custom provision script missing expected signature: ${expectedSig}`;
+                                        if (provisionStrict) {
+                                            console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                                            state.safeMode = true;
+                                            save();
+                                            return { status: 'provision_failed', message: msg };
+                                        }
+                                        console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+                                        provisionScript = defaultProvisionScript;
+                                        // skip setting provisionScript to custom below
+                                    } else {
+                                        console.log('WarmPool: ✅ Provision script contains expected signature:', expectedSig);
+                                    }
+                                }
+
+                                // Reject known-bad internal markers (helps detect outdated scripts that were partially updated)
+                                // By default do NOT block any substring here to avoid self-detection; set via PROVISION_DISALLOWED_SUBSTRINGS env var when needed
+                                const disallowedList = (process.env.PROVISION_DISALLOWED_SUBSTRINGS || '').split(',').map(s => s.trim()).filter(Boolean);
+                                const foundDisallowed = disallowedList.filter(sub => sub && text.includes(sub));
+                                if (foundDisallowed.length > 0) {
+                                    const msg = `Custom provision script contains disallowed substrings: ${foundDisallowed.join(', ')}`;
+                                    if (provisionStrict) {
+                                        console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                                        state.safeMode = true;
+                                        save();
+                                        return { status: 'provision_failed', message: msg };
+                                    }
+                                    console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+                                    provisionScript = defaultProvisionScript;
+                                    // skip setting provisionScript to custom below
+                                }
+
+                                const allowedHosts = (process.env.PROVISION_ALLOWED_HOSTS || '').split(',').map(s => s.trim()).filter(Boolean);
+                                if (allowedHosts.length > 0) {                                    const disallowed = hosts.filter(h => !allowedHosts.some(a => h.includes(a)));
+                                    if (disallowed.length > 0) {
+                                        const msg = `Provision script references disallowed external hosts: ${disallowed.join(', ')}`;
+                                        if (provisionStrict) {
+                                            console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                                            state.safeMode = true;
+                                            save();
+                                            return { status: 'provision_failed', message: msg };
+                                        }
+                                        console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+                                        provisionScript = defaultProvisionScript;
+                                        // skip setting provisionScript to custom below
+                                    } else {
+                                        provisionScript = customProvisionScript;
+                                        console.log('WarmPool: ✅ Custom provision script allowed, reachable, and references only allowed hosts:', allowedHosts.join(', '));
+                                    }
+                                } else {
+                                    provisionScript = customProvisionScript;
+                                    console.log('WarmPool: ✅ Custom script reachable; no PROVISION_ALLOWED_HOSTS configured to validate external refs');
+                                }
+                            } catch (err) {
+                                const msg = `Failed to validate provision script content: ${err.message}`;
+                                if (provisionStrict) {
+                                    console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                                    state.safeMode = true;
+                                    save();
+                                    return { status: 'provision_failed', message: msg };
+                                }
+                                console.warn('WarmPool: ⚠️', msg, ', falling back to default');
+                                provisionScript = defaultProvisionScript;
+                            }
+                        }
+                    } else {
+                        provisionScript = customProvisionScript;
+                        console.log('WarmPool: ✅ Using custom provision script:', customProvisionScript);
+                    }
                 }
             } catch (err) {
-                console.warn(`WarmPool: ⚠️ Custom provision script unreachable, falling back to default:`, err.message);
+                const msg = `Custom provision script unreachable: ${err.message}`;
+                if (provisionStrict) {
+                    console.error('WarmPool: ❌', msg, 'and PROVISION_STRICT=true — aborting provisioning');
+                    state.safeMode = true;
+                    save();
+                    return { status: 'provision_failed', message: msg };
+                }
+                console.warn('WarmPool: ⚠️', msg, ', falling back to default');
                 provisionScript = defaultProvisionScript;
             }
         }
 
-        // SECURITY: Final validation - ensure we never execute a non-whitelisted script
-        if (!isUrlAllowed(provisionScript)) {
-            console.error(`WarmPool: 🔒 CRITICAL SECURITY ERROR - Final script URL failed whitelist check: ${provisionScript}`);
-            console.error('WarmPool: ❌ Aborting to prevent potential malicious code execution. Using Vast default.');
-            // Audit log critical security violation
-            try {
-                audit.logUsageEvent({
-                    event_type: 'security_critical_error',
-                    details: {
-                        reason: 'final_script_url_failed_whitelist',
-                        attempted_url: provisionScript,
-                        action: 'forced_default_script'
-                    },
-                    source: 'warm-pool-security'
-                });
-            } catch (e) { /* audit may not be available */ }
+        // FALLBACK: If provisionScript is still null (no custom script and not in fallback mode), use default
+        if (!provisionScript) {
+            console.warn('WarmPool: ⚠️ No provision script configured, using default Vast.ai script');
             provisionScript = defaultProvisionScript;
         }
 
-        // Audit log successful script selection (for security monitoring)
-        try {
-            audit.logUsageEvent({
-                event_type: 'provision_script_selected',
-                details: {
-                    script_url: provisionScript,
-                    is_whitelisted: isUrlAllowed(provisionScript),
-                    is_custom: provisionScript !== defaultProvisionScript,
-                    attempt_number: state.provisionAttempt
-                },
-                source: 'warm-pool-security'
-            });
-        } catch (e) { /* audit may not be available */ }
-
-        console.log('WarmPool: 🔧 Selected provision script (security validated):', provisionScript);
+        console.log('WarmPool: 🔧 Selected provision script:', provisionScript);
 
         // Build environment variables - include HF and Civitai tokens if set
-        // PORTAL_CONFIG: simplified to avoid "remote port forwarding failed" (fewer forwards = fewer failures)
         const envVars = {
             COMFYUI_ARGS: "--listen 0.0.0.0 --disable-auto-launch --port 8188 --enable-cors-header",
             COMFYUI_API_BASE: "http://localhost:8188",
-            PROVISIONING_SCRIPT: provisionScript,
-            PORTAL_CONFIG: "localhost:8188:18188:/:ComfyUI|localhost:1111:11111:/:Instance Portal",
+            PORTAL_CONFIG: "localhost:1111:11111:/:Instance Portal|localhost:8188:18188:/:ComfyUI|localhost:8288:18288:/docs:API Wrapper|localhost:8188:18188:/:ComfyUI|localhost:8080:18080:/:Jupyter|localhost:8080:8080:/terminals/1:Jupyter Terminal|localhost:8384:18384:/:Syncthing",
             OPEN_BUTTON_PORT: "1111",
             JUPYTER_DIR: "/",
             DATA_DIRECTORY: "/workspace/",
             OPEN_BUTTON_TOKEN: "1"
         };
+
+        // Try to ensure dropbox links file exists — auto-generate if token present
+        try {
+            const dropboxLinksPath = path.join(__dirname, '..', 'data', 'dropbox_links.txt');
+            // If token available and links missing, attempt to run generator script (local, not remote)
+            if (!fs.existsSync(dropboxLinksPath) && process.env.DROPBOX_TOKEN) {
+                try {
+                    console.log('WarmPool: DROPBOX_TOKEN present and no data/dropbox_links.txt found - generating via script');
+                    const spawnSync = require('child_process').spawnSync;
+                    const folder = process.env.DROPBOX_FOLDER || '/';
+                    const res = spawnSync('node', ['scripts/dropbox_create_links.js', folder], { stdio: 'inherit', env: Object.assign({}, process.env) });
+                    if (res.error) {
+                        console.warn('WarmPool: Failed to run dropbox_create_links script:', res.error);
+                    } else if (res.status !== 0) {
+                        console.warn('WarmPool: dropbox_create_links exited with code', res.status);
+                    } else {
+                        console.log('WarmPool: dropbox_create_links completed');
+                    }
+                } catch (e) {
+                    console.warn('WarmPool: Error executing dropbox link generator:', e && e.message ? e.message : e);
+                }
+            }
+
+            if (fs.existsSync(dropboxLinksPath)) {
+                const contents = fs.readFileSync(dropboxLinksPath, 'utf8');
+                if (contents && contents.trim().length > 0) {
+                    envVars.PROVISION_DROPBOX_LINKS_B64 = Buffer.from(contents, 'utf8').toString('base64');
+                    envVars.PROVISION_DROPBOX_LINKS_SOURCE = 'repo:file';
+                    console.log('WarmPool: Added PROVISION_DROPBOX_LINKS_B64 from data/dropbox_links.txt');
+                }
+            }
+        } catch (err) {
+            console.warn('WarmPool: Failed to prepare data/dropbox_links.txt:', err && err.message ? err.message : err);
+        }
+
+        // Only add PROVISIONING_SCRIPT if it's not null (allows disabling provisioning)
+        if (provisionScript) {
+            envVars.PROVISIONING_SCRIPT = provisionScript;
+        }
 
         // Pass through Hugging Face and Civitai tokens for model downloads
         if (process.env.HUGGINGFACE_HUB_TOKEN) {
@@ -815,6 +1176,14 @@ async function prewarm() {
         if (process.env.CIVITAI_TOKEN) {
             envVars.CIVITAI_TOKEN = process.env.CIVITAI_TOKEN;
         }
+        // Pass through Dropbox token and folder for Dropbox-based provisioning
+        if (process.env.DROPBOX_TOKEN) {
+            envVars.DROPBOX_TOKEN = process.env.DROPBOX_TOKEN;
+        }
+        if (process.env.DROPBOX_FOLDER) {
+            envVars.DROPBOX_FOLDER = process.env.DROPBOX_FOLDER;
+            envVars.DROPBOX_PATH = process.env.DROPBOX_FOLDER; // Also set DROPBOX_PATH for compatibility
+        }
 
         // Pass through SCRIPTS_BASE_URL for modular provisioning system
         if (process.env.SCRIPTS_BASE_URL) {
@@ -822,18 +1191,28 @@ async function prewarm() {
             console.log('WarmPool: 📦 Using modular scripts from:', process.env.SCRIPTS_BASE_URL);
         }
 
+        // Pass through provisioning enforcement settings so the provisioned instance can validate
+        if (process.env.PROVISION_ALLOWED_SCRIPTS) {
+            envVars.PROVISION_ALLOWED_SCRIPTS = process.env.PROVISION_ALLOWED_SCRIPTS;
+        }
+        if (process.env.PROVISION_ALLOWED_HOSTS) {
+            envVars.PROVISION_ALLOWED_HOSTS = process.env.PROVISION_ALLOWED_HOSTS;
+        }
+        if (process.env.PROVISION_STRICT) {
+            envVars.PROVISION_STRICT = process.env.PROVISION_STRICT;
+        }
+
         const rentBody = {
             ...(configuredImage && configuredImage !== 'auto' ? { image: configuredImage } : {}),
             runtype: 'ssh',
             target_state: 'running',
-            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; echo "WarmPool: Downloading provision script from whitelisted URL: ${provisionScript}"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && echo "WarmPool: Script downloaded, executing..." && bash -x /tmp/provision.sh'`,
+            onstart: `bash -lc 'if mkdir -p /workspace 2>/dev/null && test -w /workspace; then export WORKSPACE=/workspace; else mkdir -p "$HOME/workspace" 2>/dev/null || true; export WORKSPACE="$HOME/workspace"; fi; cd "$WORKSPACE" || cd; echo "WarmPool: using WORKSPACE=$WORKSPACE"; curl -fsSL "${provisionScript}" -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash -x /tmp/provision.sh'`,
             ssh_key: vastaiSsh.getKey(),
             env: envVars,
             // Request disk according to configured requirement to ensure room for model extraction
             disk: requiredDiskGb,
-            // Direct SSH avoids proxy port forwarding; fewer ports reduces "remote port forwarding failed" errors
-            ssh_direct: true,
-            direct_port_count: 20
+            // Request direct port access for ComfyUI (port 8188) and other services
+            direct_port_count: 100
         };
 
         // Ensure account-level SSH key exists so per-instance access works
@@ -976,9 +1355,28 @@ async function checkInstance() {
     if (!state.instance || !state.instance.contractId) return;
     try {
         const { contractId } = state.instance;
-        const r = await fetch(`${VAST_BASE}/instances/${contractId}/`, {
-            headers: { 'Authorization': `Bearer ${VASTAI_API_KEY}` }
-        });
+
+        // Use fetchWithRetry for automatic retry on transient errors and rate limiting
+        // Timeout: 10s per attempt, max 3 retries with exponential backoff (1s, 2s, 4s)
+        let r;
+        try {
+            r = await fetchWithRetry(
+                `${VAST_BASE}/instances/${contractId}/`,
+                { headers: { 'Authorization': `Bearer ${VASTAI_API_KEY}` } },
+                10000, // 10-second timeout per attempt
+                3,     // 3 retries max
+                1000   // 1-second initial delay
+            );
+        } catch (retryErr) {
+            // Check if it's a rate limit error that was retried
+            if (retryErr.message && retryErr.message.includes('429')) {
+                console.warn(`WarmPool: Vast.ai API rate limited (429) after retries. This is normal - will retry next cycle.`);
+                state.instance.lastError = `Rate limited (429) after retries at ${new Date().toISOString()}`;
+                return state.instance;
+            }
+            throw retryErr;
+        }
+
         if (!r.ok) {
             const txt = await r.text();
             // If the instance is gone (404), clear our local state
@@ -988,11 +1386,11 @@ async function checkInstance() {
                 save();
                 return null;
             }
-            // CRITICAL: If rate limited (429), DON'T kill the instance - just log and skip this check
+            // CRITICAL: If rate limited (429), DON'T kill the instance - just log and skip this check gracefully
             if (r.status === 429) {
-                console.warn(`WarmPool: Vast.ai API rate limited (429). Skipping this health check cycle.`);
+                console.warn(`WarmPool: Vast.ai API rate limited (429). This is normal behavior - will retry next poll cycle.`);
                 state.instance.lastError = `Rate limited (429) at ${new Date().toISOString()}`;
-                return; // Don't throw - instance is still running
+                return state.instance; // Don't throw - instance is still running, just keep state
             }
             throw new Error(`instances status error ${r.status} ${txt}`);
         }
@@ -1005,23 +1403,117 @@ async function checkInstance() {
         state.instance.status = inst.actual_status || inst.status || state.instance.status;
         // Set connection url when instance is running and public ip is available
         if ((inst.actual_status === 'running' || inst.status === 'running') && inst.public_ipaddr) {
-            // Default to direct port 8188
-            let port = 8188;
+            const portValidator = require('../lib/port-validator');
 
-            // Check for explicitly mapped ports if direct ports aren't used or as a fallback
-            if (inst.ports && inst.ports['8188/tcp'] && inst.ports['8188/tcp'].length > 0) {
-                port = inst.ports['8188/tcp'][0].HostPort;
-            } else if (inst.ports && inst.ports['18188/tcp'] && inst.ports['18188/tcp'].length > 0) {
-                // Some templates might use 18188 internally and map it
-                port = inst.ports['18188/tcp'][0].HostPort;
+            console.log(`[PortValidator] Testing connectivity to ${inst.public_ipaddr}...`);
+            const validation = await portValidator.validateInstancePorts(inst);
+
+            if (validation.success) {
+                state.instance.connectionUrl = validation.connectionUrl;
+                console.log(`✅ Port ${validation.port} (${validation.source}) validated and accessible`);
+            } else {
+                console.warn(`⚠️  Port validation failed: ${validation.error}`);
+                console.warn('   Will retry on next poll cycle');
+                // Don't set connectionUrl yet, wait for next poll when service might be ready
+                if (validation.details && validation.details.firewallDetected) {
+                    console.error('   FIREWALL DETECTED: All tested ports are blocked');
+                }
             }
-
-            state.instance.connectionUrl = `http://${inst.public_ipaddr}:${port}`;
+        } else if ((inst.actual_status === 'running' || inst.status === 'running') && !inst.public_ipaddr) {
+            console.warn(`Instance ${contractId} running but no public IP available yet`);
 
             // If this is the first time we've detected the connectionUrl, mark as loading and validate health
             if (!previousConnectionUrl && state.instance.connectionUrl && process.env.NODE_ENV !== 'test') {
                 state.instance.status = 'loading'; // Override to loading until ComfyUI responds
                 console.log(`WarmPool: Instance ${contractId} network ready, validating ComfyUI health (up to 15m)...`);
+
+                // Start log collection daemon if SSH details are available
+                if (inst.ssh_host && inst.ssh_port) {
+                    // Configurable SSH key path with fallbacks
+                    const sshKeyPath = process.env.VASTAI_SSH_KEY_PATH ||
+                        path.join(require('os').homedir(), '.ssh', 'id_rsa_vast') ||
+                        path.join(require('os').homedir(), '.ssh', 'vast_ai_key');
+
+                    const logOutputPath = path.join(__dirname, '..', 'logs', `provision_${contractId}_${Date.now()}.log`);
+
+                    console.log(`[LogCollector] Registering log collection for instance ${contractId} with watchdog`);
+                    console.log(`[LogCollector] SSH: ${inst.ssh_host}:${inst.ssh_port}`);
+                    console.log(`[LogCollector] SSH Key: ${sshKeyPath}`);
+                    console.log(`[LogCollector] Output: ${logOutputPath}`);
+
+                    // Register with process watchdog for automatic restart on failure
+                    const watchdogId = `log-collector-${contractId}`;
+                    processWatchdog.register(watchdogId, {
+                        name: `LogCollector-${contractId}`,
+                        command: 'node',
+                        args: [
+                            path.join(__dirname, '..', 'scripts', 'collect_provision_logs.js'),
+                            '--host', inst.ssh_host,
+                            '--port', String(inst.ssh_port),
+                            '--key', sshKeyPath,
+                            '--contract-id', String(contractId),
+                            '--output', logOutputPath,
+                            '--timeout', '3600'  // 1 hour max
+                        ],
+                        maxRestarts: -1,  // Unlimited restarts
+                        restartDelay: 10000,  // 10s base delay with exponential backoff
+                        stdio: ['ignore', 'pipe', 'pipe']
+                    });
+
+                    // Listen for watchdog events for this specific process
+                    const handleStdout = ({ id, data }) => {
+                        if (id === watchdogId) {
+                            console.log(`[LogCollector] ${data.trim()}`);
+                        }
+                    };
+
+                    const handleStderr = ({ id, data }) => {
+                        if (id === watchdogId) {
+                            console.error(`[LogCollector] ERROR: ${data.trim()}`);
+                        }
+                    };
+
+                    processWatchdog.on('stdout', handleStdout);
+                    processWatchdog.on('stderr', handleStderr);
+
+                    // Store watchdog ID for cleanup (instead of PID)
+                    if (!state.instance.logCollectorWatchdogId) {
+                        state.instance.logCollectorWatchdogId = watchdogId;
+                        state.instance.logCollectorOutputPath = logOutputPath;
+                    }
+                } else {
+                    console.warn(`[LogCollector] SSH details not available for instance ${contractId}, skipping log collection`);
+                }
+
+                // Start proactive ComfyUI keepalive monitoring
+                if (!comfyKeepalive && state.instance.connectionUrl) {
+                    console.log('[Keepalive] Starting ComfyUI connection monitoring');
+                    comfyKeepalive = new ComfyUIKeepalive(state.instance.connectionUrl, {
+                        intervalMs: 30000,  // Ping every 30s
+                        timeoutMs: 5000,    // 5s timeout per ping
+                        maxConsecutiveFailures: 5  // Alert after 5 failures
+                    });
+
+                    comfyKeepalive.on('connection-lost', ({ failures, lastError }) => {
+                        console.error(`❌ ComfyUI connection LOST after ${failures} failures: ${lastError}`);
+                        console.error('   Triggering emergency health check...');
+                        // Trigger immediate health check
+                        checkInstance().catch(err => console.error('Emergency health check failed:', err));
+                    });
+
+                    comfyKeepalive.on('ping-failure', ({ failures, error }) => {
+                        console.warn(`⚠️  ComfyUI ping failed (${failures} consecutive): ${error}`);
+                    });
+
+                    comfyKeepalive.on('ping-success', ({ duration }) => {
+                        if (duration > 1000) {
+                            console.log(`[Keepalive] Ping successful (${duration}ms - slow response)`);
+                        }
+                    });
+
+                    comfyKeepalive.start();
+                }
+
                 // Trigger health validation in background (don't block checkInstance)
                 const healthTimeoutMs = parseInt(process.env.COMFYUI_READY_TIMEOUT_MS || (process.env.DISABLE_AUTO_RECOVERY === '1' ? '3600000' : '900000'), 10);
                 waitForComfyReady(contractId, healthTimeoutMs, 10000).catch(async err => {
@@ -1104,6 +1596,28 @@ async function terminate(contractId = null) {
 
         // Clear local state if this was our tracked instance
         if (state.instance && state.instance.contractId == contractId) {
+            // Clean up log collector from watchdog if registered
+            if (state.instance.logCollectorWatchdogId) {
+                console.log(`[LogCollector] Unregistering from watchdog: ${state.instance.logCollectorWatchdogId}`);
+                processWatchdog.unregister(state.instance.logCollectorWatchdogId);
+            }
+            // Fallback: Clean up old PID-based log collector if still present
+            if (state.instance.logCollectorPid) {
+                try {
+                    console.log(`[LogCollector] Stopping legacy log collector process ${state.instance.logCollectorPid}`);
+                    process.kill(state.instance.logCollectorPid, 'SIGTERM');
+                } catch (err) {
+                    console.warn(`[LogCollector] Failed to kill process ${state.instance.logCollectorPid}: ${err.message}`);
+                }
+            }
+
+            // Clean up ComfyUI keepalive monitoring
+            if (comfyKeepalive) {
+                console.log('[Keepalive] Stopping ComfyUI connection monitoring');
+                comfyKeepalive.stop();
+                comfyKeepalive = null;
+            }
+
             state.instance = null;
             state.lastAction = new Date().toISOString();
             save();
@@ -1118,11 +1632,42 @@ async function terminate(contractId = null) {
 // Polling loop to update instance state and enforce idle shutdown
 let pollHandle = null;
 function startPolling(opts = {}) {
-    const intervalMs = opts.intervalMs || 120000; // 120s - adaptive polling to avoid rate limits
     if (pollHandle) return;
+    if (process.env.NODE_ENV === 'test') return;
+
     // Respect a safe-mode environment variable for aggressive shutdowns
     const safeMode = (process.env.WARM_POOL_SAFE_MODE === '1' || process.env.WARM_POOL_SAFE_MODE === 'true');
-    pollHandle = setInterval(async () => {
+
+    /**
+     * Calculate adaptive polling interval based on instance state
+     * - Active states (starting, loading, leased): 30s
+     * - Idle ready state: 180s (3min)
+     * - Default: 120s (2min)
+     */
+    function getPollingInterval() {
+        if (!state.instance) {
+            return 120000; // 2 minutes when no instance
+        }
+
+        const status = state.instance.status;
+        const isLeased = state.instance.leasedUntil && Date.now() < new Date(state.instance.leasedUntil).getTime();
+
+        if (status === 'starting' || status === 'loading' || isLeased) {
+            // Active states: check more frequently
+            return parseInt(process.env.WARM_POOL_POLL_ACTIVE_INTERVAL_MS || '30000', 10); // 30s
+        } else if (status === 'ready') {
+            // Idle but ready: slower polling
+            return parseInt(process.env.WARM_POOL_POLL_IDLE_INTERVAL_MS || '180000', 10); // 3min
+        } else {
+            // Default
+            return parseInt(process.env.WARM_POOL_POLL_INTERVAL_MS || '120000', 10); // 2min
+        }
+    }
+
+    /**
+     * Single poll execution with error handling
+     */
+    async function pollOnce() {
         try {
             await checkInstance();
             // enforce idle shutdown
@@ -1161,7 +1706,15 @@ function startPolling(opts = {}) {
         } catch (e) {
             console.error('WarmPool polling error:', e);
         }
-    }, intervalMs);
+
+        // Schedule next poll with adaptive interval
+        const nextInterval = getPollingInterval();
+        pollHandle = setTimeout(pollOnce, nextInterval);
+    }
+
+    // Start first poll
+    console.log('[Polling] Starting adaptive polling loop');
+    pollOnce();
 }
 
 function getStatus() {
@@ -1225,12 +1778,14 @@ function resetProvisioningState() {
     return getStatus();
 }
 
-// Initialize
-try {
-    load();
-} catch (e) {
-    console.error('WarmPool: Error loading state:', e);
-}
+// Initialize (async to support instance validation during load)
+(async () => {
+    try {
+        await load();
+    } catch (e) {
+        console.error('WarmPool: Error loading state:', e);
+    }
+})();
 
 function stopPolling() {
     if (pollHandle) {

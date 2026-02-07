@@ -4,8 +4,8 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $provisionPath = Join-Path $projectRoot "scripts\provision-reliable.sh"
-$gistClone = Join-Path $env:TEMP "gist-9fb9d7c60d3822c2ffd3ad4b000cc864"
-$gistId = "9fb9d7c60d3822c2ffd3ad4b000cc864"
+$gistClone = Join-Path $env:TEMP "gist-c3f61f20067d498b6699d1bdbddea395"
+$gistId = "c3f61f20067d498b6699d1bdbddea395"
 
 # Try API first (no proxy issues)
 $envPath = Join-Path $projectRoot ".env"
@@ -15,7 +15,7 @@ if (Test-Path $envPath) {
         Set-Item -Path "env:$($p[0].Trim())" -Value $p[1].Trim() -ErrorAction SilentlyContinue
     }
 }
-$token = if ($env:GITHUB_TOKEN) { $env:GITHUB_TOKEN } elseif ($env:GH_TOKEN) { $env:GH_TOKEN } else { $env:NEED_KEY }
+$token = $env:GITHUB_TOKEN ?? $env:GH_TOKEN ?? $env:NEED_KEY
 if ($token -and (Test-Path $provisionPath)) {
     Write-Host "Pushing via GitHub API..." -ForegroundColor Cyan
     & node (Join-Path $projectRoot "scripts\push-provision-to-gist.js")
@@ -38,9 +38,6 @@ if (-not (Test-Path $provisionPath)) {
 }
 
 Copy-Item $provisionPath -Destination (Join-Path $gistClone "provision-reliable.sh") -Force
-if (Test-Path (Join-Path $projectRoot "scripts\check-cloudflare.sh")) {
-    Copy-Item (Join-Path $projectRoot "scripts\check-cloudflare.sh") -Destination (Join-Path $gistClone "check-cloudflare.sh") -Force
-}
 Push-Location $gistClone
 try {
     # Avoid proxy redirecting to 127.0.0.1:9 (discard port)
@@ -49,15 +46,13 @@ try {
     git config --local --unset url."https://github.com/.insteadOf" 2>$null
     git config --local --unset url."https://gist.github.com/.insteadOf" 2>$null
     git add provision-reliable.sh
-    if (Test-Path (Join-Path $gistClone "check-cloudflare.sh")) { git add check-cloudflare.sh }
-    git commit -m "Sync provision-reliable.sh + check-cloudflare.sh: latest updates from workspace"
+    git commit -m "Sync provision-reliable.sh: latest updates from workspace"
     git push origin main
     $commitHash = (git log -1 --format="%H").Trim()
     Write-Host ""
     Write-Host "Pushed. Add to .env:" -ForegroundColor Green
     Write-Host "COMFYUI_PROVISION_SCRIPT=https://gist.githubusercontent.com/pimpsmasterson/$gistId/raw/$commitHash/provision-reliable.sh" -ForegroundColor White
     Write-Host "Then: pm2 restart vastai-proxy --update-env" -ForegroundColor Cyan
-}
-finally {
+} finally {
     Pop-Location
 }

@@ -15,6 +15,9 @@ if (Test-Path ".env") {
         if ($_ -match '^\s*([^#][^=]*)\s*=\s*(.*)$') {
             $name = $matches[1].Trim()
             $value = $matches[2].Trim()
+            # Strip inline comments and surrounding quotes
+            $value = $value -replace '\s+#.*$',''
+            if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) { if ($value.Length -ge 2) { $value = $value.Substring(1, $value.Length - 2) } }
             if (-not [string]::IsNullOrEmpty($name) -and -not (Test-Path "env:$name")) {
                 Set-Item -Path "env:$name" -Value $value
                 Write-Host "  Set $name from .env" -ForegroundColor Gray
