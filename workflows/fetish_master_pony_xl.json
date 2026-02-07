@@ -1,0 +1,203 @@
+{
+    "1": {
+        "inputs": {
+            "ckpt_name": "ponyDiffusionV6XL.safetensors"
+        },
+        "class_type": "CheckpointLoaderSimple",
+        "_meta": {
+            "title": "Master Pony XL Loader"
+        }
+    },
+    "2": {
+        "inputs": {
+            "lora_name": "sdxl_lightning_4step_lora.safetensors",
+            "strength_model": 1,
+            "strength_clip": 1,
+            "model": [
+                "1",
+                0
+            ],
+            "clip": [
+                "1",
+                1
+            ]
+        },
+        "class_type": "LoraLoader",
+        "_meta": {
+            "title": "LoRA: Lightning (Fast Gen)"
+        }
+    },
+    "3": {
+        "inputs": {
+            "lora_name": "Soiling-V1.safetensors",
+            "strength_model": 0.8,
+            "strength_clip": 0.8,
+            "model": [
+                "2",
+                0
+            ],
+            "clip": [
+                "2",
+                1
+            ]
+        },
+        "class_type": "LoraLoader",
+        "_meta": {
+            "title": "LoRA: Specialty (Scat)"
+        }
+    },
+    "4": {
+        "inputs": {
+            "lora_name": "defecation_v1.safetensors",
+            "strength_model": 0.7,
+            "strength_clip": 0.7,
+            "model": [
+                "3",
+                0
+            ],
+            "clip": [
+                "3",
+                1
+            ]
+        },
+        "class_type": "LoraLoader",
+        "_meta": {
+            "title": "LoRA: Specialty (Defecation)"
+        }
+    },
+    "5": {
+        "inputs": {
+            "text": "score_9, score_8_up, score_7_up, rating_explicit, masterwork, highly detailed, realistic, photorealistic, mistress",
+            "clip": [
+                "4",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Positive Prompt (Pony Scaled)"
+        }
+    },
+    "6": {
+        "inputs": {
+            "text": "score_4, score_5, score_6, low quality, bad quality, blurry, deformed, flat color",
+            "clip": [
+                "4",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Negative Prompt"
+        }
+    },
+    "7": {
+        "inputs": {
+            "control_net_name": "xinsir_union_promax_sdxl.safetensors"
+        },
+        "class_type": "ControlNetLoader",
+        "_meta": {
+            "title": "ControlNet: Union Promax (12-in-1)"
+        }
+    },
+    "8": {
+        "inputs": {
+            "strength": 0.8,
+            "conditioning": [
+                "5",
+                0
+            ],
+            "control_net": [
+                "7",
+                0
+            ],
+            "image": [
+                "14",
+                0
+            ]
+        },
+        "class_type": "ControlNetApply",
+        "_meta": {
+            "title": "Apply ControlNet (Pose/Depth)"
+        }
+    },
+    "10": {
+        "inputs": {
+            "seed": 42,
+            "steps": 4,
+            "cfg": 1.5,
+            "sampler_name": "dpmpp_sde",
+            "scheduler": "karras",
+            "denoise": 1,
+            "model": [
+                "4",
+                0
+            ],
+            "positive": [
+                "8",
+                0
+            ],
+            "negative": [
+                "6",
+                0
+            ],
+            "latent_image": [
+                "11",
+                0
+            ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+            "title": "KSampler (Ultra Fast)"
+        }
+    },
+    "11": {
+        "inputs": {
+            "width": 1024,
+            "height": 1024,
+            "batch_size": 1
+        },
+        "class_type": "EmptyLatentImage",
+        "_meta": {
+            "title": "Empty Latent Image"
+        }
+    },
+    "12": {
+        "inputs": {
+            "samples": [
+                "10",
+                0
+            ],
+            "vae": [
+                "1",
+                2
+            ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+            "title": "VAE Decode"
+        }
+    },
+    "13": {
+        "inputs": {
+            "images": [
+                "12",
+                0
+            ]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+            "title": "Save Finished Masterwork"
+        }
+    },
+    "14": {
+        "inputs": {
+            "image": "krita_canvas_input.png",
+            "upload": "image"
+        },
+        "class_type": "LoadImage",
+        "_meta": {
+            "title": "Krita Canvas (Pose Reference)"
+        }
+    }
+}

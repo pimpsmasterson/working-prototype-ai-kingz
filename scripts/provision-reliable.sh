@@ -818,7 +818,7 @@ activate_venv() {
 }
 
 detect_cuda_version() {
-  # Return a short CUDA tag like cu130, cu124, cu121, cu118, cu111 or "cpu"
+  # Return a short CUDA tag like cu130, cu128, cu124, cu121, cu118, cu111 or "cpu"
   # NOTE: Only echo the result - all logs go to stderr to avoid polluting return value
   if command -v nvidia-smi >/dev/null 2>&1; then
     # Try to read reported CUDA version from nvidia-smi
@@ -827,20 +827,31 @@ detect_cuda_version() {
     if [[ -n "$cuda_raw" ]]; then
       echo "   🔎 Detected CUDA from nvidia-smi: $cuda_raw" >&2
       case "$cuda_raw" in
-        13.*|13.0|13) echo "cu130"; return 0 ;;
+        13.*|13) echo "cu130"; return 0 ;;
         12.9*|12.9) echo "cu130"; return 0 ;;
+        12.8*|12.8) echo "cu128"; return 0 ;;
         12.4*|12.4) echo "cu124"; return 0 ;;
         12.1*|12.1) echo "cu121"; return 0 ;;
         11.8*|11.8) echo "cu118"; return 0 ;;
         11.1*|11.1) echo "cu111"; return 0 ;;
+        *)
+            # Fallback for newer minor versions - map to closest known
+            # If 12.5, 12.6, 12.7 -> map to cu124 (stable fallback) or maybe cu128 if available?
+            # For robustness, let's map unknown 12.x to cu124 as a safe baseline, unless >12.8
+            if [[ "$cuda_raw" =~ ^12\.[5-7] ]]; then echo "cu124"; return 0; fi
+            if [[ "$cuda_raw" =~ ^12\.([8-9]|[1-9][0-9]) ]]; then echo "cu128"; return 0; fi
+            ;;
       esac
 
-      # Additional heuristic: check GPU name for RTX 50-series / Blackwell cues and prefer cu130
+      # Additional heuristic: check GPU name for RTX 50-series / Blackwell cues and prefer cu128/cu130
       local gpu_name
       gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n1 | tr -d '\r' || true)
       if [[ -n "$gpu_name" ]]; then
         echo "   🔎 Detected GPU name: $gpu_name" >&2
-        if [[ "$gpu_name" =~ 5060|RTX\ 50|Blackwell|RTX\ 5 ]]; then
+        # Use case-insensitive matching for Blackwell/RTX 50
+        if echo "$gpu_name" | grep -qiE "5060|RTX 5[0-9]|Blackwell"; then
+          # Blackwell needs at least cu128 (PyTorch 2.7+ / Nightly)
+          # We return cu130 as the primary target for nightlies usually, or cu128
           echo "cu130"; return 0
         fi
       fi
@@ -852,6 +863,8 @@ detect_cuda_version() {
       echo "   🔎 Detected driver version: $driver" >&2
       if (( driver >= 570 )); then
         echo "cu130"; return 0
+      elif (( driver >= 550 )); then # Approx for CUDA 12.4+ / 12.8
+        echo "cu128"; return 0
       elif (( driver >= 535 )); then
         echo "cu124"; return 0
       elif (( driver >= 525 )); then
@@ -952,10 +965,32 @@ install_torch() {
               log "   📥 Installing torch NIGHTLY for cu130 (RTX 50-series support) (attempt $torch_attempt/3)"
               log "   ⚠️  Using PyTorch nightly build for sm_120 CUDA arch support (Blackwell GPUs)"
               log "   🔄 Force-reinstalling to replace pre-installed PyTorch..."
+              
+              # First try cu130 nightly
               if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
                 --force-reinstall --upgrade \
                 --pre torch torchvision torchaudio \
                 --index-url https://download.pytorch.org/whl/nightly/cu130 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              
+              log "   ⚠️  cu130 nightly failed, trying cu128 nightly..."
+              # Fallback to cu128 nightly
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                --force-reinstall --upgrade \
+                --pre torch torchvision torchaudio \
+                --index-url https://download.pytorch.org/whl/nightly/cu128 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
+                torch_success=true
+                break
+              fi
+              ;;
+            cu128)
+              log "   📥 Installing torch NIGHTLY for cu128 (RTX 50-series support) (attempt $torch_attempt/3)"
+              if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                --force-reinstall --upgrade \
+                --pre torch torchvision torchaudio \
+                --index-url https://download.pytorch.org/whl/nightly/cu128 2>&1 | tee -a /workspace/pip_install.log | grep -v "WARNING:"; then
                 torch_success=true
                 break
               fi
@@ -998,7 +1033,7 @@ install_torch() {
           esac
         fi
 
-        if [[ $torch_attempt -lt 3 ]]; then
+        if [[ $torch_success == "false" && $torch_attempt -lt 3 ]]; then
             log "   ⚠️  PyTorch install attempt $torch_attempt failed, retrying in 30s..."
             sleep 30
         fi
@@ -1086,12 +1121,30 @@ PY
         "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
           --force-reinstall --upgrade --pre torch torchvision torchaudio \
           --index-url https://download.pytorch.org/whl/nightly/cu130 2>&1 | tee -a /workspace/pip_install.log || {
-            log "   ⚠️ nightly cu130 install failed, falling back to generic wheels"
+            log "   ⚠️ nightly cu130 install failed, falling back to nightly cu128"
             "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
-              torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+              --force-reinstall --upgrade --pre torch torchvision torchaudio \
+              --index-url https://download.pytorch.org/whl/nightly/cu128 2>&1 | tee -a /workspace/pip_install.log || {
+                  log "   ⚠️ nightly cu128 install failed, falling back to generic wheels"
+                  "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                    torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+              }
         }
       fi
-        elif [[ "$cuda_tag" == "cpu" ]]; then
+    elif [[ "$cuda_tag" == "cu128" ]]; then
+      if [[ "$installed_torch_cuda" == 12.8* ]] || [[ "$installed_torch_cuda" == 13* ]]; then
+         log "   ✅ Installed PyTorch already supports CUDA 12.8+; skipping reinstall"
+      else
+         log "   📥 Ensuring PyTorch supports cu128 (RTX 50-series); attempting nightly cu128"
+         "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+           --force-reinstall --upgrade --pre torch torchvision torchaudio \
+           --index-url https://download.pytorch.org/whl/nightly/cu128 2>&1 | tee -a /workspace/pip_install.log || {
+             log "   ⚠️ nightly cu128 install failed, falling back to generic wheels"
+             "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
+                torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
+           }
+      fi
+    elif [[ "$cuda_tag" == "cpu" ]]; then
       log "   ⚠️ Ensuring CPU-only PyTorch is installed"
       "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 300 \
           torch torchvision torchaudio 2>&1 | tee -a /workspace/pip_install.log || true
@@ -1403,11 +1456,20 @@ install_nodes() {
     }
 
     # Optional: install segment_anything if Impact-Pack is present to avoid import error
+    # Optional: install segment_anything if Impact-Pack is present
+    # This is critical for Impact Pack to work
     if [[ -d "${COMFYUI_DIR}/custom_nodes/ComfyUI-Impact-Pack" ]]; then
-        log "   📦 Installing optional Impact-Pack dependency 'segment_anything'..."
-        "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 segment_anything 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
-            log "   ⚠️  segment_anything install failed (continuing)"
-        }
+        log "   📦 Installing 'segment_anything' for Impact Pack..."
+        # Try pip install package first
+        if "$VENV_PYTHON" -m pip install --no-cache-dir --retries 5 --timeout 120 segment-anything 2>&1 | grep -v "WARNING: Running pip as the 'root' user"; then
+             log "   ✅ segment-anything installed via pip"
+        else
+             log "   ⚠️  pip install segment-anything failed, trying git install..."
+             # Fallback to direct git install
+             "$VENV_PYTHON" -m pip install --no-cache-dir git+https://github.com/facebookresearch/segment-anything.git 2>&1 | grep -v "WARNING: Running pip as the 'root' user" || {
+                 log "   ❌ segment_anything install failed (Impact Pack may fail to load)"
+             }
+        fi
     fi
 
     log "✅ Custom nodes installation complete"

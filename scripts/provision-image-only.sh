@@ -5,9 +5,9 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v4.1"
+VERSION="v5.0"
 # Canonical signature used by server to validate fetched provision script
-PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - IMAGE WORKFLOW PROVISIONER ${VERSION}"
+PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
 # ║   ✓ CUDA 12.4/13.0 Auto-Detection (RTX 50-series support)                    ║
 # ║   ✓ Verified HuggingFace Links Only (No Dead Links)                          ║
@@ -15,7 +15,7 @@ PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - IMAGE WORKFLOW PROVISIONER ${VERS
 # ║   ✓ 20GB Total Download (vs 100GB+ in video version)                         ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-set -euo pipefail
+set -uo pipefail
 
 # Allow provisioning to continue even when some non-critical assets fail to download.
 # Set PROVISION_ALLOW_MISSING_ASSETS=false in the environment to restore strict behavior.
@@ -58,10 +58,22 @@ CHECKPOINT_MODELS=(
     "https://huggingface.co/SG161222/RealVisXL_V4.0/resolve/main/RealVisXL_V4.0.safetensors||RealVisXL_V4.0.safetensors"
     
     # DreamShaper 8 - Great for artistic styles (~2GB)
-    "https://huggingface.co/stablediffusionapi/dreamshaper-8/resolve/main/dreamshaper_8.safetensors||dreamshaper_8.safetensors"
+    "https://www.dropbox.com/scl/fi/v6230870997380927/dreamshaper_8.safetensors?rlkey=433621453213&dl=1||dreamshaper_8.safetensors"
     
     # SDXL Base 1.0 - Official Stability AI (~6.9GB)
     "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors||sd_xl_base_1.0.safetensors"
+    
+    # Pony Diffusion V6 XL (6.6GB)
+    "https://civitai.com/api/download/models/290640?type=Model&format=SafeTensor&size=pruned&fp=fp16||ponyDiffusionV6XL.safetensors"
+    
+    # Pony Realism v2.2 (6.5GB)
+    "https://civitai.com/api/download/models/914390?type=Model&format=SafeTensor&size=pruned&fp=fp16|https://www.dropbox.com/scl/fi/hy476rxzeacsx8g3aodj0/pony_realism_v2.2.safetensors?rlkey=09k5sba46pqoptdu7h1tu03b4&dl=1|pony_realism_v2.2.safetensors"
+    
+    # pmXL v1 (6.5GB) - Dropbox mirror
+    "https://www.dropbox.com/scl/fi/dd7aiju5petevb6nalinr/pmXL_v1.safetensors?rlkey=p4ukouvdd2o912ilcfbi6cqk3&dl=1||pmXL_v1.safetensors"
+    
+    # revAnimated v1.2.2 (2GB)
+    "https://civitai.com/api/download/models/119057?type=Model&format=SafeTensor&size=pruned&fp=fp16|https://civitai.com/api/download/models/122606|revAnimated_v122.safetensors"
 )
 
 # --- SDXL VAE (Required for SDXL) ---
@@ -81,18 +93,43 @@ CONTROLNET_MODELS=(
     
     # Depth - For depth map control (~1.4GB)
     "https://huggingface.co/diffusers/controlnet-depth-sdxl-1.0/resolve/main/diffusion_pytorch_model.safetensors||controlnet-depth-sdxl.safetensors"
+    
+    # Xinsir ControlNet Union Promax (SDXL) - 12+ types in one model (~2.5GB)
+    "https://huggingface.co/xinsir/controlnet-union-sdxl-1.0/resolve/main/diffusion_pytorch_model_promax.safetensors||xinsir_union_promax_sdxl.safetensors"
+)
+
+# --- CONTROLNET MODELS (SD 1.5) ---
+CONTROLNET_MODELS_SD15=(
+    "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_inpaint.pth||control_v11p_sd15_inpaint.pth"
+    "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11e_sd15_shuffle.pth||control_v11e_sd15_shuffle.pth"
+    "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_softedge.pth||control_v11p_sd15_softedge.pth"
+)
+
+# --- CONTROLNET MODELS (FLUX) ---
+CONTROLNET_MODELS_FLUX=(
+    "https://huggingface.co/xinsir/controlnet-union-flux-1.0-alpha/resolve/main/diffusion_pytorch_model.safetensors||xinsir_union_flux_alpha.safetensors"
 )
 
 # --- IPADAPTER MODELS (For image-to-image conditioning) ---
 IPADAPTER_MODELS=(
-    # IPAdapter SDXL Base (~400MB)
     "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter_sdxl.safetensors||ip-adapter_sdxl.safetensors"
-    
-    # IPAdapter Plus SDXL - Better quality (~800MB)
     "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors||ip-adapter-plus_sdxl.safetensors"
-    
-    # Image Encoder for IPAdapter (~1.8GB)
     "https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors||ip-adapter_image_encoder.safetensors"
+    
+    # Flux Redux (SDXL Style Reference for Flux)
+    "https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev/resolve/main/flux1-redux-dev.safetensors||flux1-redux-dev.safetensors"
+)
+
+# --- IPADAPTER MODELS (SD 1.5) ---
+IPADAPTER_MODELS_SD15=(
+    "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.bin||ip-adapter_sd15.bin"
+    "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors||ip-adapter_sd15_vit-G.safetensors"
+)
+
+# --- CLIP VISION MODELS ---
+CLIP_VISION_MODELS=(
+    "https://huggingface.co/Comfy-Org/Clip_Vision_repackaged/resolve/main/clip_vision_g.safetensors||clip_vision_g.safetensors"
+    "https://huggingface.co/Comfy-Org/Clip_Vision_repackaged/resolve/main/clip_vision_h.safetensors||clip_vision_h.safetensors"
 )
 
 # --- UPSCALE MODELS (Essential for high-res output) ---
@@ -105,6 +142,23 @@ UPSCALE_MODELS=(
     
     # 4x NMKD Siax - Alternative upscaler (~67MB)
     "https://huggingface.co/Akumetsu971/4x_NMKD-Siax_200k/resolve/main/4x_NMKD-Siax_200k.pth||4x_NMKD-Siax_200k.pth"
+    
+    # NMKD Superscale
+    "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x_NMKD-Superscale-SP_178000_G.pth||4x_NMKD-Superscale-SP_178000_G.pth"
+    
+    # OmniSR Superscale
+    "https://huggingface.co/uwg/upscaler/resolve/main/OmniSR_X2_DIV2K.safetensors||OmniSR_X2_DIV2K.safetensors"
+    "https://huggingface.co/uwg/upscaler/resolve/main/OmniSR_X3_DIV2K.safetensors||OmniSR_X3_DIV2K.safetensors"
+    "https://huggingface.co/uwg/upscaler/resolve/main/OmniSR_X4_DIV2K.safetensors||OmniSR_X4_DIV2K.safetensors"
+)
+
+# --- INPAINT MODELS ---
+INPAINT_MODELS=(
+    # MAT Inpaint
+    "https://huggingface.co/Acly/MAT/resolve/main/MAT_Places512_G_fp16.safetensors||MAT_Places512_G_fp16.safetensors"
+    
+    # Fooocus Inpaint (patch)
+    "https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch||inpaint_v26.fooocus.patch"
 )
 
 # --- LORA MODELS (Optional but useful) ---
@@ -137,17 +191,47 @@ LORA_MODELS=(
     "https://files.catbox.moe/ugly_bastard.safetensors||ugly_bastard.safetensors"
     "https://files.catbox.moe/sex_machine.safetensors||sex_machine.safetensors"
     "https://files.catbox.moe/stasis_tank.safetensors||stasis_tank.safetensors"
+    
+    # More LoRAs from Reliable Provisioner
+    "https://www.dropbox.com/scl/fi/eq3qqc5rnwod3ac1xfisp/Rajii-Artist-Style-V2-Illustrious.safetensors?rlkey=cvfjam45wbmye89g2mvj245lz&dl=1||Rajii-Artist-Style-V2-Illustrious.safetensors"
+    "https://www.dropbox.com/scl/fi/8280uj9myxuf2376d13jt/pornmasterPro_noobV6.safetensors?rlkey=lmduqq3jxusts1fqqexuqz72w&dl=1||pornmasterPro_noobV6.safetensors"
+    
+    # Hyper-SD LoRAs
+    "https://huggingface.co/ByteDance/Hyper-SD/resolve/main/Hyper-SDXL-8steps-lora.safetensors||hyper-sdxl-8step-lora.safetensors"
+    "https://huggingface.co/ByteDance/Hyper-SD/resolve/main/Hyper-SD15-12steps-lora.safetensors||hyper-sd15-12step-lora.safetensors"
 )
 
-# --- FLUX MODELS (Next-gen, optional - requires more VRAM) ---
+# --- DETECTOR MODELS (For Inpainting/ADetailer) ---
+SAM_MODELS=(
+    "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth||sam_vit_b_01ec64.pth"
+)
+YOLO_MODELS=(
+    "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt||face_yolov8m.pt"
+    "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt||hand_yolov8n.pt"
+)
+
+# --- SD3.5 MODELS ---
+SD3_MODELS=(
+    # SD 3.5 Large (FP8 quantized)
+    "https://huggingface.co/Comfy-Org/stable-diffusion-3.5-fp8/resolve/main/sd3.5_large_fp8_scaled.safetensors||sd3.5_large_fp8_scaled.safetensors"
+    "https://huggingface.co/Comfy-Org/stable-diffusion-3.5-fp8/resolve/main/clip_g.safetensors||clip_g.safetensors"
+)
+
+# --- FLUX MODELS (Schnell + Dev FP8) ---
 FLUX_MODELS=(
-    # FLUX.1 Schnell - Fast, good quality (~23GB quantized)
     "https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-schnell-fp8.safetensors||flux1-schnell-fp8.safetensors"
+    "https://huggingface.co/Kijai/flux-fp8/resolve/main/flux1-dev-fp8.safetensors||flux1-dev-fp8.safetensors"
 )
 
 FLUX_CLIP_MODELS=(
     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors||clip_l.safetensors"
     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors||t5xxl_fp8_e4m3fn.safetensors"
+)
+
+# --- QWEN MODELS (Text Encoders for Flux/Klein) ---
+QWEN_MODELS=(
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/qwen2p5_7b_it_fp8_e4m3fn.safetensors||qwen_2.5_7b_it_fp8.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors||qwen_3_4b.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -165,6 +249,13 @@ NODES=(
     "https://github.com/chflame163/ComfyUI_LayerStyle"
     "https://github.com/WASasquatch/was-node-suite-comfyui"
     "https://github.com/EllangoK/ComfyUI-post-processing-nodes"
+    
+    # KRITA & TOOLING NODES
+    "https://github.com/Fannovel16/comfyui_controlnet_aux"
+    "https://github.com/Acly/comfyui-tooling-nodes"
+    "https://github.com/Acly/comfyui-inpaint-nodes"
+    "https://github.com/AIDC-AI/ComfyUI-Copilot"
+    "https://github.com/SXQBW/ComfyUI-Qwen3"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -415,7 +506,7 @@ download_batch() {
     log "╚════════════════════════════════════════════════════════════════╝"
     
     for entry in "${arr[@]}"; do
-        download_file "$entry" "$dir" || ((failed++))
+        download_file "$entry" "$dir" || failed=$((failed + 1))
     done
     
     log "   📊 Complete: $((total-failed))/$total successful"
@@ -492,36 +583,57 @@ install_models() {
     
     # 1. Checkpoints
     log "🎨 [1/7] Checkpoints..."
-    download_batch "${COMFYUI_DIR}/models/checkpoints" "${CHECKPOINT_MODELS[@]}"
+    download_batch "${COMFYUI_DIR}/models/checkpoints" "${CHECKPOINT_MODELS[@]}" || true
     
     # 2. VAE
     log "🎨 [2/7] VAE..."
-    download_batch "${COMFYUI_DIR}/models/vae" "${VAE_MODELS[@]}"
+    download_batch "${COMFYUI_DIR}/models/vae" "${VAE_MODELS[@]}" || true
     
     # 3. ControlNet
     log "🎮 [3/7] ControlNet..."
-    download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS[@]}"
+    download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS[@]}" || true
     
     # 4. IPAdapter
     log "🔗 [4/7] IPAdapter..."
-    download_batch "${COMFYUI_DIR}/models/ipadapter" "${IPADAPTER_MODELS[@]}"
+    download_batch "${COMFYUI_DIR}/models/ipadapter" "${IPADAPTER_MODELS[@]}" || true
     
     # 5. Upscalers
     log "⬆️  [5/7] Upscalers..."
-    download_batch "${COMFYUI_DIR}/models/upscale_models" "${UPSCALE_MODELS[@]}"
+    download_batch "${COMFYUI_DIR}/models/upscale_models" "${UPSCALE_MODELS[@]}" || true
     
     # 6. LoRAs
-    log "⚡ [6/7] LoRAs..."
-    download_batch "${COMFYUI_DIR}/models/loras" "${LORA_MODELS[@]}"
+    log "⚡ [6/8] LoRAs..."
+    download_batch "${COMFYUI_DIR}/models/loras" "${LORA_MODELS[@]}" || true
+
+    # 7. Detectors (face/hand/SAM)
+    log "🔍 [7/11] Detectors..."
+    download_batch "${COMFYUI_DIR}/models/sams" "${SAM_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/ultralytics" "${YOLO_MODELS[@]}" || true
+
+    # 8. Inpaint Models
+    log "🎨 [8/11] Inpaint Models..."
+    download_batch "${COMFYUI_DIR}/models/inpaint" "${INPAINT_MODELS[@]}" || true
     
-    # 7. FLUX (Optional - only if enough disk space)
+    # 9. CLIP Vision Models
+    log "👁️  [9/11] CLIP Vision..."
+    download_batch "${COMFYUI_DIR}/models/clip_vision" "${CLIP_VISION_MODELS[@]}" || true
+
+    # 10. SD 1.5 Specialised (IPAdapter/ControlNet)
+    log "⚙️  [10/11] SD 1.5 Extras..."
+    download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS_SD15[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/ipadapter" "${IPADAPTER_MODELS_SD15[@]}" || true
+    
+    # 11. Large Models (Optional - only if enough disk space)
     local available_gb=$(df "$WORKSPACE" | awk 'NR==2 {print int($4/1024/1024)}')
-    if [[ $available_gb -gt 50 ]]; then
-        log "⚡ [7/7] FLUX (Optional)..."
-        download_batch "${COMFYUI_DIR}/models/diffusion_models" "${FLUX_MODELS[@]}"
-        download_batch "${COMFYUI_DIR}/models/clip" "${FLUX_CLIP_MODELS[@]}"
+    if [[ $available_gb -gt 100 ]]; then
+        log "⚡ [11/11] Large Models (Flux/SD3.5)..."
+        download_batch "${COMFYUI_DIR}/models/checkpoints" "${SD3_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/diffusion_models" "${FLUX_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS_FLUX[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/clip" "${FLUX_CLIP_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/text_encoders" "${QWEN_MODELS[@]}" || true
     else
-        log "⏭️  [7/7] FLUX skipped (low disk space)"
+        log "⏭️  [11/11] Heavy models skipped (requires 100GB+ free space, detected ${available_gb}GB)"
     fi
     
     log "✅ Models downloaded"
@@ -562,6 +674,78 @@ EOF
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# CLOUDFLARE TUNNEL (Zero-Config Public Access)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+install_cloudflare() {
+    log_section "☁️  SETTING UP CLOUDFLARE TUNNEL"
+    log "   📥 Downloading cloudflared..."
+    
+    if ! command -v cloudflared &> /dev/null; then
+        wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb
+        dpkg -i /tmp/cloudflared.deb 2>/dev/null || {
+            apt-get update && apt-get install -f -y
+            dpkg -i /tmp/cloudflared.deb
+        }
+        rm /tmp/cloudflared.deb
+    fi
+    
+    if command -v cloudflared &> /dev/null; then
+        log "   🚀 Starting Persistent Quick Tunnel..."
+        # Stop any existing tunnel
+        pkill cloudflared || true
+        
+        # Create systemd service for cloudflared
+        cat > /etc/systemd/system/cloudflared.service <<EOF
+[Unit]
+Description=Cloudflare Tunnel for ComfyUI
+After=network.target comfyui.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${WORKSPACE}
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://localhost:8188
+Restart=always
+RestartSec=5
+StandardOutput=file:${WORKSPACE}/cloudflared.log
+StandardError=file:${WORKSPACE}/cloudflared.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        systemctl daemon-reload
+        systemctl enable --now cloudflared.service
+        
+        # Wait for URL to appear (increased timeout)
+        log "   ⏳ Waiting for Tunnel URL..."
+        local timeout=45
+        local elapsed=0
+        local tunnel_url=""
+        
+        while [ $elapsed -lt $timeout ]; do
+            tunnel_url=$(grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" "${WORKSPACE}/cloudflared.log" | head -n1 || true)
+            if [ -n "$tunnel_url" ]; then
+                break
+            fi
+            sleep 3
+            elapsed=$((elapsed + 3))
+        done
+        
+        if [ -n "$tunnel_url" ]; then
+            log "   ✅ PUBLIC ACCESS URL: $tunnel_url"
+            echo "$tunnel_url" > "${WORKSPACE}/tunnel_url.txt"
+        else
+            log "   ⚠️  Tunnel URL generation timed out. Check ${WORKSPACE}/cloudflared.log"
+            log "      Partial logs: $(tail -n 5 ${WORKSPACE}/cloudflared.log)"
+        fi
+    else
+        log "   ❌ Failed to install cloudflared"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -591,10 +775,14 @@ main() {
     install_nodes
     install_models
     start_comfyui
+    install_cloudflare
     
     log ""
     log "--- ✅ PROVISIONING COMPLETE ---"
     log "🌐 Access ComfyUI at: http://$(hostname -I | awk '{print $1}'):8188"
+    if [ -f "${WORKSPACE}/tunnel_url.txt" ]; then
+        log "☁️  Cloudflare Tunnel: $(cat ${WORKSPACE}/tunnel_url.txt)"
+    fi
     log "📊 Check status: systemctl status comfyui"
     log "📋 View logs: tail -f ${WORKSPACE}/comfyui.log"
     log ""

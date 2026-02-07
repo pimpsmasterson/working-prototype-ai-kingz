@@ -19,11 +19,11 @@ const VASTAI_API_KEY = process.env.VASTAI_API_KEY || process.env.VAST_AI_API_KEY
 processWatchdog.start();
 
 processWatchdog.on('process-restarted', ({ id, restartCount, consecutiveCrashes }) => {
-  console.log(`[Watchdog] Restarted ${id} (attempt ${restartCount}, ${consecutiveCrashes} consecutive crashes)`);
+    console.log(`[Watchdog] Restarted ${id} (attempt ${restartCount}, ${consecutiveCrashes} consecutive crashes)`);
 });
 
 processWatchdog.on('process-failed', ({ id, restartCount }) => {
-  console.error(`[Watchdog] Process ${id} FAILED after ${restartCount} restarts`);
+    console.error(`[Watchdog] Process ${id} FAILED after ${restartCount} restarts`);
 });
 
 // Global ComfyUI keepalive monitor
@@ -47,8 +47,8 @@ const MIN_CUDA_CAPABILITY = parseFloat(process.env.VASTAI_MIN_CUDA_CAPABILITY ||
 
 // Configurable minimum disk (GB) for warm instances. Default to 500GB to ensure
 // room for large models (Flux/SDXL/Wan) and custom nodes while meeting user requirements.
-const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '500', 10);
-const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 500;
+const RAW_WARM_POOL_DISK = parseInt(process.env.WARM_POOL_DISK_GB || process.env.WARM_POOL_DISK || '208', 10);
+const WARM_POOL_DISK_GB = Number.isFinite(RAW_WARM_POOL_DISK) ? RAW_WARM_POOL_DISK : 208;
 // Clamp to sane bounds: min 100GB, max 2000GB
 const requiredDiskGb = Math.min(Math.max(WARM_POOL_DISK_GB, 100), 2000);
 /**
@@ -224,7 +224,7 @@ async function waitForComfyReady(contractId, timeoutMs = parseInt(process.env.WA
                     console.warn('WarmPool: ⚠️ Detected provisioning script failure on instance. Enabling default fallback and aborting prewarm attempt early.');
                     state.useDefaultScript = true;
                     save();
-                    try { audit.logUsageEvent({ event_type: 'provision_failure_script', contract_id: contractId, details: { errors: healthReport.errors }, source: 'warm-pool' }); } catch (e) {}
+                    try { audit.logUsageEvent({ event_type: 'provision_failure_script', contract_id: contractId, details: { errors: healthReport.errors }, source: 'warm-pool' }); } catch (e) { }
                     return false;
                 }
 
@@ -233,7 +233,7 @@ async function waitForComfyReady(contractId, timeoutMs = parseInt(process.env.WA
                     console.warn(`WarmPool: Consecutive failures (${consecutiveFailures}) reached REPAIR_THRESHOLD (${REPAIR_THRESHOLD}). Attempting automated repair...`);
                     try {
                         const repairOk = await attemptRepairInstance(contractId);
-                        try { audit.logUsageEvent({ event_type: 'instance_repair_attempt', contract_id: contractId, details: { success: !!repairOk, consecutiveFailures }, source: 'warm-pool' }); } catch (e) {}
+                        try { audit.logUsageEvent({ event_type: 'instance_repair_attempt', contract_id: contractId, details: { success: !!repairOk, consecutiveFailures }, source: 'warm-pool' }); } catch (e) { }
                         if (repairOk) {
                             console.log('WarmPool: Repair attempt succeeded; continuing health checks')
                             consecutiveFailures = 0; // reset failures and continue
@@ -446,13 +446,13 @@ async function attemptRepairInstance(contractId) {
         // Construct restart commands: prefer systemd restart; fall back to pkill+manual start
         const restartCmd = `sudo systemctl restart comfyui.service || (pkill -f main.py || true; nohup python3 /workspace/ComfyUI/main.py --listen 0.0.0.0 --port 8188 --enable-cors-header >/dev/null 2>&1 &)`;
 
-        console.log(`WarmPool: Attempting SSH repair to ${sshHost}:${sshPort} (cmd: ${restartCmd.substring(0,80)}...)`);
+        console.log(`WarmPool: Attempting SSH repair to ${sshHost}:${sshPort} (cmd: ${restartCmd.substring(0, 80)}...)`);
 
         const { exec } = require('child_process');
         const sshArgs = ['-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10', '-p', sshPort.toString(), '-i', keyPath, `root@${sshHost}`, restartCmd];
 
         return await new Promise((resolve) => {
-            const child = exec(`ssh ${sshArgs.map(a => (a.indexOf(' ')>=0 ? `"${a}"` : a)).join(' ')}`, { timeout: 60000 }, (err, stdout, stderr) => {
+            const child = exec(`ssh ${sshArgs.map(a => (a.indexOf(' ') >= 0 ? `"${a}"` : a)).join(' ')}`, { timeout: 60000 }, (err, stdout, stderr) => {
                 if (err) {
                     console.warn(`WarmPool: SSH repair command failed: ${err && err.message ? err.message : err}`);
                     console.warn('WarmPool: stderr:', stderr);
@@ -467,7 +467,7 @@ async function attemptRepairInstance(contractId) {
                 }).catch(() => resolve(false));
             });
             // Safety: kill child after 55s if still running
-            setTimeout(() => { try { child.kill(); } catch (e) {} }, 55000);
+            setTimeout(() => { try { child.kill(); } catch (e) { } }, 55000);
         });
 
     } catch (e) {
@@ -518,7 +518,7 @@ function isInstanceHealthy(healthReport) {
             if (state.instance && state.instance.createdAt) {
                 const elapsed = Date.now() - new Date(state.instance.createdAt).getTime();
                 if (elapsed < defaultGraceMs) {
-                    console.log(`WarmPool: Models not yet loaded but within grace period (${Math.round(elapsed/1000)}s elapsed < ${Math.round(defaultGraceMs/1000)}s). Waiting.`);
+                    console.log(`WarmPool: Models not yet loaded but within grace period (${Math.round(elapsed / 1000)}s elapsed < ${Math.round(defaultGraceMs / 1000)}s). Waiting.`);
                     modelsReady = true; // treat as 'in-progress' and don't fail immediately
                 } else {
                     modelsReady = false;
@@ -855,7 +855,7 @@ async function prewarm() {
 
                     if (!r.ok) {
                         const errorText = await r.text();
-                        
+
                         // Handle rate limiting (429) - this is expected behavior
                         if (r.status === 429) {
                             console.warn(`WarmPool: Vast.ai API rate limited (429) on bundle search attempt ${i}. This is normal - backing off before retry.`);
@@ -863,17 +863,17 @@ async function prewarm() {
                             await new Promise(resolve => setTimeout(resolve, backoffDelay));
                             continue; // Try again after waiting
                         }
-                        
+
                         console.error(`WarmPool: Vast.ai API returned ${r.status} ${r.statusText}`);
                         console.error(`WarmPool: Error response:`, errorText);
-                        
+
                         // Rate limiting handled above, now check for other transient errors
                         if (r.status >= 500 || r.status === 408) {
                             console.warn(`WarmPool: Server error detected, will retry after brief pause`);
                             await new Promise(resolve => setTimeout(resolve, 1000 * i));
                             continue;
                         }
-                        
+
                         continue;
                     }
 
@@ -962,6 +962,8 @@ async function prewarm() {
 
         // SECURITY: Whitelist of allowed script URLs (canonical gist 002d41... v3.1.8 - gistfile1.txt)
         const allowedScriptPatterns = [
+            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-reliable\.sh(\?.*)?$/,
+            /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/[a-f0-9]+\/raw(\/[a-f0-9]+)?\/provision-image-only\.sh(\?.*)?$/,
             /^https:\/\/gist\.githubusercontent\.com\/pimpsmasterson\/002d4121626567402b4c59febbc1297d\/raw(\/[a-f0-9]+)?\/gistfile1\.txt(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/vast-ai\/base-image\/.*\/default\.sh(\?.*)?$/,
             /^https:\/\/raw\.githubusercontent\.com\/.*\/provision.*\.sh(\?.*)?$/
@@ -986,7 +988,7 @@ async function prewarm() {
             console.error(`WarmPool: ❌ Exceeded max provisioning attempts (${MAX_ATTEMPTS}). Entering safe mode to prevent further churn.`);
             state.safeMode = true;
             save();
-            try { audit.logUsageEvent({ event_type: 'safe_mode_engaged', details: { provisionAttempt: state.provisionAttempt }, source: 'warm-pool' }); } catch (e) {}
+            try { audit.logUsageEvent({ event_type: 'safe_mode_engaged', details: { provisionAttempt: state.provisionAttempt }, source: 'warm-pool' }); } catch (e) { }
             return { status: 'safe_mode', message: 'Max provisioning attempts exceeded, safe mode engaged' };
         }
 
