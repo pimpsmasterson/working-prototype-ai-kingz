@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.6"
+VERSION="v5.7"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -683,6 +683,23 @@ start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFYUI_DIR}"
     activate_venv
+    
+    # ========== PRE-FLIGHT DEPENDENCY CHECK ==========
+    # Custom nodes may have downgraded SQLAlchemy. Check and fix BEFORE starting.
+    log "   🔍 Pre-flight: Checking critical dependencies..."
+    
+    local sqlalchemy_ver=$("$VENV_PYTHON" -c "import sqlalchemy; print(sqlalchemy.__version__)" 2>/dev/null || echo "0.0.0")
+    local major_ver=$(echo "$sqlalchemy_ver" | cut -d. -f1)
+    
+    if [[ "$major_ver" -lt 2 ]]; then
+        log "   ⚠️  SQLAlchemy $sqlalchemy_ver is too old (need 2.0+). Fixing..."
+        "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING:" || true
+        sqlalchemy_ver=$("$VENV_PYTHON" -c "import sqlalchemy; print(sqlalchemy.__version__)" 2>/dev/null || echo "unknown")
+        log "   ✅ SQLAlchemy upgraded to $sqlalchemy_ver"
+    else
+        log "   ✅ SQLAlchemy $sqlalchemy_ver OK"
+    fi
+    # ================================================
     
     # Kill any existing ComfyUI process first
     if [[ -f "${WORKSPACE}/comfyui.pid" ]]; then
