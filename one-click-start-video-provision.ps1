@@ -242,7 +242,7 @@ Write-Host "  Selected: $($selectedOffer.GPU) ($($selectedOffer.ID)) at $($selec
 Write-Host "[3/6] Renting GPU..." -ForegroundColor Yellow
 # NOTE: Update this URL after pushing the v2.5 provisioner commit
 # Use commit-specific URL to bypass GitHub's 5-minute cache
-$provisionScriptUrl = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-video-only.sh"
+$provisionScriptUrl = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/55d4e05/scripts/provision-video-only.sh"
 
 $rentBody = @{
     image        = "vastai/comfy:v0.10.0-cuda-12.9-py312"
