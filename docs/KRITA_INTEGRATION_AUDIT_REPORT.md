@@ -54,7 +54,25 @@ We have updated the **Master Provisioning Script** to prevent these issues from 
 
 ---
 
-## 5. Next Steps for Automation
-*   [x] Push v6.1 with Model Size Verification.
+---
+
+## 5. Workflow Selection & Usage
+**How Krita knows which workflow to use:**
+1.  **Manual Selection:** Krita AI Diffusion does not "auto-guess" the workflow file from your disk. You must go to the **"Graph"** or **"Workflow"** tab in the Krita sidebar and click **"Import"** or select the file from the dropdown (if it's already in the server's `/workflows` folder).
+2.  **Architecture Match:** Once loaded, you must ensure the **"Architecture"** dropdown in the main Krita sidebar (where you select SDXL or Flux) matches the workflow you loaded. If you load an SDXL workflow but the sidebar says "Flux", Krita will send a 16-channel latent and the server will crash.
+
+---
+
+## 6. Dropbox Sync & Space Management
+**Keeping the server clean and light:**
+*   **Space Guards:** The provisioning script now checks for free disk space. If you have **less than 100GB**, the script will **skip** downloading massive models like Flux or SD3.5 to prevent the disk from filling up and corrupting your database.
+*   **Dropbox Fallbacks:** We have configured the script to use Dropbox mirrors for several large models. This ensures that even if primary mirrors (HuggingFace/Civitai) are slow or rate-limited, the server can still pull the "Gold Standard" assets.
+*   **Corruption Auto-Clean:** If a model download is interrupted (creating a small file), the script will now detect this, delete the corrupted file, and retry the download automatically.
+
+---
+
+## 7. Next Steps for Automation
+*   [x] Push v6.1 with Model Size Verification (Min 500MB for Checkpoints).
 *   [x] Push Verified ETN_ Workflows to Repo.
+*   [x] Fix VAE Name Mismatch (`sdxl_vae_fp16.safetensors`).
 *   [ ] (Optional) Add a "Self-Heal" button to the Admin UI to trigger v6.1 repatching on an existing instance.
