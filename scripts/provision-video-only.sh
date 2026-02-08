@@ -39,22 +39,30 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODEL DEFINITIONS - v3.0 VERIFIED LINKS
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODEL DEFINITIONS - v3.1 PRODUCTION (ALL VARIANTS)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Wan 2.1 - Must go to models/diffusion_models to work with WanVideoWrapper
+# Wan 2.1 T2V - fp16 (Best Quality) & fp8 (Speed/Low VRAM)
 WAN_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-14B_fp16.safetensors|https://modelscope.cn/models/Wan-AI/Wan2.1-T2V-14B/files/diffusion_pytorch_model.fp16.safetensors||wan2.1_t2v_14B_fp16.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-14B_fp8_e4m3fn.safetensors|||wan2.1_t2v_14B_fp8.safetensors"
 )
 
-# LTX-Video - Goes to models/checkpoints for standard loading
+# Wan 2.1 I2V - fp16 & fp8 (Added for completeness)
+WAN_I2V_MODELS=(
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp16.safetensors|||wan2.1_i2v_14B_fp16.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp8_e4m3fn.safetensors|||wan2.1_i2v_14B_fp8.safetensors"
+)
+
+# LTX-Video - v0.9.8 (Newest/Stable)
 LTX_MODELS=(
-    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.1.safetensors|||ltx-video-2b-v0.9.1.safetensors"
+    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Lightricks/LTX-Video-0.9.8-dev/resolve/main/ltx-video-2b-v0.9.8.safetensors||ltx-video-2b-v0.9.8.safetensors"
 )
 
 TEXT_ENCODERS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|https://huggingface.co/mcmonkey/google_t5-v1_1-xxl_encoderonly/resolve/main/model.safetensors||umt5_xxl_fp8_scaled.safetensors"
-    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors|https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/resolve/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-HF.safetensors||clip_l.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|||umt5_xxl_fp8_scaled.safetensors"
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors|||clip_l.safetensors"
 )
 
 CLIP_VISION=(
@@ -62,12 +70,12 @@ CLIP_VISION=(
 )
 
 LIGHTNING_LORAS=(
-    # Wan 2.1 Lightning LoRA (Pending official/verified link for T2V, keeping empty for safety based on logs)
+    "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/Wan21_T2V_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|||wan2.1_lightning_t2v.safetensors"
 )
 
 VAE_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2.1_VAE_bf16.safetensors||wan_vae.safetensors"
-    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors|https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/diffusion_pytorch_model.safetensors|||vae-ft-mse-840000-ema-pruned.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|||wan_vae.safetensors"
+    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors||||vae-ft-mse-840000-ema-pruned.safetensors"
 )
 
 UPSCALER_MODELS=(
@@ -447,6 +455,7 @@ install_models() {
     
     # Wan 2.1 -> diffusion_models (CRITICAL FIX)
     download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN_I2V_MODELS[@]}"
     
     # LTX-Video -> checkpoints (Standard)
     download_batch "${COMFY_DIR}/models/checkpoints" "1000000000" "${LTX_MODELS[@]}"
