@@ -8,12 +8,12 @@
 # ║   ✓ Downloads: Added PROVISION_ALLOW_MISSING_ASSETS check                    ║
 # ║   ✓ PyTorch: Stable 2.6.0+cu124                                              ║
 # ║   ✓ Node deps: Fixed find -exec syntax                                       ║
-# ║   v2.8 FIXES:                                                                ║
-# ║   ✓ Missing Models: Fixed 404s for Clip Vision, LTX Upscaler, Lotus Depth    ║
-# ║   ✓ Wan Lightning: Removed unverified LoRA for now                           ║
+# ║   v2.9 FIXES:                                                                ║
+# ║   ✓ Unified Fix: Merged all repair logic into main script                    ║
+# ║   ✓ Missing Models: Added force-download checks for CLIP/VAE/Upscalers       ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.8"
+VERSION="v2.9"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
