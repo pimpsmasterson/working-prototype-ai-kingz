@@ -1,0 +1,121 @@
+{
+    "1": {
+        "inputs": {
+            "ckpt_name": "flux1-schnell-fp8.safetensors"
+        },
+        "class_type": "CheckpointLoaderSimple",
+        "_meta": {
+            "title": "Checkpoint: Flux Schnell"
+        }
+    },
+    "2": {
+        "inputs": {
+            "image": "krita_canvas_input.png",
+            "upload": "image"
+        },
+        "class_type": "KritaInput",
+        "_meta": {
+            "title": "Krita Input"
+        }
+    },
+    "3": {
+        "inputs": {
+            "pixels": [
+                "2",
+                0
+            ],
+            "vae": [
+                "1",
+                2
+            ]
+        },
+        "class_type": "VAEEncode",
+        "_meta": {
+            "title": "VAE Encode"
+        }
+    },
+    "4": {
+        "inputs": {
+            "text": "masterpiece, 1girl, realistic portrait, detailed skin, soft lighting",
+            "clip": [
+                "1",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Prompt"
+        }
+    },
+    "5": {
+        "inputs": {
+            "text": "blurry, low quality, bad anatomy, text, signature",
+            "clip": [
+                "1",
+                1
+            ]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+            "title": "Negative Prompt"
+        }
+    },
+    "6": {
+        "inputs": {
+            "seed": 4242,
+            "steps": 4,
+            "cfg": 1.0,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 0.6,
+            "model": [
+                "1",
+                0
+            ],
+            "positive": [
+                "4",
+                0
+            ],
+            "negative": [
+                "5",
+                0
+            ],
+            "latent_image": [
+                "3",
+                0
+            ]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+            "title": "Flux Sampler"
+        }
+    },
+    "7": {
+        "inputs": {
+            "samples": [
+                "6",
+                0
+            ],
+            "vae": [
+                "1",
+                2
+            ]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+            "title": "VAE Decode"
+        }
+    },
+    "8": {
+        "inputs": {
+            "image": [
+                "7",
+                0
+            ]
+        },
+        "class_type": "KritaOutput",
+        "_meta": {
+            "title": "Krita Output"
+        }
+    }
+}

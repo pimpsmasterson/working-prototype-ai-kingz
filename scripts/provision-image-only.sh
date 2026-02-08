@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.8"
+VERSION="v5.9"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -239,7 +239,8 @@ QWEN_MODELS=(
 WORKFLOWS=(
     "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/fetish_master_pony_xl.json||fetish_master_pony_xl.json"
     "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/nasty_refiner_inpaint.json||nasty_refiner_inpaint.json"
-    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/krita_universal_furry_workflow.json||krita_universal_furry_workflow.json"
+    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/krita_gold_standard_sdxl.json||krita_gold_standard_sdxl.json"
+    "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/workflows/krita_gold_standard_flux.json||krita_gold_standard_flux.json"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
