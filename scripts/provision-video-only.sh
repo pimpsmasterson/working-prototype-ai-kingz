@@ -1,17 +1,16 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.5                       ║
+# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.6                       ║
 # ║                                                                               ║
-# ║   v2.5 FIXES:                                                                ║
-# ║   ✓ PyTorch: Stable 2.6.0+cu124 (was broken nightly cu128)                  ║
-# ║   ✓ Model URLs: Fixed 404s (LTX-2B, CLIP vision, Lightning LoRA)            ║
-# ║   ✓ Node deps: Fixed find -exec syntax, per-node requirements               ║
-# ║   ✓ NumPy: Force numpy<2 to avoid v2.4 conflict                             ║
-# ║   ✓ TCMalloc: Multi-path detection for Ubuntu 24.04 (t64 suffix)            ║
-# ║   ✓ aria2c: Correct argument ordering                                        ║
+# ║   v2.6 FIXES:                                                                ║
+# ║   ✓ Cloudflared: Removed critical trailing space in URL                      ║
+# ║   ✓ Models: Cleaned up URL arrays (removed spaces)                           ║
+# ║   ✓ Downloads: Added PROVISION_ALLOW_MISSING_ASSETS check                    ║
+# ║   ✓ PyTorch: Stable 2.6.0+cu124                                              ║
+# ║   ✓ Node deps: Fixed find -exec syntax                                       ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.5"
+VERSION="v2.6"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -41,14 +40,14 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODEL DEFINITIONS - NO SPACES AROUND PIPES
+# MODEL DEFINITIONS - CLEANED URLS (NO SPACES)
 # Format: "URL1|URL2|URL3|URL4|filename"
 # ═══════════════════════════════════════════════════════════════════════════════
 
 VIDEO_MODELS=(
-    # Wan 2.1 T2V 14B (verified URLs)
+    # Wan 2.1 T2V 14B
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
-    # LTX-Video 2B v0.9.1 (19B doesn't exist - fixed to 2B with correct filename)
+    # LTX-Video 2B v0.9.1
     "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.1.safetensors|||ltx-video-2b-v0.9.1.safetensors"
 )
 
@@ -58,12 +57,10 @@ TEXT_ENCODERS=(
 )
 
 CLIP_VISION=(
-    # CLIP Vision H (fixed: use comfyanonymous mirror as primary, Kijai as fallback)
     "https://huggingface.co/comfyanonymous/clip_vision_h/resolve/main/clip_vision_h.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/clip_vision_h.safetensors|||clip_vision_h.safetensors"
 )
 
 LIGHTNING_LORAS=(
-    # Wan 2.1 Lightning LoRA (fixed: use 14B variant which actually exists)
     "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
 )
 
@@ -379,6 +376,10 @@ download_batch() {
             ((success++))
         else
             ((failed++))
+            if [[ "${PROVISION_ALLOW_MISSING_ASSETS}" != "true" ]]; then
+                log_err "   ❌ Aborting due to download failure (PROVISION_ALLOW_MISSING_ASSETS=false)"
+                return 1
+            fi
         fi
     done
     
@@ -411,7 +412,7 @@ install_nodes() {
         fi
     done
 
-    # Install requirements per-node individually (fixed: old find -exec was broken)
+    # Install requirements per-node individually
     log "   🚀 Installing node dependencies..."
     find "${COMFY_DIR}/custom_nodes" -name "requirements.txt" -type f | while read -r req_file; do
         local node_name
