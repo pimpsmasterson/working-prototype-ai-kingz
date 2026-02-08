@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v6.2"
+VERSION="v6.3"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -328,7 +328,7 @@ install_apt_packages() {
     local packages=(
         "aria2" "wget" "curl" "git" "git-lfs" "ffmpeg" "libgl1"
         "python3-pip" "python3-venv" "build-essential"
-        "libjpeg-dev" "libpng-dev" "libtiff-dev"
+        "libjpeg-dev" "libpng-dev" "libtiff-dev" "libtcmalloc-minimal4"
     )
     
     apt-get update -qq
@@ -346,6 +346,37 @@ install_apt_packages() {
     fi
     
     log "✅ System packages ready"
+}
+setup_swap() {
+    log_section "🧠 CONFIGURE SWAP (OOM Protection)"
+    
+    # Check if swap already active
+    if swapon --show | grep -q "/workspace/swapfile"; then
+        log "   ✅ Swap already active at /workspace/swapfile"
+        return 0
+    fi
+    
+    local total_ram=$(free -g | awk '/^Mem:/{print $2}')
+    log "   📋 Total System RAM: ${total_ram}GB"
+    
+    if [[ $total_ram -lt 32 ]]; then
+        log "   ⚠️  Low RAM detected (<32GB). Creating 16GB swapfile on /workspace..."
+        
+        # Ensure we are not already using a swapfile elsewhere
+        swapoff -a 2>/dev/null || true
+        
+        if head -c 100 /dev/zero > /workspace/swapfile 2>/dev/null; then
+            fallocate -l 16G /workspace/swapfile || dd if=/dev/zero of=/workspace/swapfile bs=1M count=16384
+            chmod 600 /workspace/swapfile
+            mkswap /workspace/swapfile
+            swapon /workspace/swapfile
+            log "   ✅ 16GB Swap activated"
+        else
+            log "   ❌ Failed to create swapfile (insufficient space or permission)"
+        fi
+    else
+        log "   ✅ RAM ($total_ram GB) is sufficient, skipping swap"
+    fi
 }
 
 activate_venv() {
@@ -427,6 +458,8 @@ install_dependencies() {
         "insightface>=0.7.3"
         "onnxruntime-gpu>=1.16.0"
         "sqlalchemy>=2.0.0"
+        "aiohttp>=3.9.0"
+        "typing-extensions>=4.8.0"
     )
     
     for dep in "${deps[@]}"; do
@@ -613,12 +646,13 @@ install_nodes() {
     # Install Impact-Pack deps
     "$VENV_PYTHON" -m pip install --no-cache-dir piexif ultralytics segment_anything 2>&1 | grep -v "WARNING:" || true
     
-    # CRITICAL: Re-upgrade SQLAlchemy after all node requirements
-    # Some nodes may have pinned an old version that breaks ComfyUI
     log "   🔗 Ensuring SQLAlchemy 2.0+ after node installations..."
     "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING:" || true
     
-    log "✅ Nodes installed"
+    # Cleanup to save disk space
+    "$VENV_PYTHON" -m pip cache purge >/dev/null 2>&1 || true
+    
+    log "✅ Nodes installed & disk space reclaimed"
 }
 
 sync_workflows() {
@@ -752,6 +786,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=${COMFYUI_DIR}
+Environment=LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
 ExecStart=${VENV_PYTHON} main.py --listen 0.0.0.0 --port 8188 --enable-cors-header --preview-method auto
 Restart=always
 RestartSec=10
@@ -771,7 +806,8 @@ EOF
     fi
     
     if [[ "$comfy_started" != "true" ]]; then
-        log "   🔧 Starting ComfyUI in background..."
+        log "   🔧 Starting ComfyUI in background (with TCMalloc)..."
+        export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
         setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
         echo "$!" > "${WORKSPACE}/comfyui.pid"
         log "   📝 ComfyUI PID: $(cat ${WORKSPACE}/comfyui.pid)"
@@ -1022,6 +1058,11 @@ start_cloudflare_tunnel() {
 main() {
     log "--- Image Workflow Provisioner ${VERSION} Starting ---"
     
+    # Check for Civitai Token
+    if [[ -z "${CIVITAI_TOKEN:-}" ]]; then
+        log "   ⚠️  WARNING: CIVITAI_TOKEN is not set. Downloads from Civitai may fail or be restricted."
+    fi
+
     export PIP_ROOT_USER_ACTION=ignore
     export PYTHONUNBUFFERED=1
     
@@ -1040,6 +1081,7 @@ main() {
     fi
     
     # Run phases
+    setup_swap
     install_apt_packages
     install_comfyui
     install_nodes
