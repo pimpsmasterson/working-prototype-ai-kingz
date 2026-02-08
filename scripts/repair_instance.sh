@@ -46,6 +46,19 @@ download_file "https://huggingface.co/Comfy-Org/lotus/resolve/main/lotus-depth-d
 download_file "https://huggingface.co/Lightricks/ltxv-spatial-upscaler-0.9.7/resolve/main/ltxv_spatial_upscaler_0.9.7.safetensors" \
     "${COMFY_DIR}/models/latent_upscale_models" "ltxv_spatial_upscaler_0.9.7.safetensors"
 
+# MISSING MODELS FROM ERROR LOGS:
+# 1. CLIP Text Encoder (clip_l.safetensors)
+download_file "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" \
+    "${COMFY_DIR}/models/text_encoders" "clip_l.safetensors"
+
+# 2. Wan VAE (wan_vae.safetensors)
+download_file "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors" \
+    "${COMFY_DIR}/models/vae" "wan_vae.safetensors"
+
+# 3. UMT5 Encoder (umt5_xxl_fp8_scaled.safetensors)
+download_file "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors" \
+    "${COMFY_DIR}/models/text_encoders" "umt5_xxl_fp8_scaled.safetensors"
+
 # 3. RESTART COMFYUI
 echo "🔄 Restarting ComfyUI..."
 pkill -f "python.*main.py"
