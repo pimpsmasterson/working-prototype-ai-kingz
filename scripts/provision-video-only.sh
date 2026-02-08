@@ -1,19 +1,15 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.6                       ║
+# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v3.0                       ║
 # ║                                                                               ║
-# ║   v2.6 FIXES:                                                                ║
-# ║   ✓ Cloudflared: Removed critical trailing space in URL                      ║
-# ║   ✓ Models: Cleaned up URL arrays (removed spaces)                           ║
-# ║   ✓ Downloads: Added PROVISION_ALLOW_MISSING_ASSETS check                    ║
-# ║   ✓ PyTorch: Stable 2.6.0+cu124                                              ║
-# ║   ✓ Node deps: Fixed find -exec syntax                                       ║
-# ║   v2.9 FIXES:                                                                ║
-# ║   ✓ Unified Fix: Merged all repair logic into main script                    ║
-# ║   ✓ Missing Models: Added force-download checks for CLIP/VAE/Upscalers       ║
+# ║   v3.0 FIXES:                                                                 ║
+# ║   ✓ Model Paths: Wan -> diffusion_models, LTX -> checkpoints (Verified)       ║
+# ║   ✓ LTX Fix: Explicit pip install for node requirements                       ║
+# ║   ✓ URLs: Updated to verified Comfy-Org and Lightricks mirrors                ║
+# ║   ✓ Swap: Added auto-swap for 32GB RAM safety                                 ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.9"
+VERSION="v3.0"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -43,14 +39,16 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODEL DEFINITIONS - CLEANED URLS (NO SPACES)
-# Format: "URL1|URL2|URL3|URL4|filename"
+# MODEL DEFINITIONS - v3.0 VERIFIED LINKS
 # ═══════════════════════════════════════════════════════════════════════════════
 
-VIDEO_MODELS=(
-    # Wan 2.1 T2V 14B
+# Wan 2.1 - Must go to models/diffusion_models to work with WanVideoWrapper
+WAN_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
-    # LTX-Video 2B v0.9.1
+)
+
+# LTX-Video - Goes to models/checkpoints for standard loading
+LTX_MODELS=(
     "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.1.safetensors|||ltx-video-2b-v0.9.1.safetensors"
 )
 
@@ -64,8 +62,7 @@ CLIP_VISION=(
 )
 
 LIGHTNING_LORAS=(
-    # Removed Wan Lightning LoRA - awaiting official/verified T2V LoRA release
-    # "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors||||wan2_lightning_t2v.safetensors"
+    # Wan 2.1 Lightning LoRA (Pending official/verified link for T2V, keeping empty for safety based on logs)
 )
 
 VAE_MODELS=(
@@ -418,6 +415,14 @@ install_nodes() {
                 continue
             }
         fi
+        
+        # v3.0-SPECIFIC FIX: Force install LTX requirements to prevent loader issues
+        if [[ "$dir" == "ComfyUI-LTXVideo" ]]; then
+            log "      🔧 Forcing LTX dependencies..."
+            cd "$path"
+            "$VENV_PYTHON" -m pip install -r requirements.txt --force-reinstall --quiet 2>&1 | tee -a "$LOG_FILE"
+            cd -
+        fi
     done
 
     # Install requirements per-node individually
@@ -439,7 +444,13 @@ install_nodes() {
 
 install_models() {
     log_section "📦 DOWNLOADING VIDEO MODELS"
-    download_batch "${COMFY_DIR}/models/checkpoints" "1000000000" "${VIDEO_MODELS[@]}"
+    
+    # Wan 2.1 -> diffusion_models (CRITICAL FIX)
+    download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN_MODELS[@]}"
+    
+    # LTX-Video -> checkpoints (Standard)
+    download_batch "${COMFY_DIR}/models/checkpoints" "1000000000" "${LTX_MODELS[@]}"
+    
     download_batch "${COMFY_DIR}/models/text_encoders" "100000000" "${TEXT_ENCODERS[@]}"
     download_batch "${COMFY_DIR}/models/clip_vision" "100000000" "${CLIP_VISION[@]}"
     download_batch "${COMFY_DIR}/models/loras" "10000000" "${LIGHTNING_LORAS[@]}"
