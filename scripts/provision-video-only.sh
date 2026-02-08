@@ -8,9 +8,12 @@
 # ║   ✓ Downloads: Added PROVISION_ALLOW_MISSING_ASSETS check                    ║
 # ║   ✓ PyTorch: Stable 2.6.0+cu124                                              ║
 # ║   ✓ Node deps: Fixed find -exec syntax                                       ║
+# ║   v2.8 FIXES:                                                                ║
+# ║   ✓ Missing Models: Fixed 404s for Clip Vision, LTX Upscaler, Lotus Depth    ║
+# ║   ✓ Wan Lightning: Removed unverified LoRA for now                           ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.7"
+VERSION="v2.8"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -57,11 +60,12 @@ TEXT_ENCODERS=(
 )
 
 CLIP_VISION=(
-    "https://huggingface.co/comfyanonymous/clip_vision_h/resolve/main/clip_vision_h.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/clip_vision_h.safetensors|||clip_vision_h.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors|https://huggingface.co/calcuis/wan-gguf/resolve/main/clip_vision_h.safetensors|||clip_vision_h.safetensors"
 )
 
 LIGHTNING_LORAS=(
-    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
+    # Removed Wan Lightning LoRA - awaiting official/verified T2V LoRA release
+    # "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors||||wan2_lightning_t2v.safetensors"
 )
 
 VAE_MODELS=(
@@ -70,11 +74,11 @@ VAE_MODELS=(
 )
 
 UPSCALER_MODELS=(
-    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors|https://huggingface.co/Kim2091/4xNomos8k_DAT/resolve/main/4xNomos8k_DAT.safetensors|||ltx-2-spatial-upscaler-x2-1.0.safetensors"
+    "https://huggingface.co/Lightricks/ltxv-spatial-upscaler-0.9.7/resolve/main/ltxv_spatial_upscaler_0.9.7.safetensors||||ltxv_spatial_upscaler_0.9.7.safetensors"
 )
 
 DEPTH_MODELS=(
-    "https://huggingface.co/P-E-T-E-R-P/Lotus-Depth-D-V1-1/resolve/main/lotus-depth-d-v1-1.safetensors|https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.safetensors|||lotus-depth-d-v1-1.safetensors"
+    "https://huggingface.co/Comfy-Org/lotus/resolve/main/lotus-depth-d-v1-1.safetensors|https://huggingface.co/TTPlanet/TTPLanet_SDXL_Controlnet_Tile_Realistic/resolve/main/TTPLANET_Controlnet_Tile_realistic_v2_fp16.safetensors|||lotus-depth-d-v1-1.safetensors"
 )
 
 NODES=(
