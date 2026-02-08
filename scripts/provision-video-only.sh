@@ -183,10 +183,9 @@ attempt_download() {
     # HuggingFace token support (critical for gated models)
     local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
     if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
-        # Add token as header for aria2c
-        local hf_header="Authorization: Bearer $HF_TOKEN"
+        # Add token as header for aria2c (CRITICAL: Proper quoting for authentication)
         log "      ⏳ Downloading $filename (authenticated)..."
-        if aria2c "$url" --header="$hf_header" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
+        if aria2c "$url" --header="Authorization: Bearer $HF_TOKEN" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
             if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]]; then
                 log "      ✅ Finished $filename"
                 return 0
