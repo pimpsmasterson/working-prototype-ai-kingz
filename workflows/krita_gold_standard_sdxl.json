@@ -5,7 +5,7 @@
         },
         "class_type": "CheckpointLoaderSimple",
         "_meta": {
-            "title": "Checkpoint: Juggernaut XL (Gold)"
+            "title": "Checkpoint: Juggernaut XL"
         }
     },
     "2": {
@@ -13,7 +13,7 @@
             "image": "krita_canvas_input.png",
             "upload": "image"
         },
-        "class_type": "KritaInput",
+        "class_type": "ETN_KritaCanvas",
         "_meta": {
             "title": "Krita Input"
         }
@@ -113,7 +113,7 @@
                 0
             ]
         },
-        "class_type": "KritaOutput",
+        "class_type": "ETN_KritaOutput",
         "_meta": {
             "title": "Krita Output"
         }
