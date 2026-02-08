@@ -10,7 +10,7 @@
 # ║   ✓ Node deps: Fixed find -exec syntax                                       ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.6"
+VERSION="v2.7"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -180,6 +180,10 @@ install_dependencies() {
     # Install xformers separately (optional but recommended for memory efficiency)
     log "   🚀 Installing xformers (optional)..."
     "$VENV_PYTHON" -m pip install xformers 2>&1 | tee -a "$LOG_FILE" || log "   ⚠️  xformers failed, continuing..."
+
+    # CRITICAL: Force numpy<2 again at the very end to overwrite any upgrades from other packages
+    log "   🔧 Enforcing numpy<2 compatibility..."
+    "$VENV_PYTHON" -m pip install "numpy<2" --force-reinstall 2>&1 | tee -a "$LOG_FILE"
 
     log "   ✅ Core dependencies ready"
 }
