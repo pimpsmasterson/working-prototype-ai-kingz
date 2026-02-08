@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v6.1"
+VERSION="v6.2"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -619,13 +619,28 @@ install_nodes() {
     "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING:" || true
     
     log "✅ Nodes installed"
+}
 
-    # Copy repo Krita workflows into ComfyUI workspace for convenience (optional)
+sync_workflows() {
+    log_section "🧬 SYNCHRONIZING WORKFLOWS"
+    
+    # 1. Ensure directories exist
+    mkdir -p "${COMFYUI_DIR}/workflows"
+    mkdir -p "${COMFYUI_DIR}/input"
+    
+    # 2. Copy Gold Standard workflows from staging (${WORKSPACE}/workflows)
     if [[ -d "${WORKSPACE}/workflows" ]]; then
-        mkdir -p "${COMFYUI_DIR}/workflows"
+        log "   📂 Copying Krita workflows to ${COMFYUI_DIR}/workflows/"
         cp -v "${WORKSPACE}/workflows/krita_*.json" "${COMFYUI_DIR}/workflows/" || true
-        log "📁 Copied Krita workflows into ${COMFYUI_DIR}/workflows/"
+        
+        # Also copy to input folder as a secondary fallback for some plugins
+        log "   📂 Mirroring workflows to ${COMFYUI_DIR}/input/"
+        cp -v "${WORKSPACE}/workflows/krita_*.json" "${COMFYUI_DIR}/input/" || true
+    else
+        log "   ⚠️  Staging workflows folder not found at ${WORKSPACE}/workflows"
     fi
+    
+    log "✅ Workflows synchronized"
 }
 
 install_models() {
@@ -803,6 +818,15 @@ monitor_processes() {
     local cfpid_file="${WORKSPACE}/cloudflared.pid"
 
     while true; do
+        # 0. Background dependency guard
+        if [[ $(( (RANDOM % 60) )) -eq 0 ]]; then # Check occasionally (approx every 10 mins)
+            local sql_major=$("$VENV_PYTHON" -c "import sqlalchemy; print(sqlalchemy.__version__)" 2>/dev/null | cut -d. -f1 || echo "0")
+            if [[ "$sql_major" -lt 2 ]]; then
+                log_err "   ⚠️  Background Guard: SQLAlchemy downgrade detected! Repairing..."
+                "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 >/dev/null || true
+            fi
+        fi
+
         # 1. Check ComfyUI
         if [[ -f "$comfypid_file" ]]; then
             local cpid=$(cat "$comfypid_file")
@@ -1020,6 +1044,7 @@ main() {
     install_comfyui
     install_nodes
     install_models
+    sync_workflows
     start_comfyui
     start_cloudflare_tunnel
     
