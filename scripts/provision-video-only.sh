@@ -1,19 +1,17 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v1.0                       ║
+# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.0                       ║
 # ║                                                                               ║
-# ║   ✓ Optimized for Video Generation (Wan 2.2 / LTX-2 / AnimateDiff)            ║
-# ║   ✓ NSFW Quality Optimized (Remix Models)                                     ║
-# ║   ✓ Single GPU Targeted (24GB budget / 40GB+ mid-cost)                        ║
-# ║   ✓ Auto-Swap & TCMalloc Hardening                                             ║
+# ║   ✓ FIXED: aria2c argument order, URL parsing, auth headers                  ║
+# ║   ✓ Multiple fallback URLs per model (up to 4)                               ║
+# ║   ✓ Triple download methods: aria2c → curl → wget                            ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v1.0"
+VERSION="v2.0"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
 
-# Allow provisioning to continue even when some non-critical assets fail to download.
 PROVISION_ALLOW_MISSING_ASSETS=${PROVISION_ALLOW_MISSING_ASSETS:-true}
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -24,7 +22,6 @@ log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE"; }
 log_err() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG_FILE" >&2; }
 log_section() { log ""; log "═══════════════════════════════════════════════════════════════"; log "$*"; log "═══════════════════════════════════════════════════════════════"; }
 
-# Cleanup handler
 cleanup_on_exit() {
     local exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
@@ -40,43 +37,33 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# VIDEO MODEL DEFINITIONS (BULLETPROOF MULTI-FALLBACK)
-# Format: "URL1|URL2|URL3|URL4|filename" (up to 4 fallbacks supported)
+# MODEL DEFINITIONS - NO SPACES AROUND PIPES
+# Format: "URL1|URL2|URL3|URL4|filename"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# --- CORE VIDEO MODELS (Wan 2.1 & LTX-2) - Multiple mirrors ---
 VIDEO_MODELS=(
-    # Wan 2.1 T2V 14B (4 fallbacks)
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2.1_VAE_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
-    
-    # LTX-2 19B Dev (4 fallbacks - multiple mirrors)
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
     "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors||ltx-2-19b-dev-fp8.safetensors"
 )
 
-# --- TEXT ENCODERS (UMT5 + CLIP) - Multiple fallbacks ---
 TEXT_ENCODERS=(
-    # Wan UMT5-XXL FP8 (3 fallbacks)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|https://huggingface.co/mcmonkey/google_t5-v1_1-xxl_encoderonly/resolve/main/model.safetensors||umt5_xxl_fp8_scaled.safetensors"
-    
-    # CLIP-L (3 fallbacks including Stability mirror)
     "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors|https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/resolve/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-HF.safetensors||clip_l.safetensors"
 )
 
-# --- LoRAs & Specialized (Lightning) ---
+CLIP_VISION=(
+    "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/clip_vision_h.safetensors|https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/model.safetensors|||clip_vision_h.safetensors"
+)
+
 LIGHTNING_LORAS=(
-    # Wan 2.1 Lightning (2 fallbacks)
     "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
 )
 
-# --- VIDEO VAE (Multiple fallbacks) ---
 VAE_MODELS=(
-    # Wan VAE (3 fallbacks)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2.1_VAE_bf16.safetensors||wan_vae.safetensors"
-    # SD VAE (2 fallbacks)
     "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors|https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/diffusion_pytorch_model.safetensors|||vae-ft-mse-840000-ema-pruned.safetensors"
 )
 
-# --- ADDITIONAL ASSETS ---
 UPSCALER_MODELS=(
     "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors|https://huggingface.co/Kim2091/4xNomos8k_DAT/resolve/main/4xNomos8k_DAT.safetensors|||ltx-2-spatial-upscaler-x2-1.0.safetensors"
 )
@@ -85,9 +72,6 @@ DEPTH_MODELS=(
     "https://huggingface.co/P-E-T-E-R-P/Lotus-Depth-D-V1-1/resolve/main/lotus-depth-d-v1-1.safetensors|https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.safetensors|||lotus-depth-d-v1-1.safetensors"
 )
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# CUSTOM NODES (Video-focused only)
-# ═══════════════════════════════════════════════════════════════════════════════
 NODES=(
     "https://github.com/ltdrdata/ComfyUI-Manager"
     "https://github.com/kijai/ComfyUI-WanVideoWrapper"
@@ -110,20 +94,12 @@ setup_swap() {
         return 0
     fi
     local total_ram=$(free -g | awk '/^Mem:/{print $2}')
-    if [[ $total_ram -lt 40 ]]; then # Higher threshold for video
+    if [[ $total_ram -lt 40 ]]; then
         log "   ⚠️  Low RAM detected ($total_ram GB). Creating 32GB swapfile..."
         swapoff -a 2>/dev/null || true
         fallocate -l 32G /workspace/swapfile || dd if=/dev/zero of=/workspace/swapfile bs=1M count=32768
         chmod 600 /workspace/swapfile && mkswap /workspace/swapfile && swapon /workspace/swapfile
         log "   ✅ 32GB Swap activated"
-    fi
-}
-
-detect_cuda_version() {
-    if command -v nvidia-smi >/dev/null 2>&1; then
-        nvidia-smi --query-gpu=cuda_version --format=csv,noheader,nounits | head -n1 | tr -d '\r'
-    else
-        echo "unknown"
     fi
 }
 
@@ -141,7 +117,7 @@ activate_venv() {
         source "${WORKSPACE}/venv/bin/activate"
         VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
     else
-        log "📦 Creating virtual environment (using system pkgs)..."
+        log "📦 Creating virtual environment..."
         python3 -m venv --system-site-packages "${WORKSPACE}/venv"
         source "${WORKSPACE}/venv/bin/activate"
         VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
@@ -149,11 +125,18 @@ activate_venv() {
 }
 
 install_torch() {
-    log_section "🧠 INSTALLING BLACKWELL-READY PYTORCH (v2.1)"
+    log_section "🧠 INSTALLING PYTORCH (Nightly CUDA 12.8)"
     activate_venv
-    # Blackwell GPUs (RTX 50-series) require experimental/nightly torch for sm_120 support
-    log "   🚀 Installing Torch with Nightly/Experimental CUDA support..."
-    "$VENV_PYTHON" -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
+    log "   🚀 Installing latest nightly torch with CUDA 12.8 support..."
+    "$VENV_PYTHON" -m pip install --pre torch torchvision torchaudio \
+        --index-url https://download.pytorch.org/whl/nightly/cu128 \
+        --upgrade || {
+        log_err "   ❌ PyTorch installation failed"
+        return 1
+    }
+    
+    # Verify installation
+    "$VENV_PYTHON" -c "import torch; print(f'✅ PyTorch {torch.__version__}, CUDA {torch.version.cuda}, Available: {torch.cuda.is_available()}')" | tee -a "$LOG_FILE"
 }
 
 install_dependencies() {
@@ -162,7 +145,7 @@ install_dependencies() {
     local deps=(
         "transformers>=4.38.0" "accelerate>=0.26.0" "safetensors>=0.4.0"
         "einops>=0.7.0" "opencv-python-headless" "huggingface-hub"
-        "timm" "scipy" "numpy<2" "pillow" "tqdm" "sqlalchemy>=2.0.0"
+        "timm" "scipy" "pillow" "tqdm" "sqlalchemy>=2.0.0"
         "aiohttp>=3.9.0" "typing-extensions>=4.8.0" "moviepy" "imageio-ffmpeg"
         "onnxruntime-gpu" "opencv-contrib-python-headless"
         "gguf" "scikit-image" "sentencepiece" "cupy-cuda12x"
@@ -173,70 +156,53 @@ install_dependencies() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# BULLETPROOF DOWNLOAD SYSTEM (aria2c + curl fallback)
+# DOWNLOAD FUNCTIONS - FIXED aria2c SYNTAX
 # ═══════════════════════════════════════════════════════════════════════════════
 
 attempt_download_aria2() {
     local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
     local filepath="${dir}/${filename}"
     
-    # Skip empty URLs
     [[ -z "$url" ]] && return 1
-    
     mkdir -p "$dir"
     
-    # Build auth header for HuggingFace
     local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
-    local auth_args=""
+    local auth_args=()
     
     if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
-        auth_args="--header=Authorization: Bearer ${HF_TOKEN}"
-        log "      [aria2c] Downloading $filename (HF authenticated)..."
+        auth_args=(--header="Authorization: Bearer ${HF_TOKEN}")
+        log "      [aria2c] Downloading $filename (authenticated)..."
     else
         log "      [aria2c] Downloading $filename..."
     fi
     
-    # Inject Civitai token as query param
     if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
         url="${url}?token=$CIVITAI_TOKEN"
     fi
     
-    # Try aria2c with authentication
-    if [[ -n "$auth_args" ]]; then
-        aria2c "$url" "$auth_args" \
-            -d "$dir" -o "$filename" \
-            -x16 -s16 -k1M \
-            --continue=true \
-            --allow-overwrite=true \
-            --file-allocation=none \
-            --max-tries=3 \
-            --retry-wait=5 \
-            --timeout=120 \
-            --connect-timeout=30 \
-            --summary-interval=30 2>&1 | tee -a "$LOG_FILE"
-    else
-        aria2c "$url" \
-            -d "$dir" -o "$filename" \
-            -x16 -s16 -k1M \
-            --continue=true \
-            --allow-overwrite=true \
-            --file-allocation=none \
-            --max-tries=3 \
-            --retry-wait=5 \
-            --timeout=120 \
-            --connect-timeout=30 \
-            --summary-interval=30 2>&1 | tee -a "$LOG_FILE"
-    fi
-    
-    # Verify file size
-    if [[ -f "$filepath" ]]; then
-        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
-        if [[ "$actual_size" -ge "$min_size" ]]; then
-            log "      ✅ [aria2c] SUCCESS: $filename (${actual_size} bytes)"
-            return 0
-        else
-            log "      ⚠️  [aria2c] File too small: $filename (${actual_size} < ${min_size})"
-            rm -f "$filepath"
+    # CORRECT ORDER: auth args, then options, then URL last
+    if aria2c "${auth_args[@]}" \
+        -d "$dir" -o "$filename" \
+        -x16 -s16 -k1M \
+        --continue=true \
+        --allow-overwrite=true \
+        --file-allocation=none \
+        --max-tries=3 \
+        --retry-wait=5 \
+        --timeout=120 \
+        --connect-timeout=30 \
+        --summary-interval=30 \
+        "$url" 2>&1 | tee -a "$LOG_FILE"; then
+        
+        if [[ -f "$filepath" ]]; then
+            local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+            if [[ "$actual_size" -ge "$min_size" ]]; then
+                log "      ✅ [aria2c] SUCCESS: $filename (${actual_size} bytes)"
+                return 0
+            else
+                log "      ⚠️  [aria2c] File too small: $filename (${actual_size} < ${min_size})"
+                rm -f "$filepath"
+            fi
         fi
     fi
     
@@ -247,46 +213,35 @@ attempt_download_curl() {
     local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
     local filepath="${dir}/${filename}"
     
-    # Skip empty URLs
     [[ -z "$url" ]] && return 1
-    
     mkdir -p "$dir"
     
-    # Build auth header for HuggingFace
     local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
-    local auth_args=""
+    local curl_cmd="curl -fSL --progress-bar --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 3600"
     
     if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
-        auth_args="-H \"Authorization: Bearer ${HF_TOKEN}\""
-        log "      [curl] FALLBACK: $filename (HF authenticated)..."
+        curl_cmd="$curl_cmd -H \"Authorization: Bearer ${HF_TOKEN}\""
+        log "      [curl] FALLBACK: $filename (authenticated)..."
     else
         log "      [curl] FALLBACK: $filename..."
     fi
     
-    # Inject Civitai token as query param
     if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
         url="${url}?token=$CIVITAI_TOKEN"
     fi
     
-    # Build and execute curl command
-    local curl_cmd="curl -fSL --progress-bar --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 3600"
-    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
-        curl_cmd="$curl_cmd -H \"Authorization: Bearer ${HF_TOKEN}\""
-    fi
     curl_cmd="$curl_cmd -o \"$filepath\" \"$url\""
     
-    # Execute with eval to handle quotes properly
-    eval "$curl_cmd" 2>&1 | tee -a "$LOG_FILE"
-    
-    # Verify file size
-    if [[ -f "$filepath" ]]; then
-        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
-        if [[ "$actual_size" -ge "$min_size" ]]; then
-            log "      ✅ [curl] SUCCESS: $filename (${actual_size} bytes)"
-            return 0
-        else
-            log "      ⚠️  [curl] File too small: $filename (${actual_size} < ${min_size})"
-            rm -f "$filepath"
+    if eval "$curl_cmd" 2>&1 | tee -a "$LOG_FILE"; then
+        if [[ -f "$filepath" ]]; then
+            local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+            if [[ "$actual_size" -ge "$min_size" ]]; then
+                log "      ✅ [curl] SUCCESS: $filename (${actual_size} bytes)"
+                return 0
+            else
+                log "      ⚠️  [curl] File too small: $filename (${actual_size} < ${min_size})"
+                rm -f "$filepath"
+            fi
         fi
     fi
     
@@ -297,22 +252,17 @@ attempt_download_wget() {
     local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
     local filepath="${dir}/${filename}"
     
-    # Skip empty URLs
     [[ -z "$url" ]] && return 1
-    
     mkdir -p "$dir"
     
-    # Build auth header for HuggingFace
     local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
     
     log "      [wget] LAST RESORT: $filename..."
     
-    # Inject Civitai token as query param
     if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
         url="${url}?token=$CIVITAI_TOKEN"
     fi
     
-    # Build wget command
     if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
         wget --header="Authorization: Bearer ${HF_TOKEN}" \
             --tries=3 --timeout=120 --continue \
@@ -322,7 +272,6 @@ attempt_download_wget() {
             -O "$filepath" "$url" 2>&1 | tee -a "$LOG_FILE"
     fi
     
-    # Verify file size
     if [[ -f "$filepath" ]]; then
         local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
         if [[ "$actual_size" -ge "$min_size" ]]; then
@@ -340,13 +289,11 @@ attempt_download_wget() {
 download_file() {
     local entry="$1" dir="$2" min_size="${3:-1000000}"
     
-    # Parse up to 4 URLs + filename (format: url1|url2|url3|url4|filename)
     local url1 url2 url3 url4 filename
     IFS='|' read -r url1 url2 url3 url4 filename <<< "$entry"
     
     local filepath="${dir}/${filename}"
     
-    # Skip if already exists and valid
     if [[ -f "$filepath" ]]; then
         local existing_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
         if [[ "$existing_size" -ge "$min_size" ]]; then
@@ -357,31 +304,26 @@ download_file() {
     
     log "   📥 Downloading: $filename"
     
-    # Debug: Show token status
     local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
     if [[ -n "$HF_TOKEN" ]]; then
         log "      🔑 HF Token: Present (${#HF_TOKEN} chars)"
     else
-        log "      ⚠️  HF Token: NOT SET - downloads may fail!"
+        log "      ⚠️  HF Token: NOT SET"
     fi
     
-    # Try all URLs with aria2c first, then curl, then wget
     local urls=("$url1" "$url2" "$url3" "$url4")
     
     for url in "${urls[@]}"; do
         [[ -z "$url" ]] && continue
         
-        # Method 1: aria2c (fastest, multi-connection)
         if attempt_download_aria2 "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
         
-        # Method 2: curl (most compatible)
         if attempt_download_curl "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
         
-        # Method 3: wget (last resort)
         if attempt_download_wget "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
@@ -424,7 +366,6 @@ install_nodes() {
     log_section "🧩 INSTALLING VIDEO NODES"
     activate_venv
     
-    # 1. Clone all nodes
     log "   📦 Cloning custom nodes..."
     for repo in "${NODES[@]}"; do
         local dir="${repo##*/}"
@@ -435,12 +376,10 @@ install_nodes() {
         fi
     done
 
-    # 2. Combine all requirements correctly (with newlines)
     local combined_reqs="${COMFY_DIR}/all_requirements.txt"
     > "$combined_reqs"
     find "${COMFY_DIR}/custom_nodes" -name "requirements.txt" -exec sh -c 'cat "$1"; echo ""' _ {} >> "$combined_reqs"
     
-    # 3. Fast Install into VENV (No --system flag!)
     log "   🚀 Installing node dependencies..."
     if command -v uv &> /dev/null; then
         uv pip install -r "$combined_reqs" --python "$VENV_PYTHON"
@@ -448,15 +387,14 @@ install_nodes() {
         "$VENV_PYTHON" -m pip install -r "$combined_reqs"
     fi
 
-    # Re-repair SQLAlchemy
     "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0"
 }
 
 install_models() {
-    log_section "📦 DOWNLOADING VIDEO MODELS (v2.0)"
-    # Folder mapping to match graph expectations
+    log_section "📦 DOWNLOADING VIDEO MODELS"
     download_batch "${COMFY_DIR}/models/checkpoints" "1000000000" "${VIDEO_MODELS[@]}"
     download_batch "${COMFY_DIR}/models/text_encoders" "100000000" "${TEXT_ENCODERS[@]}"
+    download_batch "${COMFY_DIR}/models/clip_vision" "100000000" "${CLIP_VISION[@]}"
     download_batch "${COMFY_DIR}/models/loras" "10000000" "${LIGHTNING_LORAS[@]}"
     download_batch "${COMFY_DIR}/models/vae" "100000000" "${VAE_MODELS[@]}"
     download_batch "${COMFY_DIR}/models/latent_upscale_models" "10000000" "${UPSCALER_MODELS[@]}"
@@ -467,11 +405,19 @@ start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFY_DIR}"
     activate_venv
-    # Dependency check
+    
     local sql_ver=$("$VENV_PYTHON" -c "import sqlalchemy; print(sqlalchemy.__version__)" 2>/dev/null || echo "0")
     [[ "${sql_ver:0:1}" -lt 2 ]] && "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0" >/dev/null 2>&1
     
-    export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4
+    # Check TCMalloc exists before using
+    local tcmalloc_path="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
+    if [[ -f "$tcmalloc_path" ]]; then
+        export LD_PRELOAD="$tcmalloc_path"
+        log "   🧠 Using TCMalloc for memory optimization"
+    else
+        log "   ⚠️  TCMalloc not found, proceeding without it"
+    fi
+    
     setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
     echo "$!" > "${WORKSPACE}/comfyui.pid"
     log "✅ ComfyUI started (PID: $!)"
@@ -495,7 +441,6 @@ start_cloudflare_tunnel() {
     local TUNNEL_LOG="${WORKSPACE}/cloudflared.log"
     local TUNNEL_PID_FILE="${WORKSPACE}/cloudflared.pid"
     
-    # Stop any existing run
     if [[ -f "$TUNNEL_PID_FILE" ]]; then
         local oldpid=$(cat "$TUNNEL_PID_FILE" 2>/dev/null || true)
         [[ -n "$oldpid" ]] && kill "$oldpid" 2>/dev/null || true
@@ -506,7 +451,6 @@ start_cloudflare_tunnel() {
     setsid nohup "$cf_bin" tunnel --url http://localhost:8188 > "$TUNNEL_LOG" 2>&1 < /dev/null &
     echo "$!" > "$TUNNEL_PID_FILE"
 
-    # Capture URL
     local TUNNEL_URL=""
     for i in {1..60}; do
         TUNNEL_URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$TUNNEL_LOG" 2>/dev/null | head -n1 || true)
@@ -528,7 +472,6 @@ main() {
     mkdir -p "$WORKSPACE" && cd "$WORKSPACE"
     COMFY_DIR="${WORKSPACE}/ComfyUI"
     
-    # Disk check check
     local available_kb=$(df "$WORKSPACE" | awk 'NR==2 {print $4}')
     if (( available_kb < 100 * 1024 * 1024 )); then
         log "❌ ERROR: Not enough disk space ($((available_kb/1024/1024))GB < 100GB)"
@@ -549,10 +492,8 @@ main() {
     log "--- ✅ VIDEO PROVISIONING COMPLETE ---"
     log "🌐 ComfyUI: Port 8188"
 
-    # Maintenance loop
     log "🛠️  Starting Maintenance Watchdog..."
     while true; do
-        # Keep Cloudflare alive
         if [[ "${DISABLE_CLOUDFLARED:-0}" != "1" ]]; then
             local cfpid_file="${WORKSPACE}/cloudflared.pid"
             if [[ -f "$cfpid_file" ]]; then
@@ -563,7 +504,6 @@ main() {
             fi
         fi
         
-        # Keep Comfyalive
         local cpid_file="${WORKSPACE}/comfyui.pid"
         if [[ -f "$cpid_file" ]]; then
             if ! kill -0 $(cat "$cpid_file") 2>/dev/null; then
