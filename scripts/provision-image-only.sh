@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v5.7"
+VERSION="v5.8"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -602,6 +602,11 @@ install_nodes() {
     
     # Install Impact-Pack deps
     "$VENV_PYTHON" -m pip install --no-cache-dir piexif ultralytics segment_anything 2>&1 | grep -v "WARNING:" || true
+    
+    # CRITICAL: Re-upgrade SQLAlchemy after all node requirements
+    # Some nodes may have pinned an old version that breaks ComfyUI
+    log "   🔗 Ensuring SQLAlchemy 2.0+ after node installations..."
+    "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" 2>&1 | grep -v "WARNING:" || true
     
     log "✅ Nodes installed"
 
