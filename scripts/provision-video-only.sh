@@ -40,47 +40,49 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# VIDEO MODEL DEFINITIONS (NSFW Optimized)
-# Format: "PRIMARY_URL|FALLBACK_URL|filename"
+# VIDEO MODEL DEFINITIONS (BULLETPROOF MULTI-FALLBACK)
+# Format: "URL1|URL2|URL3|URL4|filename" (up to 4 fallbacks supported)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# --- CORE VIDEO MODELS (Wan 2.1 & LTX-2) ---
+# --- CORE VIDEO MODELS (Wan 2.1 & LTX-2) - Multiple mirrors ---
 VIDEO_MODELS=(
-    # Wan 2.1 T2V 14B (Stable)
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|wan2.1_t2v_14B_bf16.safetensors"
+    # Wan 2.1 T2V 14B (4 fallbacks)
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2.1_VAE_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
     
-    # LTX-2 19B Dev (Public Mirror) - filename matches workflow
-    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-dev-fp8.safetensors"
+    # LTX-2 19B Dev (4 fallbacks - multiple mirrors)
+    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors||ltx-2-19b-dev-fp8.safetensors"
 )
 
-# --- TEXT ENCODERS (UMT5 + CLIP) ---
+# --- TEXT ENCODERS (UMT5 + CLIP) - Multiple fallbacks ---
 TEXT_ENCODERS=(
-    # Wan UMT5-XXL FP8 Scaled
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|umt5_xxl_fp8_scaled.safetensors"
+    # Wan UMT5-XXL FP8 (3 fallbacks)
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|https://huggingface.co/mcmonkey/google_t5-v1_1-xxl_encoderonly/resolve/main/model.safetensors||umt5_xxl_fp8_scaled.safetensors"
     
-    # CLIP-L
-    "https://huggingface.co/comfyanonymous/ensemble-default-models/resolve/main/clip_l.safetensors|https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin|clip_l.safetensors"
+    # CLIP-L (3 fallbacks including Stability mirror)
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors|https://huggingface.co/zer0int/CLIP-GmP-ViT-L-14/resolve/main/ViT-L-14-TEXT-detail-improved-hiT-GmP-HF.safetensors||clip_l.safetensors"
 )
 
 # --- LoRAs & Specialized (Lightning) ---
 LIGHTNING_LORAS=(
-    # Wan 2.1 Lightning
-    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors||wan2_lightning_t2v.safetensors"
+    # Wan 2.1 Lightning (2 fallbacks)
+    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
 )
 
-# --- VIDEO VAE ---
+# --- VIDEO VAE (Multiple fallbacks) ---
 VAE_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|wan_vae.safetensors"
-    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors||vae-ft-mse-840000-ema-pruned.safetensors"
+    # Wan VAE (3 fallbacks)
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2.1_VAE_bf16.safetensors||wan_vae.safetensors"
+    # SD VAE (2 fallbacks)
+    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors|https://huggingface.co/stabilityai/sd-vae-ft-mse/resolve/main/diffusion_pytorch_model.safetensors|||vae-ft-mse-840000-ema-pruned.safetensors"
 )
 
 # --- ADDITIONAL ASSETS ---
 UPSCALER_MODELS=(
-    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors||ltx-2-spatial-upscaler-x2-1.0.safetensors"
+    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors|https://huggingface.co/Kim2091/4xNomos8k_DAT/resolve/main/4xNomos8k_DAT.safetensors|||ltx-2-spatial-upscaler-x2-1.0.safetensors"
 )
 
 DEPTH_MODELS=(
-    "https://huggingface.co/P-E-T-E-R-P/Lotus-Depth-D-V1-1/resolve/main/lotus-depth-d-v1-1.safetensors||lotus-depth-d-v1-1.safetensors"
+    "https://huggingface.co/P-E-T-E-R-P/Lotus-Depth-D-V1-1/resolve/main/lotus-depth-d-v1-1.safetensors|https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.safetensors|||lotus-depth-d-v1-1.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -170,61 +172,243 @@ install_dependencies() {
     log "   ✅ Core dependencies ready"
 }
 
-attempt_download() {
+# ═══════════════════════════════════════════════════════════════════════════════
+# BULLETPROOF DOWNLOAD SYSTEM (aria2c + curl fallback)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+attempt_download_aria2() {
     local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
     local filepath="${dir}/${filename}"
+    
+    # Skip empty URLs
+    [[ -z "$url" ]] && return 1
+    
     mkdir -p "$dir"
     
-    # Inject tokens for authentication
+    # Build auth header for HuggingFace
+    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
+    local auth_args=""
+    
+    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        auth_args="--header=Authorization: Bearer ${HF_TOKEN}"
+        log "      [aria2c] Downloading $filename (HF authenticated)..."
+    else
+        log "      [aria2c] Downloading $filename..."
+    fi
+    
+    # Inject Civitai token as query param
     if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
         url="${url}?token=$CIVITAI_TOKEN"
     fi
     
-    # HuggingFace token support (critical for gated models)
-    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
-    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
-        # Add token as header for aria2c (CRITICAL: Proper quoting for authentication)
-        log "      ⏳ Downloading $filename (authenticated)..."
-        if aria2c "$url" --header="Authorization: Bearer $HF_TOKEN" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
-            if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]]; then
-                log "      ✅ Finished $filename"
-                return 0
-            fi
-        fi
+    # Try aria2c with authentication
+    if [[ -n "$auth_args" ]]; then
+        aria2c "$url" "$auth_args" \
+            -d "$dir" -o "$filename" \
+            -x16 -s16 -k1M \
+            --continue=true \
+            --allow-overwrite=true \
+            --file-allocation=none \
+            --max-tries=3 \
+            --retry-wait=5 \
+            --timeout=120 \
+            --connect-timeout=30 \
+            --summary-interval=30 2>&1 | tee -a "$LOG_FILE"
     else
-        log "      ⏳ Downloading $filename..."
-        if aria2c "$url" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
-            if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]]; then
-                log "      ✅ Finished $filename"
-                return 0
-            fi
+        aria2c "$url" \
+            -d "$dir" -o "$filename" \
+            -x16 -s16 -k1M \
+            --continue=true \
+            --allow-overwrite=true \
+            --file-allocation=none \
+            --max-tries=3 \
+            --retry-wait=5 \
+            --timeout=120 \
+            --connect-timeout=30 \
+            --summary-interval=30 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # Verify file size
+    if [[ -f "$filepath" ]]; then
+        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+        if [[ "$actual_size" -ge "$min_size" ]]; then
+            log "      ✅ [aria2c] SUCCESS: $filename (${actual_size} bytes)"
+            return 0
+        else
+            log "      ⚠️  [aria2c] File too small: $filename (${actual_size} < ${min_size})"
+            rm -f "$filepath"
         fi
     fi
     
-    log_err "      ❌ Failed to download $filename (or size too small)"
+    return 1
+}
+
+attempt_download_curl() {
+    local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
+    local filepath="${dir}/${filename}"
+    
+    # Skip empty URLs
+    [[ -z "$url" ]] && return 1
+    
+    mkdir -p "$dir"
+    
+    # Build auth header for HuggingFace
+    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
+    local auth_args=""
+    
+    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        auth_args="-H \"Authorization: Bearer ${HF_TOKEN}\""
+        log "      [curl] FALLBACK: $filename (HF authenticated)..."
+    else
+        log "      [curl] FALLBACK: $filename..."
+    fi
+    
+    # Inject Civitai token as query param
+    if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
+        url="${url}?token=$CIVITAI_TOKEN"
+    fi
+    
+    # Build and execute curl command
+    local curl_cmd="curl -fSL --progress-bar --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 3600"
+    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        curl_cmd="$curl_cmd -H \"Authorization: Bearer ${HF_TOKEN}\""
+    fi
+    curl_cmd="$curl_cmd -o \"$filepath\" \"$url\""
+    
+    # Execute with eval to handle quotes properly
+    eval "$curl_cmd" 2>&1 | tee -a "$LOG_FILE"
+    
+    # Verify file size
+    if [[ -f "$filepath" ]]; then
+        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+        if [[ "$actual_size" -ge "$min_size" ]]; then
+            log "      ✅ [curl] SUCCESS: $filename (${actual_size} bytes)"
+            return 0
+        else
+            log "      ⚠️  [curl] File too small: $filename (${actual_size} < ${min_size})"
+            rm -f "$filepath"
+        fi
+    fi
+    
+    return 1
+}
+
+attempt_download_wget() {
+    local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
+    local filepath="${dir}/${filename}"
+    
+    # Skip empty URLs
+    [[ -z "$url" ]] && return 1
+    
+    mkdir -p "$dir"
+    
+    # Build auth header for HuggingFace
+    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
+    
+    log "      [wget] LAST RESORT: $filename..."
+    
+    # Inject Civitai token as query param
+    if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
+        url="${url}?token=$CIVITAI_TOKEN"
+    fi
+    
+    # Build wget command
+    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        wget --header="Authorization: Bearer ${HF_TOKEN}" \
+            --tries=3 --timeout=120 --continue \
+            -O "$filepath" "$url" 2>&1 | tee -a "$LOG_FILE"
+    else
+        wget --tries=3 --timeout=120 --continue \
+            -O "$filepath" "$url" 2>&1 | tee -a "$LOG_FILE"
+    fi
+    
+    # Verify file size
+    if [[ -f "$filepath" ]]; then
+        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+        if [[ "$actual_size" -ge "$min_size" ]]; then
+            log "      ✅ [wget] SUCCESS: $filename (${actual_size} bytes)"
+            return 0
+        else
+            log "      ⚠️  [wget] File too small: $filename (${actual_size} < ${min_size})"
+            rm -f "$filepath"
+        fi
+    fi
+    
     return 1
 }
 
 download_file() {
     local entry="$1" dir="$2" min_size="${3:-1000000}"
-    local primary fallback filename
-    IFS='|' read -r primary fallback filename <<< "$entry"
+    
+    # Parse up to 4 URLs + filename (format: url1|url2|url3|url4|filename)
+    local url1 url2 url3 url4 filename
+    IFS='|' read -r url1 url2 url3 url4 filename <<< "$entry"
+    
     local filepath="${dir}/${filename}"
-    if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge $min_size ]]; then
-        return 0
+    
+    # Skip if already exists and valid
+    if [[ -f "$filepath" ]]; then
+        local existing_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+        if [[ "$existing_size" -ge "$min_size" ]]; then
+            log "   ✅ Already exists: $filename (${existing_size} bytes)"
+            return 0
+        fi
     fi
-    log "   📥 $filename"
-    attempt_download "$primary" "$dir" "$filename" "$min_size" || \
-    attempt_download "$fallback" "$dir" "$filename" "$min_size" || return 1
+    
+    log "   📥 Downloading: $filename"
+    
+    # Debug: Show token status
+    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
+    if [[ -n "$HF_TOKEN" ]]; then
+        log "      🔑 HF Token: Present (${#HF_TOKEN} chars)"
+    else
+        log "      ⚠️  HF Token: NOT SET - downloads may fail!"
+    fi
+    
+    # Try all URLs with aria2c first, then curl, then wget
+    local urls=("$url1" "$url2" "$url3" "$url4")
+    
+    for url in "${urls[@]}"; do
+        [[ -z "$url" ]] && continue
+        
+        # Method 1: aria2c (fastest, multi-connection)
+        if attempt_download_aria2 "$url" "$dir" "$filename" "$min_size"; then
+            return 0
+        fi
+        
+        # Method 2: curl (most compatible)
+        if attempt_download_curl "$url" "$dir" "$filename" "$min_size"; then
+            return 0
+        fi
+        
+        # Method 3: wget (last resort)
+        if attempt_download_wget "$url" "$dir" "$filename" "$min_size"; then
+            return 0
+        fi
+        
+        log "      ❌ All methods failed for URL: ${url:0:80}..."
+    done
+    
+    log_err "   ❌ FAILED ALL FALLBACKS: $filename"
+    return 1
 }
 
 download_batch() {
     local dir="$1" min_size="$2"
     shift 2
     local arr=("$@")
+    local success=0
+    local failed=0
+    
     for entry in "${arr[@]}"; do
-        download_file "$entry" "$dir" "$min_size" || true
+        if download_file "$entry" "$dir" "$min_size"; then
+            ((success++))
+        else
+            ((failed++))
+        fi
     done
+    
+    log "   📊 Batch complete: $success succeeded, $failed failed"
 }
 
 install_comfyui() {
