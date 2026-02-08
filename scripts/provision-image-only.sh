@@ -5,7 +5,7 @@
 # ║   ✓ Optimized for Image Generation (SDXL/SD 1.5/FLUX)                        ║
 
 # Version identifier (bump on every change)
-VERSION="v6.0"
+VERSION="v6.1"
 # Canonical signature used by server to validate fetched provision script
 PROVISIONER_SIGNATURE="🎨 AI KINGS COMFYUI - MASTER IMAGE PROVISIONER ${VERSION}"
 
@@ -457,6 +457,7 @@ attempt_download() {
     local url="$1"
     local dir="$2"
     local filename="$3"
+    local min_size="${4:-1000000}" # Default 1MB
     local filepath="${dir}/${filename}"
     
     mkdir -p "$dir"
@@ -478,12 +479,12 @@ attempt_download() {
             --continue=true --allow-overwrite=true \
             --console-log-level=error 2>&1 | tee -a "$LOG_FILE"
         
-        [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -gt 1000000 ]] && return 0
+        [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]] && return 0
     fi
     
     # Fallback to wget
     wget -c --timeout=300 --tries=5 -O "$filepath" "$url" 2>&1 | tee -a "$LOG_FILE"
-    [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -gt 1000000 ]] && return 0
+    [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]] && return 0
     
     return 1
 }
@@ -491,6 +492,7 @@ attempt_download() {
 download_file() {
     local entry="$1"
     local dir="$2"
+    local min_size="${3:-1000000}" # Default 1MB
     
     # Parse: PRIMARY|FALLBACK|filename
     local IFS='|'
@@ -498,22 +500,28 @@ download_file() {
     
     local filepath="${dir}/${filename}"
     
-    # Skip if exists
-    if [[ -f "$filepath" ]] && [[ $(stat -c%s "$filepath" 2>/dev/null) -gt 1000000 ]]; then
-        log "   ✅ $filename (cached)"
-        return 0
+    # Skip if exists and is valid size
+    if [[ -f "$filepath" ]]; then
+        local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+        if [[ $actual_size -ge $min_size ]]; then
+            log "   ✅ $filename (cached: $(numfmt --to=iec $actual_size))"
+            return 0
+        else
+            log "   ⚠️  $filename is too small ($actual_size bytes < $min_size). Re-downloading..."
+            rm -f "$filepath"
+        fi
     fi
     
     log "   📥 $filename"
     
     # Try primary
-    if [[ -n "$primary" ]] && attempt_download "$primary" "$dir" "$filename"; then
+    if [[ -n "$primary" ]] && attempt_download "$primary" "$dir" "$filename" "$min_size"; then
         log "   ✅ $filename ($(numfmt --to=iec $(stat -c%s "$filepath")))"
         return 0
     fi
     
     # Try fallback
-    if [[ -n "$fallback" ]] && attempt_download "$fallback" "$dir" "$filename"; then
+    if [[ -n "$fallback" ]] && attempt_download "$fallback" "$dir" "$filename" "$min_size"; then
         log "   ✅ $filename (fallback)"
         return 0
     fi
@@ -524,18 +532,19 @@ download_file() {
 
 download_batch() {
     local dir="$1"
-    shift
+    local min_size="${2:-1000000}" # Default 1MB
+    shift 2
     local arr=("$@")
     local total=${#arr[@]}
     local failed=0
     
     log ""
     log "╔════════════════════════════════════════════════════════════════╗"
-    log "║  📦 Downloading $total files                                   "
+    log "║  📦 Downloading $total files (Min Size: $(numfmt --to=iec $min_size))"
     log "╚════════════════════════════════════════════════════════════════╝"
     
     for entry in "${arr[@]}"; do
-        download_file "$entry" "$dir" || failed=$((failed + 1))
+        download_file "$entry" "$dir" "$min_size" || failed=$((failed + 1))
     done
     
     log "   📊 Complete: $((total-failed))/$total successful"
@@ -624,55 +633,55 @@ install_models() {
     
     # 1. Checkpoints
     log "🎨 [1/7] Checkpoints..."
-    download_batch "${COMFYUI_DIR}/models/checkpoints" "${CHECKPOINT_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/checkpoints" "500000000" "${CHECKPOINT_MODELS[@]}" || true
     
     # 2. VAE
     log "🎨 [2/7] VAE..."
-    download_batch "${COMFYUI_DIR}/models/vae" "${VAE_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/vae" "50000000" "${VAE_MODELS[@]}" || true
     
     # 3. ControlNet
     log "🎮 [3/7] ControlNet..."
-    download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/controlnet" "100000000" "${CONTROLNET_MODELS[@]}" || true
     
     # 4. IPAdapter
     log "🔗 [4/7] IPAdapter..."
-    download_batch "${COMFYUI_DIR}/models/ipadapter" "${IPADAPTER_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/ipadapter" "50000000" "${IPADAPTER_MODELS[@]}" || true
     
     # 5. Upscalers
     log "⬆️  [5/7] Upscalers..."
-    download_batch "${COMFYUI_DIR}/models/upscale_models" "${UPSCALE_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/upscale_models" "10000000" "${UPSCALE_MODELS[@]}" || true
     
     # 6. LoRAs
     log "⚡ [6/8] LoRAs..."
-    download_batch "${COMFYUI_DIR}/models/loras" "${LORA_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/loras" "10000000" "${LORA_MODELS[@]}" || true
 
     # 7. Detectors (face/hand/SAM)
     log "🔍 [7/11] Detectors..."
-    download_batch "${COMFYUI_DIR}/models/sams" "${SAM_MODELS[@]}" || true
-    download_batch "${COMFYUI_DIR}/models/ultralytics" "${YOLO_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/sams" "10000000" "${SAM_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/ultralytics" "10000000" "${YOLO_MODELS[@]}" || true
 
     # 8. Inpaint Models
     log "🎨 [8/11] Inpaint Models..."
-    download_batch "${COMFYUI_DIR}/models/inpaint" "${INPAINT_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/inpaint" "10000000" "${INPAINT_MODELS[@]}" || true
     
     # 9. CLIP Vision Models
     log "👁️  [9/11] CLIP Vision..."
-    download_batch "${COMFYUI_DIR}/models/clip_vision" "${CLIP_VISION_MODELS[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/clip_vision" "50000000" "${CLIP_VISION_MODELS[@]}" || true
 
     # 10. SD 1.5 Specialised (IPAdapter/ControlNet)
     log "⚙️  [10/11] SD 1.5 Extras..."
-    download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS_SD15[@]}" || true
-    download_batch "${COMFYUI_DIR}/models/ipadapter" "${IPADAPTER_MODELS_SD15[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/controlnet" "100000000" "${CONTROLNET_MODELS_SD15[@]}" || true
+    download_batch "${COMFYUI_DIR}/models/ipadapter" "50000000" "${IPADAPTER_MODELS_SD15[@]}" || true
     
     # 11. Large Models (Optional - only if enough disk space)
     local available_gb=$(df "$WORKSPACE" | awk 'NR==2 {print int($4/1024/1024)}')
     if [[ $available_gb -gt 100 ]]; then
         log "⚡ [11/11] Large Models (Flux/SD3.5)..."
-        download_batch "${COMFYUI_DIR}/models/checkpoints" "${SD3_MODELS[@]}" || true
-        download_batch "${COMFYUI_DIR}/models/diffusion_models" "${FLUX_MODELS[@]}" || true
-        download_batch "${COMFYUI_DIR}/models/controlnet" "${CONTROLNET_MODELS_FLUX[@]}" || true
-        download_batch "${COMFYUI_DIR}/models/clip" "${FLUX_CLIP_MODELS[@]}" || true
-        download_batch "${COMFYUI_DIR}/models/text_encoders" "${QWEN_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/checkpoints" "1000000000" "${SD3_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/diffusion_models" "1000000000" "${FLUX_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/controlnet" "100000000" "${CONTROLNET_MODELS_FLUX[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/clip" "50000000" "${FLUX_CLIP_MODELS[@]}" || true
+        download_batch "${COMFYUI_DIR}/models/text_encoders" "50000000" "${QWEN_MODELS[@]}" || true
     else
         log "⏭️  [11/11] Heavy models skipped (requires 100GB+ free space, detected ${available_gb}GB)"
     fi
@@ -680,7 +689,7 @@ install_models() {
     # 12. Master Workflows
     log "🧬 [12/12] Master Workflows..."
     mkdir -p "${WORKSPACE}/workflows"
-    download_batch "${WORKSPACE}/workflows" "${WORKFLOWS[@]}" || true
+    download_batch "${WORKSPACE}/workflows" "1000" "${WORKFLOWS[@]}" || true
     
     log "✅ Models and Workflows downloaded"
 }
