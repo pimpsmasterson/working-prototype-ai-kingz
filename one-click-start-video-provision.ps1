@@ -239,8 +239,8 @@ Write-Host "  Selected: $($selectedOffer.GPU) ($($selectedOffer.ID)) at $($selec
 
 # 4. Rent GPU
 Write-Host "[3/6] Renting GPU..." -ForegroundColor Yellow
-# Using robust base raw URL to avoid Gist filename 404s
-$provisionScriptUrl = "https://gist.githubusercontent.com/pimpsmasterson/cf06441f0ea9b657a459227d0334f2d0/raw/"
+# Use GitHub raw URL for the FIXED provisioning script (not the broken Gist)
+$provisionScriptUrl = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-video-only.sh"
 
 $rentBody = @{
     image        = "vastai/comfy:v0.10.0-cuda-12.9-py312"

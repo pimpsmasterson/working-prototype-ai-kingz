@@ -49,8 +49,8 @@ VIDEO_MODELS=(
     # Wan 2.1 T2V 14B (Stable)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|wan2.1_t2v_14B_bf16.safetensors"
     
-    # LTX-2 19B Dev (Public Mirror)
-    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-v0.9.safetensors"
+    # LTX-2 19B Dev (Public Mirror) - filename matches workflow
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-dev-fp8.safetensors"
 )
 
 # --- TEXT ENCODERS (UMT5 + CLIP) ---

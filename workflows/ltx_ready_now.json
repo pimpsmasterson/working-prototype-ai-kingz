@@ -1,0 +1,347 @@
+{
+    "last_node_id": 10,
+    "last_link_id": 10,
+    "nodes": [
+        {
+            "id": 1,
+            "type": "LTXVideoLoader",
+            "pos": [
+                10,
+                10
+            ],
+            "size": [
+                315,
+                120
+            ],
+            "flags": {},
+            "order": 0,
+            "mode": 0,
+            "outputs": [
+                {
+                    "name": "MODEL",
+                    "type": "MODEL",
+                    "links": [
+                        1
+                    ]
+                },
+                {
+                    "name": "VAE",
+                    "type": "VAE",
+                    "links": [
+                        2
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "LTXVideoLoader"
+            },
+            "widgets_values": [
+                "ltx-2-19b-dev-fp8.safetensors"
+            ]
+        },
+        {
+            "id": 2,
+            "type": "CLIPLoader",
+            "pos": [
+                10,
+                150
+            ],
+            "size": [
+                315,
+                82
+            ],
+            "flags": {},
+            "order": 1,
+            "mode": 0,
+            "outputs": [
+                {
+                    "name": "CLIP",
+                    "type": "CLIP",
+                    "links": [
+                        3
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "CLIPLoader"
+            },
+            "widgets_values": [
+                "clip_l.safetensors",
+                "v1"
+            ]
+        },
+        {
+            "id": 3,
+            "type": "CLIPTextEncode",
+            "pos": [
+                350,
+                10
+            ],
+            "size": [
+                422,
+                161
+            ],
+            "flags": {},
+            "order": 3,
+            "mode": 0,
+            "inputs": [
+                {
+                    "name": "clip",
+                    "type": "CLIP",
+                    "link": 3
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "CONDITIONING",
+                    "type": "CONDITIONING",
+                    "links": [
+                        4
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "CLIPTextEncode"
+            },
+            "widgets_values": [
+                "cinematic close up shot of a robotic eye, high detail, 4k, cyberpunk aesthetics"
+            ]
+        },
+        {
+            "id": 4,
+            "type": "CLIPTextEncode",
+            "pos": [
+                350,
+                200
+            ],
+            "size": [
+                422,
+                100
+            ],
+            "flags": {},
+            "order": 4,
+            "mode": 0,
+            "inputs": [
+                {
+                    "name": "clip",
+                    "type": "CLIP",
+                    "link": 3
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "CONDITIONING",
+                    "type": "CONDITIONING",
+                    "links": [
+                        5
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "CLIPTextEncode"
+            },
+            "widgets_values": [
+                "low quality, blurry, static, jittery, deformed"
+            ]
+        },
+        {
+            "id": 5,
+            "type": "LTXVideoSampler",
+            "pos": [
+                800,
+                10
+            ],
+            "size": [
+                315,
+                250
+            ],
+            "flags": {},
+            "order": 5,
+            "mode": 0,
+            "inputs": [
+                {
+                    "name": "model",
+                    "type": "MODEL",
+                    "link": 1
+                },
+                {
+                    "name": "positive",
+                    "type": "CONDITIONING",
+                    "link": 4
+                },
+                {
+                    "name": "negative",
+                    "type": "CONDITIONING",
+                    "link": 5
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "LATENT",
+                    "type": "LATENT",
+                    "links": [
+                        6
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "LTXVideoSampler"
+            },
+            "widgets_values": [
+                123456789,
+                "randomize",
+                25,
+                3,
+                "unipc",
+                "karras",
+                1,
+                768,
+                512,
+                25
+            ]
+        },
+        {
+            "id": 6,
+            "type": "VAEDecode",
+            "pos": [
+                1150,
+                10
+            ],
+            "size": [
+                210,
+                46
+            ],
+            "flags": {},
+            "order": 6,
+            "mode": 0,
+            "inputs": [
+                {
+                    "name": "samples",
+                    "type": "LATENT",
+                    "link": 6
+                },
+                {
+                    "name": "vae",
+                    "type": "VAE",
+                    "link": 2
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "IMAGE",
+                    "type": "IMAGE",
+                    "links": [
+                        7
+                    ]
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "VAEDecode"
+            }
+        },
+        {
+            "id": 7,
+            "type": "VHS_VideoCombine",
+            "pos": [
+                1400,
+                10
+            ],
+            "size": [
+                315,
+                450
+            ],
+            "flags": {},
+            "order": 7,
+            "mode": 0,
+            "inputs": [
+                {
+                    "name": "images",
+                    "type": "IMAGE",
+                    "link": 7
+                }
+            ],
+            "properties": {
+                "Node name for S&R": "VHS_VideoCombine"
+            },
+            "widgets_values": [
+                24,
+                0,
+                "video/h264-mp4",
+                "ComfyUI",
+                true,
+                true,
+                null
+            ]
+        }
+    ],
+    "links": [
+        [
+            1,
+            1,
+            0,
+            5,
+            0,
+            "MODEL"
+        ],
+        [
+            2,
+            1,
+            1,
+            6,
+            1,
+            "VAE"
+        ],
+        [
+            3,
+            2,
+            0,
+            3,
+            0,
+            "CLIP"
+        ],
+        [
+            4,
+            3,
+            0,
+            5,
+            1,
+            "CONDITIONING"
+        ],
+        [
+            5,
+            4,
+            0,
+            5,
+            2,
+            "CONDITIONING"
+        ],
+        [
+            6,
+            5,
+            0,
+            6,
+            0,
+            "LATENT"
+        ],
+        [
+            7,
+            6,
+            0,
+            7,
+            0,
+            "IMAGE"
+        ],
+        [
+            8,
+            2,
+            0,
+            4,
+            0,
+            "CLIP"
+        ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {},
+    "version": 0.4
+}
