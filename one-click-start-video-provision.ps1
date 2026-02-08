@@ -2,7 +2,7 @@
 # Bulletproof Video Provisioning Launcher for AI KINGS
 # Version 1.9 - Fastest 4-Stage Fallback & Gist 404 Fix
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
@@ -54,43 +54,59 @@ $headers = @{
     "Authorization" = "Bearer $vastKey"
     "Content-Type"  = "application/json"
 }
+   
+# 1.5 Safety Check: Prevent Double Renting
+Write-Host "Checking for existing instances..." -ForegroundColor Yellow
+try {
+    $existingRaw = Invoke-RestMethod -Uri "$vastApiBase/instances/" -Method Get -Headers $headers
+    $activeItems = $existingRaw.instances | Where-Object { $_.actual_status -ne "deleted" }
+    if ($activeItems.Count -gt 0) {
+        Write-Host "CRITICAL ERROR: Active instances found ($($activeItems.Count))!" -ForegroundColor Red
+        Write-Host "To prevent accidental billing, you must destroy existing instances before running this script." -ForegroundColor Red
+        Write-Host ""
+        $activeItems | ForEach-Object { 
+            Write-Host "  $($_.id) - $($_.machine_id) - $($_.actual_status)" -ForegroundColor Cyan 
+        }
+        Write-Host ""
+        Write-Host "Run '.\destroy-instance.ps1' to clean up." -ForegroundColor Yellow
+        exit 1
+    }
+}
+catch {
+    Write-Host "Warning: Could not check existing instances. Proceeding with caution..." -ForegroundColor Gray
+}
 
 $candidates = New-Object System.Collections.Generic.List[PSCustomObject]
 $retryCount = 0
 
 while ($candidates.Count -eq 0) {
     # 4-STAGE DYNAMIC LOGIC (FASTEST ENGAGEMENT)
-    $midCap = 0.85
-    $bandwidthFloor = 2000
-    $reliabilityFloor = 0.90
-    $diskFloor = 400
+    $midCap = 0.90
+    $bandwidthFloor = 1000
+    $reliabilityFloor = 0.85
+    $diskFloor = 250
     
-    if ($retryCount -lt 2) {
-        # Try 1, 2: Elite performance
-        $budgetCap = 0.55
-        $stageText = "ELITE"
+    if ($retryCount -lt 3) {
+        # Try 1-3: Elite performance (1000Mbps+)
+        $budgetCap = 0.95      
+        $bandwidthFloor = 1000  
+        $stageText = "ELITE SPEED (1000Mbps+)"
     }
-    elseif ($retryCount -lt 3) {
-        # Try 3: Market Relaxed
-        $budgetCap = 0.75
-        $stageText = "MARKET RELAXED"
-        Write-Host "  [STAGE 2] Relaxing price target to `$0.75 (Try 3)..." -ForegroundColor Cyan
-    }
-    elseif ($retryCount -lt 4) {
-        # Try 4: High Speed Budget
-        $budgetCap = 0.65
-        $bandwidthFloor = 1000
-        $stageText = "SPEED BUDGET"
-        Write-Host "  [STAGE 3] Relaxing bandwidth to 1Gbps floor (Try 4)..." -ForegroundColor Cyan
+    elseif ($retryCount -lt 6) {
+        # Try 4-6: Professional Speed (800Mbps+)
+        $budgetCap = 1.25      
+        $bandwidthFloor = 800  
+        $stageText = "PROFESSIONAL SPEED (800Mbps+)"
+        Write-Host "  [STAGE 2] Prioritizing High Speed: 800Mbps floor (Try $($retryCount + 1))..." -ForegroundColor Cyan
     }
     else {
-        # Try 5+: Ultimate Catch (Requested fallback behavior)
-        $budgetCap = 0.70
-        $bandwidthFloor = 500
-        $reliabilityFloor = 0.85
-        $diskFloor = 300
-        $stageText = "ULTIMATE CATCH"
-        Write-Host "  [STAGE 4] Ultimate Catch Engaged: 16GB+ @ `$0.70, 500Mbps, 85% Reliability..." -ForegroundColor Magenta
+        # Try 7+: Global High Speed (600Mbps Absolute Floor)
+        $budgetCap = 1.65      
+        $bandwidthFloor = 600  
+        $reliabilityFloor = 0.82 
+        $diskFloor = 250
+        $stageText = "GLOBAL HIGH SPEED (600Mbps Floor)"
+        Write-Host "  [STAGE 3] Maximum Effort: $1.65 Cap @ 600Mbps floor (Try $($retryCount + 1))..." -ForegroundColor Magenta
     }
 
     Write-Host "[2/6] Searching for optimal GPUs on Vast.ai (Attempt $($retryCount + 1) - $stageText)..." -ForegroundColor Yellow
@@ -117,20 +133,50 @@ while ($candidates.Count -eq 0) {
             if (-not $o.rentable -or $o.rented) { continue }
             if ($o.disk_space -lt $diskFloor) { continue } 
 
-            # Reliability Hardening
+            # More Blacklisted Hosts
+            $blacklistedHosts = @(
+                16146,    # Broken GPU/CDI Injection (Machine ID 16146)
+                28576020, # RTX 5060 Ti with slow download
+                3969,     # Tesla P100 with slow download (~800Mbps)
+                46741,    # RTX 5060 Ti (Verified but firewall/throttling issues)
+                46556,    # RTX 5060 Ti (Broken Docker Registry / No Internet)
+                49761     # RTX 5070 Ti (Slow Peering ~16MB/s)
+            )
+            if ($blacklistedHosts -contains [int]$o.machine_id) { 
+                Write-Host "  Skipping blacklisted host $($o.machine_id)..." -ForegroundColor DarkGray
+                continue 
+            }
+
+            # Reliability & Verification Logic (Broadened)
             $reliability = if ($null -eq $o.reliability) { 0 } else { [float]$o.reliability }
             $verification = if ($null -eq $o.verification) { "unverified" } else { $o.verification }
             $isVerified = ($verification -eq "verified") -or ($o.verified -eq $true)
 
-            if (-not $isVerified) { continue }
-            if ($reliability -lt $reliabilityFloor) { continue }
+            # Accept unverified if they meet our speed/reliability floor
+            # However, Stage 1 remains Verified-only for maximum safety
+            if ($retryCount -lt 2 -and -not $isVerified) {
+                Write-Host "    [Debug] Skipping $($o.id) ($($o.gpu_name)): Stage 1 restricted to Verified" -ForegroundColor DarkGray
+                continue
+            }
+
+            if ($reliability -lt $reliabilityFloor) { 
+                Write-Host "    [Debug] Skipping $($o.id) ($($o.gpu_name)): Reliability Low ($($reliability * 100)%)" -ForegroundColor DarkGray
+                continue 
+            }
 
             # Bandwidth check (Dynamic Floor)
             $bandwidthOk = $false
-            if ($o.internet_down_cost_per_tb -le 0.1 -or $o.inet_down -ge $bandwidthFloor) {
+            $inetDown = if ($null -eq $o.inet_down) { 0 } else { [float]$o.inet_down }
+            $inetCost = if ($null -eq $o.internet_down_cost_per_tb) { 0 } else { [float]$o.internet_down_cost_per_tb }
+            
+            if ($inetCost -le 0.1 -or $inetDown -ge $bandwidthFloor) {
                 $bandwidthOk = $true
             }
-            if (-not $bandwidthOk) { continue }
+
+            if (-not $bandwidthOk) { 
+                Write-Host "    [Debug] Skipping $o.id ($o.gpu_name): Low Bandwidth ($inetDown Mbps < $bandwidthFloor Mbps)" -ForegroundColor DarkGray
+                continue 
+            }
 
             $numGpus = if ($null -eq $o.num_gpus) { 1 } else { $o.num_gpus }
             $totalVram = $o.gpu_ram * $numGpus
@@ -143,7 +189,10 @@ while ($candidates.Count -eq 0) {
             elseif ($totalVram -ge 16000 -and $price -le $budgetCap) {
                 $tier = "Budget (16GB+)"
             }
-
+            else {
+                Write-Host "    [Debug] Skipping $o.id ($o.gpu_name): No Tier Match (VRAM: $totalVram, Price: $price > Cap $budgetCap)" -ForegroundColor DarkGray
+            }
+ 
             if ($tier -ne "") {
                 $candidates.Add([PSCustomObject]@{
                         Index          = $candidates.Count
@@ -164,8 +213,8 @@ while ($candidates.Count -eq 0) {
     }
 
     if ($candidates.Count -eq 0) {
-        $nextSleep = if ($retryCount -lt 4) { 10 } else { 30 }
-        Write-Host "  No matches yet. Waiting $($nextSleep)s for market update..." -ForegroundColor Gray
+        $nextSleep = 10 # FIXED: Always 10 seconds max
+        Write-Host "  No matches yet. Waiting ${nextSleep}s for market update..." -ForegroundColor Gray
         $retryCount++
         Start-Sleep -Seconds $nextSleep
     }
@@ -200,9 +249,12 @@ $rentBody = @{
     onstart      = "bash -lc 'curl -fsSL $provisionScriptUrl -o /tmp/provision.sh && chmod +x /tmp/provision.sh && bash /tmp/provision.sh'"
     disk         = 400
     env          = @{
-        DROPBOX_TOKEN  = $dropboxToken
-        VASTAI_API_KEY = $vastKey
-        COMFYUI_ARGS   = "--listen 0.0.0.0 --port 8188 --enable-cors-header"
+        DROPBOX_TOKEN                  = $dropboxToken
+        VASTAI_API_KEY                 = $vastKey
+        HUGGINGFACE_HUB_TOKEN          = $env:HUGGINGFACE_HUB_TOKEN
+        CIVITAI_TOKEN                  = $env:CIVITAI_TOKEN
+        PROVISION_ALLOW_MISSING_ASSETS = "true"
+        COMFYUI_ARGS                   = "--listen 0.0.0.0 --port 8188 --enable-cors-header"
     }
 } | ConvertTo-Json
 

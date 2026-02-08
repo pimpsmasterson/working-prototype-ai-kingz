@@ -44,57 +44,43 @@ trap cleanup_on_exit EXIT INT TERM
 # Format: "PRIMARY_URL|FALLBACK_URL|filename"
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# --- CORE VIDEO MODELS ---
+# --- CORE VIDEO MODELS (Wan 2.1 & LTX-2) ---
 VIDEO_MODELS=(
-    # Wan 2.2 Remix (NSFW King)
-    "https://huggingface.co/wangkanai/wan22-fp8-i2v/resolve/main/wan2.2_remix_fp8.safetensors|https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/wan2.2_remix_fp8.safetensors|wan2.2_remix_fp8.safetensors"
+    # Wan 2.1 T2V 14B (Stable)
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|wan2.1_t2v_14B_bf16.safetensors"
     
-    # LTX-2 19B Dev (Professional Quality)
-    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-dev-fp8.safetensors||ltx-2-19b-dev-fp8.safetensors"
-    
-    # LTX-2 19B Distilled (Fast Quality)
-    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled-fp8.safetensors||ltx-2-19b-distilled-fp8.safetensors"
-    
-    # Wan 2.2 T2V High-Noise 14B FP8
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_14B_fp8_e4m3fn.safetensors||wan2.2_t2v_14B_fp8.safetensors"
+    # LTX-2 19B Dev (Public Mirror)
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-dev-fp8.safetensors|ltx-2-19b-v0.9.safetensors"
 )
 
-# --- TEXT ENCODERS (Wan/LTX-2) ---
+# --- TEXT ENCODERS (UMT5 + CLIP) ---
 TEXT_ENCODERS=(
-    # UMT5-XXL FP8 (Wan Default)
-    "https://huggingface.co/wangkanai/wan22-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|https://huggingface.co/Anyfusion/umt5-xxl-encoder-fp8/resolve/main/umt5-xxl-encoder-fp8.safetensors|umt5-xxl-encoder-fp8.safetensors"
+    # Wan UMT5-XXL FP8 Scaled
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|umt5_xxl_fp8_scaled.safetensors"
     
-    # NSFW Scaled Encoder (Wan Remix companion)
-    "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/nsfw_wan_umt5-xxl_fp8_scaled.safetensors||nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
-    
-    # CLIP-L (Wan/Flux companion)
-    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors||clip_l.safetensors"
+    # CLIP-L
+    "https://huggingface.co/comfyanonymous/ensemble-default-models/resolve/main/clip_l.safetensors|https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/pytorch_model.bin|clip_l.safetensors"
+)
+
+# --- LoRAs & Specialized (Lightning) ---
+LIGHTNING_LORAS=(
+    # Wan 2.1 Lightning
+    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors||wan2_lightning_t2v.safetensors"
 )
 
 # --- VIDEO VAE ---
 VAE_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/wan2.2_vae.safetensors||wan2.2_vae.safetensors"
-    "https://huggingface.co/Lightricks/LTX-2/resolve/main/vae/diffusion_pytorch_model.safetensors||ltx-2_vae.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|wan_vae.safetensors"
+    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors||vae-ft-mse-840000-ema-pruned.safetensors"
 )
 
-# --- LIGHTNING LoRAs (4-Step Fast Video) ---
-LIGHTNING_LORAS=(
-    "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors||wan2_lightning_t2v_high.safetensors"
-    "https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors||wan2_lightning_t2v_low.safetensors"
-    "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors||wan2_lightning_i2v_high.safetensors"
-    "https://huggingface.co/lightx2v/Wan2.2-Distill-Loras/resolve/main/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors||wan2_lightning_i2v_low.safetensors"
+# --- ADDITIONAL ASSETS ---
+UPSCALER_MODELS=(
+    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-spatial-upscaler-x2-1.0.safetensors||ltx-2-spatial-upscaler-x2-1.0.safetensors"
 )
 
-# --- ANIMATEDIFF MODELS ---
-ANIMATEDIFF_MODELS=(
-    "https://huggingface.co/guoyww/animatediff-motion-adapter-sdxl-beta/resolve/main/diffusion_pytorch_model.safetensors||mm_sdxl_v10_beta.safetensors"
-    "https://huggingface.co/guoyww/animatediff/resolve/main/mm_sd_v15_v2.ckpt||mm_sd_v15_v2.ckpt"
-)
-
-# --- UPSCALE / INTERPOLATION ---
-SUPPORT_MODELS=(
-    "https://huggingface.co/Kim2091/UltraSharp/resolve/main/4x-UltraSharp.pth||4x-UltraSharp.pth"
-    "https://huggingface.co/Fannovel16/ComfyUI-Frame-Interpolation/resolve/main/rife426.pth||rife426.pth"
+DEPTH_MODELS=(
+    "https://huggingface.co/P-E-T-E-R-P/Lotus-Depth-D-V1-1/resolve/main/lotus-depth-d-v1-1.safetensors||lotus-depth-d-v1-1.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -141,10 +127,10 @@ detect_cuda_version() {
 
 install_apt_packages() {
     log_section "📦 INSTALLING SYSTEM PACKAGES"
-    apt-get update -qq
-    apt-get install -y -qq aria2 wget curl git git-lfs ffmpeg libgl1 \
+    apt-get update
+    apt-get install -y apt-utils aria2 wget curl git git-lfs ffmpeg libgl1 \
         python3-pip python3-venv build-essential libtcmalloc-minimal4 \
-        libjpeg-dev libpng-dev libtiff-dev rclone >/dev/null
+        libjpeg-dev libpng-dev libtiff-dev rclone
     log "✅ System packages ready"
 }
 
@@ -153,17 +139,19 @@ activate_venv() {
         source "${WORKSPACE}/venv/bin/activate"
         VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
     else
-        log "📦 Creating virtual environment..."
-        python3 -m venv "${WORKSPACE}/venv"
+        log "📦 Creating virtual environment (using system pkgs)..."
+        python3 -m venv --system-site-packages "${WORKSPACE}/venv"
         source "${WORKSPACE}/venv/bin/activate"
         VENV_PYTHON="${WORKSPACE}/venv/bin/python3"
     fi
 }
 
 install_torch() {
-    log_section "🧠 INSTALLING PYTORCH"
+    log_section "🧠 INSTALLING BLACKWELL-READY PYTORCH (v2.1)"
     activate_venv
-    "$VENV_PYTHON" -m pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+    # Blackwell GPUs (RTX 50-series) require experimental/nightly torch for sm_120 support
+    log "   🚀 Installing Torch with Nightly/Experimental CUDA support..."
+    "$VENV_PYTHON" -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128
 }
 
 install_dependencies() {
@@ -174,19 +162,47 @@ install_dependencies() {
         "einops>=0.7.0" "opencv-python-headless" "huggingface-hub"
         "timm" "scipy" "numpy<2" "pillow" "tqdm" "sqlalchemy>=2.0.0"
         "aiohttp>=3.9.0" "typing-extensions>=4.8.0" "moviepy" "imageio-ffmpeg"
+        "onnxruntime-gpu" "opencv-contrib-python-headless"
+        "gguf" "scikit-image" "sentencepiece" "cupy-cuda12x"
     )
-    for dep in "${deps[@]}"; do
-        "$VENV_PYTHON" -m pip install --no-cache-dir "$dep" >/dev/null 2>&1 || true
-    done
+    log "   🚀 Installing core dependencies..."
+    "$VENV_PYTHON" -m pip install "${deps[@]}"
+    log "   ✅ Core dependencies ready"
 }
 
 attempt_download() {
     local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
     local filepath="${dir}/${filename}"
     mkdir -p "$dir"
-    [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]] && url="${url}?token=$CIVITAI_TOKEN"
-    aria2c "$url" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --console-log-level=error >/dev/null 2>&1
-    [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]] && return 0
+    
+    # Inject tokens for authentication
+    if [[ -n "${CIVITAI_TOKEN:-}" && "$url" == *"civitai.com"* ]]; then
+        url="${url}?token=$CIVITAI_TOKEN"
+    fi
+    
+    # HuggingFace token support (critical for gated models)
+    local HF_TOKEN="${HUGGINGFACE_HUB_TOKEN:-${HF_TOKEN:-}}"
+    if [[ -n "$HF_TOKEN" && "$url" == *"huggingface.co"* ]]; then
+        # Add token as header for aria2c
+        local hf_header="Authorization: Bearer $HF_TOKEN"
+        log "      ⏳ Downloading $filename (authenticated)..."
+        if aria2c "$url" --header="$hf_header" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
+            if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]]; then
+                log "      ✅ Finished $filename"
+                return 0
+            fi
+        fi
+    else
+        log "      ⏳ Downloading $filename..."
+        if aria2c "$url" -d "$dir" -o "$filename" -x8 -s8 --continue=true --allow-overwrite=true --summary-interval=30 2>&1 | tee -a "$LOG_FILE" | grep -v "Downloaded"; then
+            if [[ -f "$filepath" && $(stat -c%s "$filepath" 2>/dev/null) -ge "$min_size" ]]; then
+                log "      ✅ Finished $filename"
+                return 0
+            fi
+        fi
+    fi
+    
+    log_err "      ❌ Failed to download $filename (or size too small)"
     return 1
 }
 
@@ -217,30 +233,51 @@ install_comfyui() {
     [[ ! -d "${COMFY_DIR}" ]] && git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "${COMFY_DIR}"
     cd "${COMFY_DIR}"
     install_torch && install_dependencies
-    "$VENV_PYTHON" -m pip install -r requirements.txt >/dev/null 2>&1
+    log "   📦 Installing ComfyUI requirements..."
+    "$VENV_PYTHON" -m pip install -r requirements.txt
 }
 
 install_nodes() {
     log_section "🧩 INSTALLING VIDEO NODES"
     activate_venv
+    
+    # 1. Clone all nodes
+    log "   📦 Cloning custom nodes..."
     for repo in "${NODES[@]}"; do
         local dir="${repo##*/}"
         local path="${COMFY_DIR}/custom_nodes/${dir}"
-        [[ ! -d "$path" ]] && git clone --depth 1 "$repo" "$path" --recursive >/dev/null 2>&1
-        [[ -f "${path}/requirements.txt" ]] && "$VENV_PYTHON" -m pip install -r "${path}/requirements.txt" >/dev/null 2>&1
+        if [[ ! -d "$path" ]]; then
+            log "      🔗 Cloning $dir..."
+            git clone --depth 1 "$repo" "$path" --recursive
+        fi
     done
+
+    # 2. Combine all requirements correctly (with newlines)
+    local combined_reqs="${COMFY_DIR}/all_requirements.txt"
+    > "$combined_reqs"
+    find "${COMFY_DIR}/custom_nodes" -name "requirements.txt" -exec sh -c 'cat "$1"; echo ""' _ {} >> "$combined_reqs"
+    
+    # 3. Fast Install into VENV (No --system flag!)
+    log "   🚀 Installing node dependencies..."
+    if command -v uv &> /dev/null; then
+        uv pip install -r "$combined_reqs" --python "$VENV_PYTHON"
+    else
+        "$VENV_PYTHON" -m pip install -r "$combined_reqs"
+    fi
+
     # Re-repair SQLAlchemy
-    "$VENV_PYTHON" -m pip install --no-cache-dir --upgrade "sqlalchemy>=2.0.0" >/dev/null 2>&1
+    "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0"
 }
 
 install_models() {
-    log_section "📦 DOWNLOADING VIDEO MODELS"
-    download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${VIDEO_MODELS[@]}"
-    download_batch "${COMFY_DIR}/models/clip" "100000000" "${TEXT_ENCODERS[@]}"
-    download_batch "${COMFY_DIR}/models/vae" "100000000" "${VAE_MODELS[@]}"
+    log_section "📦 DOWNLOADING VIDEO MODELS (v2.0)"
+    # Folder mapping to match graph expectations
+    download_batch "${COMFY_DIR}/models/checkpoints" "1000000000" "${VIDEO_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/text_encoders" "100000000" "${TEXT_ENCODERS[@]}"
     download_batch "${COMFY_DIR}/models/loras" "10000000" "${LIGHTNING_LORAS[@]}"
-    download_batch "${COMFY_DIR}/models/animatediff_models" "100000000" "${ANIMATEDIFF_MODELS[@]}"
-    download_batch "${COMFY_DIR}/models/upscale_models" "10000000" "${SUPPORT_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/vae" "100000000" "${VAE_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/latent_upscale_models" "10000000" "${UPSCALER_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/diffusion_models" "100000000" "${DEPTH_MODELS[@]}"
 }
 
 start_comfyui() {
