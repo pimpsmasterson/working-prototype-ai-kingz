@@ -5,10 +5,19 @@
         },
         "class_type": "CheckpointLoaderSimple",
         "_meta": {
-            "title": "Checkpoint: Juggernaut XL"
+            "title": "Checkpoint"
         }
     },
     "2": {
+        "inputs": {
+            "vae_name": "sdxl_vae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+            "title": "VAE Loader (Force SDXL)"
+        }
+    },
+    "3": {
         "inputs": {
             "image": "krita_canvas_input.png",
             "upload": "image"
@@ -18,15 +27,15 @@
             "title": "Krita Input"
         }
     },
-    "3": {
+    "4": {
         "inputs": {
             "pixels": [
-                "2",
+                "3",
                 0
             ],
             "vae": [
-                "1",
-                2
+                "2",
+                0
             ]
         },
         "class_type": "VAEEncode",
@@ -34,9 +43,9 @@
             "title": "VAE Encode"
         }
     },
-    "4": {
+    "5": {
         "inputs": {
-            "text": "score_9, score_8_up, score_7_up, masterpiece, detailed, 1girl, cinematic lighting",
+            "text": "score_9, score_8_up, score_7_up, masterpiece, 1girl",
             "clip": [
                 "1",
                 1
@@ -47,9 +56,9 @@
             "title": "Prompt"
         }
     },
-    "5": {
+    "6": {
         "inputs": {
-            "text": "score_4, score_5, score_6, low quality, bad quality, blurry, text, watermark",
+            "text": "low quality, bad anatomy, text",
             "clip": [
                 "1",
                 1
@@ -60,7 +69,7 @@
             "title": "Negative Prompt"
         }
     },
-    "6": {
+    "7": {
         "inputs": {
             "seed": 4242,
             "steps": 25,
@@ -73,32 +82,32 @@
                 0
             ],
             "positive": [
-                "4",
-                0
-            ],
-            "negative": [
                 "5",
                 0
             ],
+            "negative": [
+                "6",
+                0
+            ],
             "latent_image": [
-                "3",
+                "4",
                 0
             ]
         },
         "class_type": "KSampler",
         "_meta": {
-            "title": "KSampler"
+            "title": "Sampler"
         }
     },
-    "7": {
+    "8": {
         "inputs": {
             "samples": [
-                "6",
+                "7",
                 0
             ],
             "vae": [
-                "1",
-                2
+                "2",
+                0
             ]
         },
         "class_type": "VAEDecode",
@@ -106,10 +115,10 @@
             "title": "VAE Decode"
         }
     },
-    "8": {
+    "9": {
         "inputs": {
             "image": [
-                "7",
+                "8",
                 0
             ]
         },
