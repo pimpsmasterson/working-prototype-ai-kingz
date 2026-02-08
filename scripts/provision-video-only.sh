@@ -1,13 +1,17 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.0                       ║
+# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v2.5                       ║
 # ║                                                                               ║
-# ║   ✓ FIXED: aria2c argument order, URL parsing, auth headers                  ║
-# ║   ✓ Multiple fallback URLs per model (up to 4)                               ║
-# ║   ✓ Triple download methods: aria2c → curl → wget                            ║
+# ║   v2.5 FIXES:                                                                ║
+# ║   ✓ PyTorch: Stable 2.6.0+cu124 (was broken nightly cu128)                  ║
+# ║   ✓ Model URLs: Fixed 404s (LTX-2B, CLIP vision, Lightning LoRA)            ║
+# ║   ✓ Node deps: Fixed find -exec syntax, per-node requirements               ║
+# ║   ✓ NumPy: Force numpy<2 to avoid v2.4 conflict                             ║
+# ║   ✓ TCMalloc: Multi-path detection for Ubuntu 24.04 (t64 suffix)            ║
+# ║   ✓ aria2c: Correct argument ordering                                        ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v2.0"
+VERSION="v2.5"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -42,8 +46,10 @@ trap cleanup_on_exit EXIT INT TERM
 # ═══════════════════════════════════════════════════════════════════════════════
 
 VIDEO_MODELS=(
+    # Wan 2.1 T2V 14B (verified URLs)
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/wangkanai/wan21-bf16/resolve/main/wan2.1_t2v_14B_bf16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_bf16.safetensors||wan2.1_t2v_14B_bf16.safetensors"
-    "https://huggingface.co/Lightricks/LTX-Video-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Comfy-Org/ltx-2/resolve/main/ltx-2-19b-v0.9.safetensors|https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors||ltx-2-19b-dev-fp8.safetensors"
+    # LTX-Video 2B v0.9.1 (19B doesn't exist - fixed to 2B with correct filename)
+    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.1.safetensors|||ltx-video-2b-v0.9.1.safetensors"
 )
 
 TEXT_ENCODERS=(
@@ -52,11 +58,13 @@ TEXT_ENCODERS=(
 )
 
 CLIP_VISION=(
-    "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/clip_vision_h.safetensors|https://huggingface.co/openai/clip-vit-large-patch14/resolve/main/model.safetensors|||clip_vision_h.safetensors"
+    # CLIP Vision H (fixed: use comfyanonymous mirror as primary, Kijai as fallback)
+    "https://huggingface.co/comfyanonymous/clip_vision_h/resolve/main/clip_vision_h.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/clip_vision_h.safetensors|||clip_vision_h.safetensors"
 )
 
 LIGHTNING_LORAS=(
-    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_1.3B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
+    # Wan 2.1 Lightning LoRA (fixed: use 14B variant which actually exists)
+    "https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|||wan2_lightning_t2v.safetensors"
 )
 
 VAE_MODELS=(
@@ -106,9 +114,13 @@ setup_swap() {
 install_apt_packages() {
     log_section "📦 INSTALLING SYSTEM PACKAGES"
     apt-get update
+    # Try both package names: Ubuntu 24.04+ uses t64 suffix
     apt-get install -y apt-utils aria2 wget curl git git-lfs ffmpeg libgl1 \
-        python3-pip python3-venv build-essential libtcmalloc-minimal4 \
+        python3-pip python3-venv build-essential \
         libjpeg-dev libpng-dev libtiff-dev rclone
+    apt-get install -y libtcmalloc-minimal4t64 2>/dev/null || \
+        apt-get install -y libtcmalloc-minimal4 2>/dev/null || \
+        log "   ⚠️  TCMalloc not available in apt repos"
     log "✅ System packages ready"
 }
 
@@ -125,16 +137,24 @@ activate_venv() {
 }
 
 install_torch() {
-    log_section "🧠 INSTALLING PYTORCH (Nightly CUDA 12.8)"
+    log_section "🧠 INSTALLING PYTORCH (Stable 2.6.0 + CUDA 12.4)"
     activate_venv
-    log "   🚀 Installing latest nightly torch with CUDA 12.8 support..."
-    "$VENV_PYTHON" -m pip install --pre torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/nightly/cu128 \
-        --upgrade || {
-        log_err "   ❌ PyTorch installation failed"
-        return 1
+
+    # Remove any broken nightly installs first
+    "$VENV_PYTHON" -m pip uninstall torch torchvision torchaudio -y 2>/dev/null || true
+
+    log "   🚀 Installing PyTorch 2.6.0 stable with CUDA 12.4..."
+    "$VENV_PYTHON" -m pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+        --index-url https://download.pytorch.org/whl/cu124 \
+        --force-reinstall || {
+        log_err "   ❌ PyTorch stable install failed, trying latest stable..."
+        "$VENV_PYTHON" -m pip install torch torchvision torchaudio \
+            --index-url https://download.pytorch.org/whl/cu124 || {
+            log_err "   ❌ PyTorch installation failed completely"
+            return 1
+        }
     }
-    
+
     # Verify installation
     "$VENV_PYTHON" -c "import torch; print(f'✅ PyTorch {torch.__version__}, CUDA {torch.version.cuda}, Available: {torch.cuda.is_available()}')" | tee -a "$LOG_FILE"
 }
@@ -142,6 +162,11 @@ install_torch() {
 install_dependencies() {
     log_section "📦 INSTALLING PYTHON DEPENDENCIES"
     activate_venv
+
+    # Force numpy<2 first to avoid conflicts with system numpy 2.4
+    log "   🚀 Pinning numpy<2 to avoid compatibility issues..."
+    "$VENV_PYTHON" -m pip install "numpy<2" --force-reinstall --quiet 2>&1 | tee -a "$LOG_FILE"
+
     local deps=(
         "transformers>=4.38.0" "accelerate>=0.26.0" "safetensors>=0.4.0"
         "einops>=0.7.0" "opencv-python-headless" "huggingface-hub"
@@ -149,9 +174,16 @@ install_dependencies() {
         "aiohttp>=3.9.0" "typing-extensions>=4.8.0" "moviepy" "imageio-ffmpeg"
         "onnxruntime-gpu" "opencv-contrib-python-headless"
         "gguf" "scikit-image" "sentencepiece" "cupy-cuda12x"
+        "diffusers>=0.32.0"
+        "av>=14.2.0"
     )
     log "   🚀 Installing core dependencies..."
-    "$VENV_PYTHON" -m pip install "${deps[@]}"
+    "$VENV_PYTHON" -m pip install "${deps[@]}" 2>&1 | tee -a "$LOG_FILE"
+
+    # Install xformers separately (optional but recommended for memory efficiency)
+    log "   🚀 Installing xformers (optional)..."
+    "$VENV_PYTHON" -m pip install xformers 2>&1 | tee -a "$LOG_FILE" || log "   ⚠️  xformers failed, continuing..."
+
     log "   ✅ Core dependencies ready"
 }
 
@@ -365,29 +397,35 @@ install_comfyui() {
 install_nodes() {
     log_section "🧩 INSTALLING VIDEO NODES"
     activate_venv
-    
+
     log "   📦 Cloning custom nodes..."
     for repo in "${NODES[@]}"; do
         local dir="${repo##*/}"
         local path="${COMFY_DIR}/custom_nodes/${dir}"
         if [[ ! -d "$path" ]]; then
             log "      🔗 Cloning $dir..."
-            git clone --depth 1 "$repo" "$path" --recursive
+            git clone --depth 1 "$repo" "$path" --recursive || {
+                log_err "      ❌ Failed to clone $dir"
+                continue
+            }
         fi
     done
 
-    local combined_reqs="${COMFY_DIR}/all_requirements.txt"
-    > "$combined_reqs"
-    find "${COMFY_DIR}/custom_nodes" -name "requirements.txt" -exec sh -c 'cat "$1"; echo ""' _ {} >> "$combined_reqs"
-    
+    # Install requirements per-node individually (fixed: old find -exec was broken)
     log "   🚀 Installing node dependencies..."
-    if command -v uv &> /dev/null; then
-        uv pip install -r "$combined_reqs" --python "$VENV_PYTHON"
-    else
-        "$VENV_PYTHON" -m pip install -r "$combined_reqs"
-    fi
+    find "${COMFY_DIR}/custom_nodes" -name "requirements.txt" -type f | while read -r req_file; do
+        local node_name
+        node_name=$(basename "$(dirname "$req_file")")
+        log "      📦 Installing deps for $node_name..."
+        "$VENV_PYTHON" -m pip install -r "$req_file" --quiet 2>&1 | tee -a "$LOG_FILE" || {
+            log_err "      ⚠️  Some deps failed for $node_name"
+        }
+    done
 
-    "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0"
+    # Fix SQLAlchemy version
+    "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0" --quiet
+
+    log "   ✅ Nodes installed"
 }
 
 install_models() {
@@ -405,22 +443,47 @@ start_comfyui() {
     log_section "🚀 STARTING COMFYUI"
     cd "${COMFY_DIR}"
     activate_venv
-    
+
     local sql_ver=$("$VENV_PYTHON" -c "import sqlalchemy; print(sqlalchemy.__version__)" 2>/dev/null || echo "0")
     [[ "${sql_ver:0:1}" -lt 2 ]] && "$VENV_PYTHON" -m pip install --upgrade "sqlalchemy>=2.0.0" >/dev/null 2>&1
-    
-    # Check TCMalloc exists before using
-    local tcmalloc_path="/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
-    if [[ -f "$tcmalloc_path" ]]; then
-        export LD_PRELOAD="$tcmalloc_path"
-        log "   🧠 Using TCMalloc for memory optimization"
+
+    # Find correct TCMalloc library (Ubuntu 24.04 uses t64 suffix)
+    local tcmalloc_paths=(
+        "/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4t64"
+        "/usr/lib/x86_64-linux-gnu/libtcmalloc_minimal.so.4"
+        "/usr/lib/libtcmalloc_minimal.so.4"
+    )
+
+    local tcmalloc_found=""
+    for path in "${tcmalloc_paths[@]}"; do
+        if [[ -f "$path" ]]; then
+            tcmalloc_found="$path"
+            break
+        fi
+    done
+
+    if [[ -n "$tcmalloc_found" ]]; then
+        export LD_PRELOAD="$tcmalloc_found"
+        log "   🧠 Using TCMalloc: $tcmalloc_found"
     else
         log "   ⚠️  TCMalloc not found, proceeding without it"
     fi
-    
+
+    # Kill any existing ComfyUI
+    pkill -f "python.*main.py" 2>/dev/null || true
+    sleep 2
+
     setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
     echo "$!" > "${WORKSPACE}/comfyui.pid"
     log "✅ ComfyUI started (PID: $!)"
+
+    # Verify it actually started
+    sleep 5
+    if ! kill -0 "$(cat "${WORKSPACE}/comfyui.pid")" 2>/dev/null; then
+        log_err "❌ ComfyUI failed to start! Check ${WORKSPACE}/comfyui.log"
+        tail -n 30 "${WORKSPACE}/comfyui.log" | tee -a "$LOG_FILE"
+        return 1
+    fi
 }
 
 start_cloudflare_tunnel() {

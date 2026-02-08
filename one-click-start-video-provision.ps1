@@ -1,6 +1,6 @@
 # one-click-start-video-provision.ps1
 # Bulletproof Video Provisioning Launcher for AI KINGS
-# Version 1.9 - Fastest 4-Stage Fallback & Gist 404 Fix
+# Version 2.0 - v2.5 Provisioner: Fixed PyTorch, URLs, deps, TCMalloc
 
 $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -8,7 +8,7 @@ Set-Location $root
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Magenta
-Write-Host "  AI KINGS - VIDEO PROVISIONER v1.9" -ForegroundColor Magenta
+Write-Host "  AI KINGS - VIDEO PROVISIONER v2.0" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
 Write-Host ""
 
@@ -140,7 +140,8 @@ while ($candidates.Count -eq 0) {
                 3969,     # Tesla P100 with slow download (~800Mbps)
                 46741,    # RTX 5060 Ti (Verified but firewall/throttling issues)
                 46556,    # RTX 5060 Ti (Broken Docker Registry / No Internet)
-                49761     # RTX 5070 Ti (Slow Peering ~16MB/s)
+                49761,    # RTX 5070 Ti (Slow Peering ~16MB/s)
+                53732     # RTX 5080 (Stuck on Docker image verification)
             )
             if ($blacklistedHosts -contains [int]$o.machine_id) { 
                 Write-Host "  Skipping blacklisted host $($o.machine_id)..." -ForegroundColor DarkGray
@@ -239,7 +240,8 @@ Write-Host "  Selected: $($selectedOffer.GPU) ($($selectedOffer.ID)) at $($selec
 
 # 4. Rent GPU
 Write-Host "[3/6] Renting GPU..." -ForegroundColor Yellow
-# Use GitHub raw URL for the FIXED provisioning script (not the broken Gist)
+# NOTE: Update this URL after pushing the v2.5 provisioner commit
+# Use commit-specific URL to bypass GitHub's 5-minute cache
 $provisionScriptUrl = "https://raw.githubusercontent.com/pimpsmasterson/working-prototype-ai-kingz/main/scripts/provision-video-only.sh"
 
 $rentBody = @{
