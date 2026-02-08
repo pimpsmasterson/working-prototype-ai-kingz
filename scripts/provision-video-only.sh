@@ -49,7 +49,7 @@ WAN_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-14B_fp8_e4m3fn.safetensors|||wan2.1_t2v_14B_fp8.safetensors"
 )
 
-# Wan 2.1 I2V - fp16 & fp8 (Added for completeness)
+# Wan 2.1 I2V - fp16 & fp8 (FIXED URLs)
 WAN_I2V_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp16.safetensors|||wan2.1_i2v_14B_fp16.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp8_e4m3fn.safetensors|||wan2.1_i2v_14B_fp8.safetensors"
@@ -187,8 +187,8 @@ install_dependencies() {
     "$VENV_PYTHON" -m pip install "${deps[@]}" 2>&1 | tee -a "$LOG_FILE"
 
     # Install xformers separately (optional but recommended for memory efficiency)
-    log "   🚀 Installing xformers (optional)..."
-    "$VENV_PYTHON" -m pip install xformers 2>&1 | tee -a "$LOG_FILE" || log "   ⚠️  xformers failed, continuing..."
+    # v3.1.1: REMOVED xformers (Causes Torch 2.10 conflict/timeout)
+    # "$VENV_PYTHON" -m pip install xformers 2>&1 | tee -a "$LOG_FILE" || log "   ⚠️  xformers failed, continuing..."
 
     # CRITICAL: Force numpy<2 again at the very end to overwrite any upgrades from other packages
     log "   🔧 Enforcing numpy<2 compatibility..."
