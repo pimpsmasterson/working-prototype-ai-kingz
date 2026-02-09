@@ -216,8 +216,26 @@ All extensions installed in `${COMFYUI_DIR}/custom_nodes/`
 
 ### 16. ComfyUI-LTXVideo
 - **Repository:** https://github.com/Lightricks/ComfyUI-LTXVideo
-- **Purpose:** LTX-2 video generation
-- **Features:** Official LTX-2 integration, advanced text-to-video
+- **Purpose:** LTX-2 audio-aware video generation
+- **Features:**
+    - Native support for synchronized audio and facial expressions.
+    - **AudioVAEEncode Node:** Processes audio latents to guide video motion.
+    - **Prompt Hint:** Spoken content should be in double quotes (e.g., `"The character is singing"`).
+
+### 17. ComfyUI-Florence2
+- **Repository:** https://github.com/kijai/ComfyUI-Florence2
+- **Purpose:** Vision-Language model Integration
+- **Features:** Image captioning, object detection, VQA for consistency
+
+### 18. ComfyUI-Easy-Use
+- **Repository:** https://github.com/yolain/ComfyUI-Easy-Use
+- **Purpose:** Workflow simplification
+- **Features:** Easy GPU management, show anything, multi-path input
+
+### 19. ComfyUI_essentials
+- **Repository:** https://github.com/cubiq/ComfyUI_essentials
+- **Purpose:** Essential utility nodes
+- **Features:** Image resizing, constants, image loaders
 
 ---
 
@@ -318,6 +336,30 @@ Location: `${COMFYUI_DIR}/models/loras/`
 | `wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors` | ~500MB | HuggingFace | 4-step T2V (low noise) |
 | `wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors` | ~500MB | HuggingFace | 4-step I2V (high noise) |
 | `wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors` | ~500MB | HuggingFace | 4-step I2V (low noise) |
+| `Wan2.2-T2V-A14B-4steps-lora-rank64-V1` | ~500MB | [HF (Lightx2v)](https://huggingface.co/lightx2v/Wan2.2-Lightning) | 4-step speed boost |
+
+---
+
+## 🔞 AI MODELS - NSFW VIDEO (2026 EDITION)
+
+### Primary NSFW Video Engines
+Location: `${COMFYUI_DIR}/models/diffusion_models/`
+
+| Model | Type | Source | Purpose |
+|-------|------|--------|---------|
+| `Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors` | I2V (Uncensored) | [HF (FX-FeiHou)](https://huggingface.co/FX-FeiHou/wan2.2-Remix) | Ultra-realistic motion |
+| `Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors` | I2V (Uncensored) | [HF (FX-FeiHou)](https://huggingface.co/FX-FeiHou/wan2.2-Remix) | Fluid transitions |
+| `WAN2.2-14B-Rapid-AllInOne NSFW Mega v12` | T2V/I2V (Merge) | [HF (Phr00t)](https://huggingface.co/Phr00t/WAN2.2-14B-Rapid-AllInOne) | Baked-in NSFW actions |
+| `SmoothMix Wan 2.2 I2V/T2V 14B` | Enhancement | [Civitai](https://civitai.com/models/1995784) | NSFW-tuned consistency |
+
+### NSFW LoRAs & Enhancers
+Location: `${COMFYUI_DIR}/models/loras/`
+
+| Model | Type | Source | Purpose |
+|-------|------|--------|---------|
+| `wan-dr34ml4y-all-in-one-nsfw` | Action Enhancer | [Civitai](https://civitai.com/models/1811313) | Position/fluid coverage |
+| `Experimental WAN General NSFW v0.08a` | General NSFW | [Civitai](https://civitai.com/models/1307155) | Explicit scene fidelity |
+| `Squatting Cowgirl` | Pose | [Civitai](https://civitai.com/models/8877) | Explicit pose control |
 
 ### Wan Text Encoders
 Location: `${COMFYUI_DIR}/models/clip/`
@@ -474,6 +516,8 @@ Location: `${COMFYUI_DIR}/models/` (RIFE subdirectory)
 - **Reliability:** ⭐⭐⭐⭐ (Reliable fallback)
 - **Rate Limits:** ~1TB/day per account
 - **Download Rules:** Single connection only, 3-min timeout
+- **Legacy Location:** `/pornmaster100` (14 files, ~39GB)
+- **New Location:** `/AI_KINGS_HUB_2026` (organized structure)
 
 #### Civitai API
 - **Authentication:** `CIVITAI_TOKEN` (required)
@@ -509,7 +553,33 @@ https://www.dropbox.com/scl/fi/3qygk64xe2ui2ey74neto/sdxl_vae.safetensors?rlkey=
 https://www.dropbox.com/scl/fi/p0uxwux03oq90l8fxmrqx/ponyDiffusionV6XL.safetensors?rlkey=nxd5ll1idx0uk6jvsqn7l4hmo&dl=1
 ```
 
-**Note:** These links are from an older file. Cross-verify with Dropbox account for current links.
+**Note:** These links are from `/pornmaster100` (legacy). New models go to `/AI_KINGS_HUB_2026`.
+
+### New Dropbox Structure (AI_KINGS_HUB_2026)
+
+After running `scripts/master_harvest.sh`, models are organized as:
+
+```
+/AI_KINGS_HUB_2026/
+  checkpoints/
+    nsfw/                    # NSFW video models (Wan Remix, etc.)
+    standard/                # Standard image models (DreamShaper, RealVis, etc.)
+    video/                   # Video generation (LTX-Video)
+    legacy/                  # Migrated from /pornmaster100
+  loras/
+    nsfw/                    # NSFW LoRAs (dr34ml4y, general-nsfw, etc.)
+    utility/                 # Speed/Lightning LoRAs
+    catbox/                  # Backup of Catbox.moe LoRAs
+  vae/                       # VAE models (Wan, SDXL, Lumina)
+  text_encoders/             # CLIP, T5, UMT5, Gemma encoders
+  controlnet/                # ControlNet models (OpenPose)
+  upscale_models/            # Upscalers (UltraSharp, ESRGAN, LTX)
+```
+
+**Harvest Script:** `scripts/master_harvest.sh`
+- Requires: `DROPBOX_TOKEN` and optionally `CIVITAI_TOKEN`
+- Run on Vast.ai instance (no local PC space needed)
+- Downloads ~115GB of models and syncs to Dropbox
 
 ---
 

@@ -565,10 +565,9 @@ NODES=(
     "https://github.com/Lightricks/ComfyUI-LTXVideo"
     "https://github.com/AIDC-AI/ComfyUI-Copilot"
     # NEW NODES FOR MISSING WORKFLOW DEPENDENCIES:
-    "https://github.com/yolain/ComfyUI-Easy-Use"  # Provides: easy cleanGpuUsed, easy showAnything, MultiplePathsInput
-    "https://github.com/cubiq/ComfyUI_essentials"  # Provides: INTConstant, ImageResize+, ImageLoader
-    "https://github.com/AIGODLIKE/AIGODLIKE-ComfyUI-Translation"  # Additional utilities
-    "https://github.com/kijai/ComfyUI-Florence2"  # VQA/Vision capabilities (includes Qwen-like models)
+    "https://github.com/kijai/ComfyUI-Florence2"  # VQA/Vision capabilities
+    "https://github.com/yolain/ComfyUI-Easy-Use"  # Simplified workflows
+    "https://github.com/cubiq/ComfyUI_essentials"  # Essential utilities
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -629,8 +628,19 @@ CHECKPOINT_MODELS=(
     "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors?download=true||sd_xl_base_1.0.safetensors"
     "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors?download=true||sd_xl_refiner_1.0.safetensors"
 
-    # LTX-2 distilled (video) — adds LTX-2 video capability
-    "https://huggingface.co/Lightricks/LTX-2/resolve/main/ltx-2-19b-distilled.safetensors||ltx-2-19b-distilled.safetensors"
+    # LTX-2 distilled (video)
+    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.8.safetensors||ltx-video-2b-v0.9.8.safetensors"
+
+    # RealVisXL v4.0 (Photorealistic)
+    "https://huggingface.co/SG161222/RealVisXL_V4.0/resolve/main/RealVisXL_V4.0.safetensors||RealVisXL_V4.0.safetensors"
+
+    # SD 3.5 Large FP8 (Scaled)
+    "https://huggingface.co/Comfy-Org/stable-diffusion-3.5-fp8/resolve/main/sd3.5_large_fp8_scaled.safetensors?download=true||sd3.5_large_fp8_scaled.safetensors"
+
+    # --- 🔞 NSFW 2026 VIDEO ENGINES (QUANTIZED) ---
+    "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors||Wan2.2_Remix_NSFW_i2v_14b_high_fp8.safetensors"
+    "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors||Wan2.2_Remix_NSFW_i2v_14b_low_fp8.safetensors"
+    "https://huggingface.co/Phr00t/WAN2.2-14B-Rapid-AllInOne/resolve/main/WAN2.2-14B-Rapid-AllInOne.safetensors||WAN2.2-14B-Rapid-AllInOne.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -678,6 +688,11 @@ LORA_MODELS=(
     "https://huggingface.co/BlackHat404/scatmodels/resolve/main/Poop_SquatV3.safetensors||Poop_SquatV3.safetensors"
     "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDump.safetensors||HyperDump.safetensors"
     "https://huggingface.co/BlackHat404/scatmodels/resolve/main/HyperDumpPlus.safetensors||HyperDumpPlus.safetensors"
+
+    # --- 🔞 NSFW 2026 LoRAs ---
+    "https://civitai.com/api/download/models/1811313||wan-dr34ml4y-nsfw.safetensors"
+    "https://civitai.com/api/download/models/1307155||wan-general-nsfw.safetensors"
+    "https://civitai.com/api/download/models/8877||squatting-cowgirl.safetensors"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -694,8 +709,10 @@ WAN_DIFFUSION_MODELS=(
     # Wan 2.2 TI2V (Text+Image-to-Video, 5B parameters, FP16)
     "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors|wan2.2_ti2v_5B_fp16.safetensors"
 
-    # Wan 2.2 Remix (FX-FeiHou) - High and Low Noise variants with Civitai fallbacks
-    "hf:FX-FeiHou/wan2.2-Remix||https://civitai.com/api/download/models/2567309?type=Model&format=SafeTensor&size=pruned&fp=fp8||https://civitai.com/api/download/models/915814?type=Model&format=SafeTensor&size=pruned&fp=fp16|wan2.2_remix_fp8.safetensors"
+    # Wan 2.2 Remix NSFW (FX-FeiHou) - High and Low lighting variants
+    # These are NSFW-trained I2V models, downloaded separately (high + low)
+    "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors|wan2.2_remix_nsfw_high.safetensors"
+    "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_low_lighting_v2.0.safetensors|wan2.2_remix_nsfw_low.safetensors"
 )
 
 WAN_CLIP_MODELS=(
