@@ -1,6 +1,11 @@
 #!/bin/bash
 # ╔═══════════════════════════════════════════════════════════════════════════════╗
-# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v3.0                       ║
+# ║   🎬 AI KINGS COMFYUI - VIDEO WORKFLOW PROVISIONER v3.2                       ║
+# ║                                                                               ║
+# ║   v3.2 NEW:                                                                   ║
+# ║   ✓ Dropbox Fallbacks: Added Dropbox backup URLs (4th fallback slot)          ║
+# ║   ✓ Single-Connection Mode: Dropbox downloads use curl (no multi-connection)  ║
+# ║   ✓ Speed Detection: 50KB/s min speed threshold prevents hangs                ║
 # ║                                                                               ║
 # ║   v3.0 FIXES:                                                                 ║
 # ║   ✓ Model Paths: Wan -> diffusion_models, LTX -> checkpoints (Verified)       ║
@@ -9,7 +14,7 @@
 # ║   ✓ Swap: Added auto-swap for 32GB RAM safety                                 ║
 # ╚═══════════════════════════════════════════════════════════════════════════════╝
 
-VERSION="v3.0"
+VERSION="v3.2"
 PROVISIONER_SIGNATURE="🎬 AI KINGS COMFYUI - MASTER VIDEO PROVISIONER ${VERSION}"
 
 set -uo pipefail
@@ -40,29 +45,47 @@ trap cleanup_on_exit EXIT INT TERM
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ═══════════════════════════════════════════════════════════════════════════════
-# MODEL DEFINITIONS - v3.1 PRODUCTION (ALL VARIANTS)
+# MODEL DEFINITIONS - v3.2 PRODUCTION (ALL VARIANTS)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# URL FORMAT: "PRIMARY|FALLBACK1|FALLBACK2|DROPBOX|filename"
+#
+# To add Dropbox fallback links:
+# 1. Upload models to Dropbox: /AI_KINGS_HUB_2026/
+# 2. Generate links: node scripts/dropbox_create_links.js /AI_KINGS_HUB_2026/folder
+# 3. Add link to 4th slot (before filename)
+#
+# Dropbox links use single-connection mode (multi-connection = account ban)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Wan 2.1 T2V - fp16 (Best Quality) & fp8 (Speed/Low VRAM)
 WAN_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-14B_fp16.safetensors|https://modelscope.cn/models/Wan-AI/Wan2.1-T2V-14B/files/diffusion_pytorch_model.fp16.safetensors||wan2.1_t2v_14B_fp16.safetensors"
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-T2V-14B_fp8_e4m3fn.safetensors|||wan2.1_t2v_14B_fp8.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors|||https://www.dropbox.com/scl/fi/2d1z6rfv4hl8254x020qz/wan2.1_t2v_1.3B_fp16.safetensors?rlkey=5e1y4kw94l3511zibqebkicik&dl=1|wan2.1_t2v_1.3B_fp16.safetensors"
 )
 
-# Wan 2.1 I2V - fp16 & fp8 (FIXED URLs)
+# Wan 2.2 T2V (High/Low Noise)
+WAN22_T2V_MODELS=(
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors|||https://www.dropbox.com/scl/fi/g8hrwoppgfvi96ial778d/wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors?rlkey=kvd6byefp8heorgmp1bt25omy&dl=1|wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors|||https://www.dropbox.com/scl/fi/nd8q635kizdnmtnm7gcau/wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors?rlkey=a4xa0enjbfu4sqikiali1jjgy&dl=1|wan2.2_t2v_low_noise_14B_fp8_scaled.safetensors"
+)
+
+# Wan 2.1 & 2.2 I2V / TI2V
 WAN_I2V_MODELS=(
     "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp16.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp16.safetensors|||wan2.1_i2v_14B_fp16.safetensors"
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_14B_fp8_e4m3fn.safetensors|https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1-I2V-14B_fp8_e4m3fn.safetensors|||wan2.1_i2v_14B_fp8.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors|||https://www.dropbox.com/scl/fi/h6lglrw0dopmdfwuhuj5p/wan2.2_ti2v_5B_fp16.safetensors?rlkey=hmx8z4rpxfhijr341k7wagcl9&dl=1|wan2.2_ti2v_5B_fp16.safetensors"
 )
 
 # LTX-Video - v0.9.8 (Newest/Stable)
 LTX_MODELS=(
-    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Lightricks/LTX-Video-0.9.8-dev/resolve/main/ltx-video-2b-v0.9.8.safetensors||ltx-video-2b-v0.9.8.safetensors"
+    "https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Comfy-Org/ltx-video/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://huggingface.co/Lightricks/LTX-Video-0.9.8-dev/resolve/main/ltx-video-2b-v0.9.8.safetensors|https://www.dropbox.com/scl/fi/nwt7r111rx3ewbjvz48yb/ltx-2-19b-dev-fp8.safetensors?rlkey=e7cit4acq8zfnv5ophdzdlg7y&dl=1|ltx-video-2b-v0.9.8.safetensors"
 )
 
 TEXT_ENCODERS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors|||umt5_xxl_fp8_scaled.safetensors"
-    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors|||clip_l.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors|https://huggingface.co/wangkanai/wan21-fp8-encoders/resolve/main/umt5-xxl-encoder-fp8.safetensors||https://www.dropbox.com/scl/fi/3j0817jkokgm5dgiigym2/t5xxl_fp16.safetensors?rlkey=mdu63vsb7t9l24xg2kpjawmod&dl=1|umt5_xxl_fp8_scaled.safetensors"
+    "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors|https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/text_encoder/model.safetensors||https://www.dropbox.com/scl/fi/thmmpms1uu70f1wd5i3t4/clip_l.safetensors?rlkey=0kgjz9959sku1ed0hczx9ye29&dl=1|clip_l.safetensors"
+    "https://huggingface.co/Comfy-Org/ltx-2/resolve/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors|||https://www.dropbox.com/scl/fi/r6te1e5f92ibvdk3dn6jp/gemma_3_12B_it_fp4_mixed.safetensors?rlkey=bre48rqyfhtmv4ckqh6gz8rmn&dl=1|gemma_3_12B_it_fp4_mixed.safetensors"
 )
 
 CLIP_VISION=(
@@ -70,16 +93,22 @@ CLIP_VISION=(
 )
 
 LIGHTNING_LORAS=(
-    "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/Wan21_T2V_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors|||wan2.1_lightning_t2v.safetensors"
+    "https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/Wan21_T2V_14B_lightx2v_4steps_lora_v1.0.safetensors|https://huggingface.co/lightx2v/Wan2.1-Lightning/resolve/main/wan2.1_t2v_14B_lightx2v_4steps_lora_v1.0.safetensors||https://www.dropbox.com/scl/fi/wbxbxg1vcqgb3d9v79kyt/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors?rlkey=9r67fpa5z3vzgbqqj8kyhvlvk&dl=1|wan2.1_lightning_t2v.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors|||https://www.dropbox.com/scl/fi/ex2dfsevlvyad0xjucjpr/wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors?rlkey=xeuq6zo6sa7kzosx32fovdlff&dl=1|wan2.2_t2v_lightx2v_4steps_lora_v1.1_low_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors|||https://www.dropbox.com/scl/fi/5k1f3sp4cvn9i3ex93ncz/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors?rlkey=fquylwdqxcchdh358kuk4xi75&dl=1|wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors|||https://www.dropbox.com/scl/fi/yp205uc74ma37n2qktlss/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors?rlkey=rvnz8n3rylk8bc0a7csqfusuf&dl=1|wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
+    "https://huggingface.co/Lightricks/LTX-2-19b-LoRA-Camera-Control-Dolly-Left/resolve/main/ltx-2-19b-lora-camera-control-dolly-left.safetensors|||https://www.dropbox.com/scl/fi/w3lxa6frvf444xs45t913/ltx-2-19b-lora-camera-control-dolly-left.safetensors?rlkey=36x7jy7ahqikyjigvb7wgevky&dl=1|ltx-2-19b-lora-camera-control-dolly-left.safetensors"
+    "https://huggingface.co/Lightricks/LTX-2-19b-distilled-LoRA-384/resolve/main/ltx-2-19b-distilled-lora-384.safetensors|||https://www.dropbox.com/scl/fi/nk4mlmt6g2e0tfu6xdr2p/ltx-2-19b-distilled-lora-384.safetensors?rlkey=8l89fsjtlc2i73t0rlc0i6p70&dl=1|ltx-2-19b-distilled-lora-384.safetensors"
 )
 
 VAE_MODELS=(
-    "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors|https://huggingface.co/wangkanai/wan21-vae/resolve/main/wan_2.1_vae.safetensors|||wan_vae.safetensors"
-    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors||||vae-ft-mse-840000-ema-pruned.safetensors"
+    "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors|||https://www.dropbox.com/scl/fi/rud3m22x56weiwk8xx3f0/wan2.2_vae.safetensors?rlkey=k3cmgjt2qm48u38qd1t3tlv4j&dl=1|wan2.2_vae.safetensors"
+    "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors|https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors||https://www.dropbox.com/scl/fi/snjshmi3kgmc4w4zkr7mt/sdxl_vae.safetensors?rlkey=h2350z1wz7sjw5l56g7og6lp9&dl=1|sdxl_vae.safetensors"
+    "https://huggingface.co/stabilityai/stable-diffusion-3-medium/resolve/main/sd3_medium_vae.safetensors|||https://www.dropbox.com/scl/fi/ao6jeyk03blcr28m09d86/ae.safetensors?rlkey=r5f87yc288e5qa19yvm0ywm5u&dl=1|ae.safetensors"
 )
 
 UPSCALER_MODELS=(
-    "https://huggingface.co/Lightricks/ltxv-spatial-upscaler-0.9.7/resolve/main/ltxv_spatial_upscaler_0.9.7.safetensors||||ltxv_spatial_upscaler_0.9.7.safetensors"
+    "https://huggingface.co/Lightricks/ltxv-spatial-upscaler-0.9.7/resolve/main/ltxv_spatial_upscaler_0.9.7.safetensors|||ltxv_spatial_upscaler_0.9.7.safetensors"
 )
 
 DEPTH_MODELS=(
@@ -97,6 +126,9 @@ NODES=(
     "https://github.com/pythongosssss/ComfyUI-Custom-Scripts"
     "https://github.com/rgthree/rgthree-comfy"
     "https://github.com/ssitu/ComfyUI_UltimateSDUpscale"
+    "https://github.com/kijai/ComfyUI-Florence2"
+    "https://github.com/yolain/ComfyUI-Easy-Use"
+    "https://github.com/cubiq/ComfyUI_essentials"
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -328,9 +360,48 @@ attempt_download_wget() {
     return 1
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# DROPBOX-SPECIFIC DOWNLOAD (Single Connection Required - Multi-connection = Ban)
+# ═══════════════════════════════════════════════════════════════════════════════
+attempt_download_dropbox() {
+    local url="$1" dir="$2" filename="$3" min_size="${4:-1000000}"
+    local filepath="${dir}/${filename}"
+
+    [[ -z "$url" ]] && return 1
+    [[ "$url" != *"dropbox.com"* ]] && return 1
+    mkdir -p "$dir"
+
+    log "      [dropbox] Downloading $filename (single-connection mode)..."
+
+    # Dropbox Rules: Single connection ONLY, 3min timeout, 50KB/s minimum speed
+    if curl -fSL --progress-bar \
+        --retry 5 \
+        --retry-delay 10 \
+        --connect-timeout 30 \
+        --max-time 180 \
+        --speed-limit 51200 \
+        --speed-time 30 \
+        -o "$filepath" "$url" 2>&1 | tee -a "$LOG_FILE"; then
+
+        if [[ -f "$filepath" ]]; then
+            local actual_size=$(stat -c%s "$filepath" 2>/dev/null || echo 0)
+            if [[ "$actual_size" -ge "$min_size" ]]; then
+                log "      ✅ [dropbox] SUCCESS: $filename (${actual_size} bytes)"
+                return 0
+            else
+                log "      ⚠️  [dropbox] File too small: $filename (${actual_size} < ${min_size})"
+                rm -f "$filepath"
+            fi
+        fi
+    fi
+
+    log "      ❌ [dropbox] Download failed: $filename"
+    return 1
+}
+
 download_file() {
     local entry="$1" dir="$2" min_size="${3:-1000000}"
-    
+
     local url1 url2 url3 url4 filename
     IFS='|' read -r url1 url2 url3 url4 filename <<< "$entry"
     
@@ -354,22 +425,32 @@ download_file() {
     fi
     
     local urls=("$url1" "$url2" "$url3" "$url4")
-    
+
     for url in "${urls[@]}"; do
         [[ -z "$url" ]] && continue
-        
+
+        # Dropbox URLs: Use dedicated single-connection handler
+        if [[ "$url" == *"dropbox.com"* ]]; then
+            if attempt_download_dropbox "$url" "$dir" "$filename" "$min_size"; then
+                return 0
+            fi
+            log "      ❌ Dropbox download failed, trying next source..."
+            continue
+        fi
+
+        # Standard URLs: Try aria2c (multi-connection), curl, wget
         if attempt_download_aria2 "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
-        
+
         if attempt_download_curl "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
-        
+
         if attempt_download_wget "$url" "$dir" "$filename" "$min_size"; then
             return 0
         fi
-        
+
         log "      ❌ All methods failed for URL: ${url:0:80}..."
     done
     
@@ -453,8 +534,9 @@ install_nodes() {
 install_models() {
     log_section "📦 DOWNLOADING VIDEO MODELS"
     
-    # Wan 2.1 -> diffusion_models (CRITICAL FIX)
+    # Wan 2.1 & 2.2 -> diffusion_models (CRITICAL FIX)
     download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN_MODELS[@]}"
+    download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN22_T2V_MODELS[@]}"
     download_batch "${COMFY_DIR}/models/diffusion_models" "1000000000" "${WAN_I2V_MODELS[@]}"
     
     # LTX-Video -> checkpoints (Standard)
@@ -466,6 +548,16 @@ install_models() {
     download_batch "${COMFY_DIR}/models/vae" "100000000" "${VAE_MODELS[@]}"
     download_batch "${COMFY_DIR}/models/latent_upscale_models" "10000000" "${UPSCALER_MODELS[@]}"
     download_batch "${COMFY_DIR}/models/diffusion_models" "100000000" "${DEPTH_MODELS[@]}"
+
+    # --- 🔞 NSFW 2026 VIDEO ENGINES ---
+    log "   🔞 Downloading NSFW 2026 Engines..."
+    # Wan 2.2 Remix NSFW - Use Dropbox fallback from the dump
+    download_file "https://huggingface.co/FX-FeiHou/wan2.2-Remix/resolve/main/NSFW/Wan2.2_Remix_NSFW_i2v_14b_high_lighting_v2.0.safetensors|||https://www.dropbox.com/scl/fi/ozryt7gspxc4ntyox1p5x/Wan2.2_Remix_NSFW_i2v_14b_low_fp8.safetensors?rlkey=uuyzswq52nvh7t0fnevbfjx3n&dl=1|Wan2.2_Remix_NSFW_i2v_14b_low_fp8.safetensors" "${COMFY_DIR}/models/diffusion_models" "1000000000"
+    download_file "https://huggingface.co/Phr00t/WAN2.2-14B-Rapid-AllInOne/resolve/main/WAN2.2-14B-Rapid-AllInOne.safetensors|||WAN2.2-14B-Rapid-AllInOne.safetensors" "${COMFY_DIR}/models/diffusion_models" "1000000000"
+
+    # FLUX.1 Dev (Added from manifest)
+    log "   ⚡ Downloading Flux.1 Dev..."
+    download_file "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors|||https://www.dropbox.com/scl/fi/r7p77wp4b0nkg5gccb02p/flux1-dev-fp8.safetensors?rlkey=3isee9i8b124mdyr0ah73114l&dl=1|flux1-dev-fp8.safetensors" "${COMFY_DIR}/models/diffusion_models" "1000000000"
 }
 
 start_comfyui() {
