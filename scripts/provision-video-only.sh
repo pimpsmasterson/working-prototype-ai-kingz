@@ -682,9 +682,13 @@ main() {
             local cfpid_file="${WORKSPACE}/cloudflared.pid"
             if [[ -f "$cfpid_file" ]]; then
                 if ! kill -0 $(cat "$cfpid_file") 2>/dev/null; then
-                    log "   ⚠️  Cloudflare died. Restarting..."
+                    log "   ⚠️  Cloudflare process died (PID $(cat "$cfpid_file")). Restarting..."
+                    rm -f "$cfpid_file"
                     start_cloudflare_tunnel
                 fi
+            else
+                log "   ⚠️  Cloudflare PID file missing. Restarting..."
+                start_cloudflare_tunnel
             fi
         fi
         
