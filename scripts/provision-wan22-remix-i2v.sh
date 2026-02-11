@@ -42,7 +42,7 @@ log "📥 Installing Python dependencies..."
 "$VENV_PYTHON" -m pip install --upgrade pip
 "$VENV_PYTHON" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
 "$VENV_PYTHON" -m pip install -r ComfyUI/requirements.txt
-"$VENV_PYTHON" -m pip install huggingface_hub
+"$VENV_PYTHON" -m pip install huggingface_hub sageattention onnxruntime-gpu
 
 # 4. Model Downloads
 log "⬇️  Downloading Wan 2.2 Remix Models..."
