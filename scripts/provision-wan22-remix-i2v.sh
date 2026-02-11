@@ -124,10 +124,16 @@ cd ../..
 start_comfyui() {
     log "🚀 Starting ComfyUI..."
     cd "${WORKSPACE}/ComfyUI"
-    
+
     # Kill any existing ComfyUI
     pkill -f "python.*main.py" 2>/dev/null || true
     sleep 2
+
+    # Disable torch.compile/Triton to fix FP8 compatibility on older GPUs
+    # (Prevents "fp8e4nv not supported" Triton compilation errors)
+    export TORCHDYNAMO_DISABLE=1
+    export TORCH_COMPILE_DISABLE=1
+    log "🔧 Disabled torch.compile/dynamo for GPU compatibility"
 
     setsid nohup "$VENV_PYTHON" main.py --listen 0.0.0.0 --port 8188 > "${WORKSPACE}/comfyui.log" 2>&1 < /dev/null &
     echo "$!" > "${WORKSPACE}/comfyui.pid"
