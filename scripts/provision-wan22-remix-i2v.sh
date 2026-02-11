@@ -40,11 +40,11 @@ VENV_PYTHON="${WORKSPACE}/ComfyUI/venv/bin/python"
 # Install ComfyUI Dependencies
 log "📥 Installing Python dependencies..."
 "$VENV_PYTHON" -m pip install --upgrade pip
-"$VENV_PYTHON" -m pip install --pre \
-    torch==2.7.0.dev20250226 \
-    torchvision==0.22.0.dev20250226 \
-    torchaudio==2.6.0.dev20250226 \
-    --index-url https://download.pytorch.org/whl/nightly/cu124
+# 1. Install latest Torch Nightly (Correct 2.7.0+ version)
+"$VENV_PYTHON" -m pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu124
+# 2. Install Torchvision/Torchaudio Nightly with NO DEPS to bypass "torch==20250226" strict check
+"$VENV_PYTHON" -m pip install --pre torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124 --no-deps
+# 3. Install remaining deps (Ignore incompatibilities warning)
 "$VENV_PYTHON" -m pip install -r ComfyUI/requirements.txt
 "$VENV_PYTHON" -m pip install huggingface_hub sageattention onnxruntime-gpu
 
