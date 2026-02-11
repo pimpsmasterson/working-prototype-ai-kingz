@@ -40,7 +40,7 @@ VENV_PYTHON="${WORKSPACE}/ComfyUI/venv/bin/python"
 # Install ComfyUI Dependencies
 log "📥 Installing Python dependencies..."
 "$VENV_PYTHON" -m pip install --upgrade pip
-"$VENV_PYTHON" -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+"$VENV_PYTHON" -m pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
 "$VENV_PYTHON" -m pip install -r ComfyUI/requirements.txt
 "$VENV_PYTHON" -m pip install huggingface_hub sageattention onnxruntime-gpu
 
